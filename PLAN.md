@@ -151,6 +151,12 @@ Anzeige auf dem Server: Marker „EL“ (mit Gerätename, z. B. „Tablet EL“)
 - [ ] Karte mit MapLibre (Gebiete, Positionen, Tracks, Abdeckung)
 - [ ] EL-Ortung, Stop bei Einsatzende, Abmeldung oder Rollenwechsel
 
+### Phase 3b – Push-Mitteilungen für die Einsatzleitung (entschieden 28.10.2026)
+- [ ] Jeder EL stellt **in der App selbst** ein, welche Mitteilungen er bekommt (z. B. Zeitwarnung Team, Funkstille Handy/Halsband, Hund außerhalb des Gebiets, neuer Funkspruch, Einsatzende) – alles einzeln abschaltbar, Standard: nur kritische Warnungen
+- [ ] Server: Geräte-Registrierung je EL-Gerät mit seinen Einstellungen, Versand bei Warnzentrum-Ereignissen und Funk
+- [ ] iOS über Apple (APNs), Android über Google (Firebase Cloud Messaging); Mitteilungstexte knapp, ohne Namen von Vermissten oder Ortsangaben
+- [ ] Mitteilungen nur, solange ein Einsatz läuft; Abmelden in der App entfernt die Registrierung
+
 ### Phase 4 – Test (TestFlight / interner Play-Test)
 - [ ] Übung mit 2–3 Teams und Einsatzleitung
 - [ ] Akku-Messung 1 h: Traccar (sparsam) gegen App
@@ -178,4 +184,4 @@ Anzeige auf dem Server: Marker „EL“ (mit Gerätename, z. B. „Tablet EL“)
 - Name und Symbol der App
 - Traccar-Endpunkt nach dem Umstieg abschalten oder als Rückfallebene behalten
 - Soll die Einsatzleitung auch ohne laufenden Einsatz geortet werden? (umgesetzt: nein, `pause`)
-- Push-Mitteilungen (Warnungen, Funk) bei gesperrtem Handy: iOS über Apple (APNs), Android über Google (Firebase) – Inhalte würden über diese Dienste laufen
+- (entschieden 28.10.2026) Push-Mitteilungen siehe Phase 3b
