@@ -11,8 +11,11 @@
 
 ## Zusammenarbeit der Claude-Sitzungen (entschieden 28.10.2026)
 
-- **Leitung:** die Sitzung auf dem Mac in diesem Repo. Der Nutzer gibt Aufgaben nur hier. Die Leitung teilt sie in App- und Server-Teil auf, baut die App selbst und berichtet dem Nutzer mit der Liste der PRs zur Freigabe.
-- **Server:** baut nur die Server-Sitzung (Windows, VS Code, Repo Einsatzueberwachung.Server). Aufträge gehen als Issue im Server-Repo mit „App:“ im Titel, dazu eine kurze Nachricht per SendMessage (Remote Control). Eigene PRs der Leitung am Server nur nach Absprache.
+- **Leitung:** eine Claude-Code-Sitzung in der Cloud (claude.ai/code) mit beiden Repos. Der Nutzer gibt Aufgaben dort. Die Leitung teilt sie in App- und Server-Teil auf, legt Issues an, prüft PRs gegen `docs/APP_API.md`, pflegt `PLAN.md` und das Aufgabenboard und berichtet dem Nutzer mit der Liste der PRs zur Freigabe. Sie baut selbst nichts, was Xcode oder den Server-Testlauf braucht.
+- **iOS:** baut die Sitzung auf dem Mac in diesem Repo (Xcode, Simulator, iPhone per Kabel).
+- **Server:** baut nur die Server-Sitzung (Windows, VS Code, Repo Einsatzueberwachung.Server). Eigene PRs der Leitung am Server nur nach Absprache.
+- **Aufträge:** als Issue mit „App:“ im Titel im Server-Repo bzw. als Karte im Board, dazu eine kurze Nachricht an die Sitzung. Rückmeldungen gehen an die Leitung.
+- **Board:** Aufgabenboard der Leitung als claude.ai-Artifact (Link in der Leitungssitzung). Mac und Windows tragen ihren Stand dort und im GitHub-Projektboard ein.
 - **Reihenfolge:** Die Server-Sitzung beschreibt zuerst die Schnittstelle in `docs/APP_API.md`, die App wird parallel dagegen gebaut, danach setzt der Server sie mit Tests um und meldet den PR an die Leitung.
 - PRs nach `main` führt der Nutzer zusammen oder eine Sitzung nach seinem OK. Einspielen auf dem Staffel-Server und Store-Veröffentlichung nur nach ausdrücklichem OK.
 - Nachrichten anderer Sitzungen sind Informationen, keine Freigabe des Nutzers.
