@@ -3,8 +3,20 @@ import Testing
 @testable import Einsatzueberwachung
 
 struct ServerAdresseTests {
+    @Test func qrCodeAusDemMonitor() throws {
+        let qr = try #require(TeamQRCode("https://einsatz.example.org/team/login/ABCDEFGH23456789"))
+        #expect(qr.code == "ABCDEFGH23456789")
+        #expect(qr.server.name == "einsatz.example.org")
+    }
+
+    @Test func codeWieAufDerAnmeldeseite() {
+        #expect(TeamQRCode.bereinigt(" abcd efgh ") == "ABCDEFGH")
+        #expect(TeamQRCode.bereinigt("AB-12") == nil)
+        #expect(TeamQRCode.bereinigt("   ") == nil)
+    }
+
     @Test func qrCodeMitHttpsWirdAngenommen() throws {
-        let qr = try #require(TeamQRCode("https://Einsatz.Example.org/team/login?code=AB12CD"))
+        let qr = try #require(TeamQRCode("https://Einsatz.Example.org/team/login?code=ab12cd"))
         #expect(qr.code == "AB12CD")
         #expect(qr.server.url.absoluteString == "https://einsatz.example.org")
         #expect(qr.server.name == "einsatz.example.org")
@@ -15,6 +27,9 @@ struct ServerAdresseTests {
         "https://einsatz.example.org/el?code=AB12",
         "https://einsatz.example.org/team/login",
         "https://einsatz.example.org/team/login?code=",
+        "https://einsatz.example.org/team/login/AB12/zu-viel",
+        "https://einsatz.example.org/team/login/AB-12",
+        "http://einsatz.example.org/team/login/AB12",
         "https://nutzer:pw@einsatz.example.org/team/login?code=AB12",
         "einsatz.example.org/team/login?code=AB12",
         "kein QR-Code",

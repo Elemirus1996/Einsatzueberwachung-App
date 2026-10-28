@@ -59,6 +59,70 @@ struct TeamClient: TeamSchnittstelle {
     }
 }
 
+enum AnmeldeFehler: Error, Equatable {
+    /// 401: Code falsch oder kein laufender Einsatz
+    case codeUngueltig
+    /// 404: Team gibt es nicht mehr
+    case teamUnbekannt
+    case server(status: Int)
+    case antwortUngueltig
+}
+
+struct TeamAuswahl: Decodable, Equatable, Sendable {
+    struct Eintrag: Decodable, Equatable, Identifiable, Sendable {
+        var teamId: String
+        var teamName: String
+        var dogName: String?
+        var hundefuehrerName: String?
+        var id: String { teamId }
+    }
+
+    var einsatz: String?
+    var staffel: String?
+    var teams: [Eintrag]
+}
+
+/// Native Anmeldung mit dem Anmelde-Code aus dem QR-Code (`login/teams`, `login`), ohne Token.
+struct TeamAnmeldung: Sendable {
+    let qr: TeamQRCode
+    var session: URLSession = .einsatz
+
+    func teams() async throws -> TeamAuswahl {
+        try await anfrage("login/teams", inhalt: ["code": qr.code])
+    }
+
+    func anmelden(teamId: String) async throws -> TeamSitzung {
+        struct Antwort: Decodable {
+            var token: String
+            var teamName: String
+            var expiresAt: Date
+        }
+        let antwort: Antwort = try await anfrage("login", inhalt: ["code": qr.code, "teamId": teamId])
+        return TeamSitzung(server: qr.server, token: antwort.token, teamName: antwort.teamName, expiresAt: antwort.expiresAt)
+    }
+
+    private func anfrage<T: Decodable>(_ endpunkt: String, inhalt: [String: String]) async throws -> T {
+        var request = URLRequest(url: qr.server.pfad("api/team-mobile/app/v1/\(endpunkt)"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(inhalt)
+        let (daten, antwort) = try await session.data(for: request)
+        guard let http = antwort as? HTTPURLResponse else { throw AnmeldeFehler.antwortUngueltig }
+        switch http.statusCode {
+        case 200..<300: break
+        case 401: throw AnmeldeFehler.codeUngueltig
+        case 404 where endpunkt == "login": throw AnmeldeFehler.teamUnbekannt
+        default: throw AnmeldeFehler.server(status: http.statusCode)
+        }
+        do {
+            return try JSONDecoder.server.decode(T.self, from: daten)
+        } catch {
+            throw AnmeldeFehler.antwortUngueltig
+        }
+    }
+}
+
 extension URLSession {
     /// Ohne Cache und Cookies, damit nichts von Einsätzen auf dem Gerät liegen bleibt.
     static let einsatz: URLSession = {

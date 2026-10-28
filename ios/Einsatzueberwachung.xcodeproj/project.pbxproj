@@ -19,6 +19,7 @@
 		8D7BC3821334E2D60C7A796D /* Schluesselbund.swift in Sources */ = {isa = PBXBuildFile; fileRef = 179F8BB87D6F40D69F2E2A8D /* Schluesselbund.swift */; };
 		A0AF23349A115130EE14C9AD /* StartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 133295A3FD86DD2CC9E0275C /* StartView.swift */; };
 		B03D88EE03FFB52B4FC67740 /* TeamStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B75574AAE2CED52F316D6A13 /* TeamStatusView.swift */; };
+		C0D161ED59E066250EC86B7A /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDE0E5851EA7EDFF57DB8F64 /* QRScannerView.swift */; };
 		D9316212B2329978232AA34B /* TeamOrtung.swift in Sources */ = {isa = PBXBuildFile; fileRef = F92EA3A1472DD75C912F9D1D /* TeamOrtung.swift */; };
 		DEA130868989542425090850 /* KernTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90922EA3579F26D42494A74A /* KernTests.swift */; };
 /* End PBXBuildFile section */
@@ -52,6 +53,7 @@
 		EBA23EF762B87148EB23B089 /* EinsatzueberwachungTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = EinsatzueberwachungTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F92EA3A1472DD75C912F9D1D /* TeamOrtung.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamOrtung.swift; sourceTree = "<group>"; };
 		FC0EEBCA567221FF2529112D /* TeamModelle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamModelle.swift; sourceTree = "<group>"; };
+		FDE0E5851EA7EDFF57DB8F64 /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -97,6 +99,7 @@
 		B6B20A748AF5AD27EEFDF548 /* Team */ = {
 			isa = PBXGroup;
 			children = (
+				FDE0E5851EA7EDFF57DB8F64 /* QRScannerView.swift */,
 				C59E8CF5D165989F439B72BD /* TeamAnmeldungView.swift */,
 				B75574AAE2CED52F316D6A13 /* TeamStatusView.swift */,
 			);
@@ -220,6 +223,7 @@
 				5A6F46FC11967E1EDF36B4A3 /* EinsatzApp.swift in Sources */,
 				1D85C57C6B2C8932F9BC62A4 /* OrtungsQuelle.swift in Sources */,
 				47806CDB947BFF78B4392CF0 /* PositionsPuffer.swift in Sources */,
+				C0D161ED59E066250EC86B7A /* QRScannerView.swift in Sources */,
 				8D7BC3821334E2D60C7A796D /* Schluesselbund.swift in Sources */,
 				5C64E699EFA85FAF73737704 /* ServerAdresse.swift in Sources */,
 				A0AF23349A115130EE14C9AD /* StartView.swift in Sources */,
