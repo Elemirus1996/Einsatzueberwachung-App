@@ -156,7 +156,7 @@ Anzeige auf dem Server: Marker „EL“ (mit Gerätename, z. B. „Tablet EL“)
 - [ ] Kostenloses Apple-Konto in Xcode anmelden, eigenes iPhone im Entwicklermodus (für die ersten Tests)
 - [ ] Später: Apple-Entwicklerkonto (Einzelperson, 99 €/Jahr) für Push und TestFlight, Händlerstatus nach DSA: nicht kommerziell
 - [ ] Google-Play-Entwicklerkonto (einmalig 25 $)
-- [ ] App-Kennung festlegen (Vorschlag `de.einsatzueberwachung.app`)
+- [x] App-Kennung: `io.github.elemirus1996.einsatzueberwachung` (an den GitHub-Namen gebunden, App gehört zum Projekt Einsatzueberwachung.Server; entschieden 28.10.2026)
 - [ ] Auf dem Mac: Xcode, Android Studio, Claude Code
 
 ### Phase 1 – Server (Server-Repo, unter Windows)
@@ -231,9 +231,10 @@ Anzeige auf dem Server: Marker „EL“ (mit Gerätename, z. B. „Tablet EL“)
 ## Offen
 
 - Name und Symbol der App
-- **Push bei selbst betriebenen Servern:** Push an Apple/Google braucht den Schlüssel des App-Entwicklerkontos. Jede Staffel
-  hat ihren eigenen Server – entweder bekommt jeder Server den Schlüssel (nur eigene Staffel) oder es gibt einen kleinen
-  zentralen Push-Weiterleiter, der nur „wecken“ ohne Inhalt weiterreicht. Klären vor Phase 3b.
+- **Push bei selbst betriebenen Servern:** Der Push-Schlüssel von Apple gilt für alle Geräte mit der App und lässt sich nicht
+  auf eine Staffel beschränken. Vorschlag: kleiner Push-Weiterleiter (Zugang je Staffel einzeln sperrbar, nur „wecken“ ohne
+  Inhalt, sichtbare Texte Ende-zu-Ende verschlüsselt). Betrieb **nicht zu Hause**; Vorschlag: kleiner eigener Server in
+  Deutschland. Erst nötig mit der bezahlten Apple-Mitgliedschaft, klären vor Phase 3b.
 - Traccar-Endpunkt nach dem Umstieg abschalten oder als Rückfallebene behalten
 - Soll die Einsatzleitung auch ohne laufenden Einsatz geortet werden? (umgesetzt: nein, `pause`)
 - (entschieden 28.10.2026) Push-Mitteilungen siehe Phase 3b
