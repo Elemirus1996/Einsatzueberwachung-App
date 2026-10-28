@@ -21,7 +21,7 @@ Anlass: Traccar Client leert den Akku und lässt sich vom Server nicht stoppen. 
 Die App darf nichts öffnen, was heute verschlossen ist.
 
 1. **Einsatzleitung nur im VPN.** Die App enthält keinen eigenen Zugang. Sie öffnet die interne Adresse, die nur über WireGuard erreichbar ist. Wer kein VPN-Gerät hat (Einstellungen → VPN-Geräte) und das Staffel-Passwort nicht kennt, kommt nicht hinein. Ohne aktives VPN zeigt die App einen Hinweis und keine Daten.
-2. **Team nur per QR-Code.** Der QR-Code enthält Server-Adresse und Team-Token. Das Token gilt nur für diesen Einsatz und dieses Team und läuft spätestens nach 24 h ab. Bei Einsatzende wird es ungültig (Token-Generation).
+2. **Team nur per QR-Code, wie bisher.** Die App scannt den **bestehenden** QR-Code aus dem Monitor (Team-Dialog), das Mitglied meldet sich in der App wie gewohnt an und wählt sein Team. Erst danach übergibt die Team-Seite der App ein App-Token. Es gilt nur für diesen Einsatz und dieses Team und läuft spätestens nach 24 h ab. Bei Einsatzende wird es ungültig (Token-Generation).
 3. **Nur HTTPS**, nur an die Adresse aus dem QR-Code bzw. die eingerichtete VPN-Adresse. Keine fest eingebaute Server-Adresse, damit auch andere Staffeln die App nutzen können.
 4. **Token im Schlüsselbund** (iOS Keychain / Android Keystore), nie im Klartext gespeichert oder geloggt.
 5. **Keine Daten an Dritte:** keine Analyse-SDKs, keine Absturzberichte an Fremddienste, keine Werbung.
@@ -67,10 +67,13 @@ Hintergrund-Ortung, die der Server stoppen kann – ist ohnehin plattformeigen; 
 - Reihenfolge: **iPhone zuerst** bauen und testen (Mehrheit der Mitglieder), Android direkt danach nach derselben Vorlage.
 - Beide Apps verhalten sich gleich, weil sie sich an **eine verbindliche Beschreibung der Server-Schnittstelle** halten
   (im Server-Repo, abgesichert durch Server-Tests).
-- Deeplink beider Apps: `einsatzueberwachung://team?server=…&token=…`
+- Anmeldung über den bestehenden Team-QR-Code (`https://<server>/team/login?code=…`); die Team-Seite übergibt das Token per
+  `WKScriptMessageHandler` „einsatzApp“ (iOS) bzw. `@JavascriptInterface` „EinsatzAppAndroid“ (Android).
 - Später automatische Builds über GitHub Actions (macOS-Runner für iOS).
 
 ## Server-Schnittstelle v1 (im Server-Repo)
+
+**Verbindlich:** [docs/APP_API.md](https://github.com/Elemirus1996/Einsatzueberwachung.Server/blob/main/docs/APP_API.md) im Server-Repo. Die Übersicht hier ist nur eine Zusammenfassung.
 
 Neuer Bereich `api/team-mobile/app/v1/` (öffentliche Adresse, eigener nginx-Block mit großzügigem Limit, weil sich im Mobilfunk viele Handys eine IP teilen) und `api/el/app/v1/` (nur intern/VPN).
 
@@ -95,16 +98,18 @@ Anzeige auf dem Server: Marker „EL“ (mit Gerätename, z. B. „Tablet EL“)
 - [ ] Auf dem Mac: Xcode, Android Studio, Claude Code
 
 ### Phase 1 – Server (Server-Repo, unter Windows)
-- [ ] `TeamTrackingModeService` (Zustandslogik, testbar) + Endpunkte Team v1
+- [x] Zustandslogik `OrtungsSteuerung` + Endpunkte Team v1 + App-Token mit Ablauf (Server PR #112)
 - [ ] Endpunkte EL v1, EL-Position speichern und auf Karte/Monitor anzeigen
-- [ ] QR-Code für die App auf der Team-Seite und im Team-QR-Dialog des Monitors
+- [x] Anmeldung über den bestehenden QR-Code, Token-Übergabe von der Team-Seite an die App (PR #112)
 - [ ] Einstellungen: Intervalle, Upload-Takt, Staffel-Anzeigename
-- [ ] nginx: eigener Block `api/team-mobile/app/` (Limit wie Traccar), `api/el/` nur intern
-- [ ] Tests: Zustandslogik, 410 bei alter Generation, Batch mit gepufferten Zeitstempeln, EL nur aus VPN
+- [x] nginx: eigener Block `api/team-mobile/app/` (300/min je IP) (PR #112)
+- [ ] `api/el/` nur intern erreichbar (prüfen)
+- [x] Tests Team: Zustandslogik, 410 nach Einsatzende, Batch mit gepufferten Zeitstempeln (PR #112)
+- [ ] Tests EL: nur aus dem VPN, nur nach Anmeldung
 
 ### Phase 2 – App, Rolle Team (Mac; erst iOS, dann Android)
 - [ ] Xcode-Projekt in `ios/`, Android-Projekt in `android/`, Startbildschirm „Team“ / „Einsatzleitung“
-- [ ] QR-Scan + Deeplink, Bestätigungsdialog, Token in Keychain/Keystore
+- [ ] QR-Scan (nur `https://…/team/login?code=…`), Bestätigungsdialog mit Servername, WebView-Anmeldung, Token-Übergabe annehmen (nur vom selben Server), Token in Keychain/Keystore
 - [ ] Ortungsdienst iOS und Android, Puffer, Upload, `mode` auswerten
 - [ ] WebView `/team` mit Anmeldung über das Token
 - [ ] Anzeige: Team, Einsatz, Status „Ortung läuft / pausiert / beendet“, letzter Upload
