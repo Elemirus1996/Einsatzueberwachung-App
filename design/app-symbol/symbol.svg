@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <!-- EinsatzSpur, App-Symbol (Entwurf A): Pfote, deren Ballen ein Standort-Pin ist. Volle Fläche, die Ecken rundet das System. -->
+  <rect width="1024" height="1024" fill="#1D2A3A"/>
+  <g transform="scale(10.24)" fill="#F07A2A">
+    <ellipse cx="27" cy="36" rx="6.5" ry="8.5" transform="rotate(-25 27 36)"/>
+    <ellipse cx="40" cy="24" rx="6.5" ry="9" transform="rotate(-8 40 24)"/>
+    <ellipse cx="60" cy="24" rx="6.5" ry="9" transform="rotate(8 60 24)"/>
+    <ellipse cx="73" cy="36" rx="6.5" ry="8.5" transform="rotate(25 73 36)"/>
+    <path fill-rule="evenodd" d="M50 88 C44 78 31 69 31 56 A19 19 0 0 1 69 56 C69 69 56 78 50 88Z M43 56 A7 7 0 1 0 57 56 A7 7 0 1 0 43 56Z"/>
+  </g>
+</svg>
