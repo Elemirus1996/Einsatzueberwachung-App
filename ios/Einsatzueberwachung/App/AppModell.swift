@@ -4,7 +4,7 @@ import Foundation
 /// Hält die angemeldete Rolle und verbindet Schlüsselbund, Schnittstelle und Ortung.
 @MainActor
 final class AppModell: ObservableObject {
-    static let statusAufgabe = "io.github.elemirus1996.einsatzueberwachung.status"
+    static let statusAufgabe = "io.github.elemirus1996.einsatzspur.status"
 
     @Published private(set) var team: TeamOrtung?
     @Published private(set) var teamAnsicht: TeamAnsicht?

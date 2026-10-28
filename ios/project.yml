@@ -21,13 +21,14 @@ targets:
       Release: Signierung.xcconfig
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: io.github.elemirus1996.einsatzueberwachung
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.elemirus1996.einsatzspur
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1"
         INFOPLIST_FILE: Einsatzueberwachung/Info.plist
     info:
       path: Einsatzueberwachung/Info.plist
       properties:
-        CFBundleDisplayName: Einsatzüberwachung
+        CFBundleDisplayName: EinsatzSpur
         CFBundleDevelopmentRegion: de
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
@@ -35,7 +36,7 @@ targets:
         NSLocationWhenInUseUsageDescription: "Während der Suche sendet die App deinen Standort an den Server deiner Staffel, damit die Einsatzleitung deinen Laufweg sieht. Nach der Suche wird die Ortung beendet."
         NSCameraUsageDescription: "Zum Scannen des QR-Codes aus dem Einsatz."
         UIBackgroundModes: [location, fetch]
-        BGTaskSchedulerPermittedIdentifiers: [io.github.elemirus1996.einsatzueberwachung.status]
+        BGTaskSchedulerPermittedIdentifiers: [io.github.elemirus1996.einsatzspur.status]
   EinsatzueberwachungTests:
     type: bundle.unit-test
     platform: iOS
