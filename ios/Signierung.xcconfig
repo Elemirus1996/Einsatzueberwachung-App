@@ -1,0 +1,3 @@
+// Signierung: Jeder trägt sein eigenes Apple-Team in ios/Lokal.xcconfig ein (nicht im Repo), z. B.
+// DEVELOPMENT_TEAM = ABCDE12345
+#include? "Lokal.xcconfig"

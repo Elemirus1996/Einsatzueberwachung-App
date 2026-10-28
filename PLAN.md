@@ -61,7 +61,7 @@ Hintergrund-Ortung, die der Server stoppen kann – ist ohnehin plattformeigen; 
 | Puffer | SQLite (Funkloch, Upload mit Originalzeit) | Room/SQLite |
 | QR-Scan | AVFoundation / VisionKit `DataScannerViewController` | CameraX + ML Kit Barcode |
 | Geheimnisse | Keychain | Android Keystore (EncryptedSharedPreferences) |
-| Mindestversion | iOS 16 | Android 8 (API 26) |
+| Mindestversion | iOS 17 (für `CLBackgroundActivitySession`, entschieden 28.10.2026) | Android 8 (API 26) |
 | Build | Xcode auf dem Mac | Android Studio (Mac oder Windows) |
 
 - Reihenfolge: **iPhone zuerst** bauen und testen (Mehrheit der Mitglieder), Android direkt danach nach derselben Vorlage.

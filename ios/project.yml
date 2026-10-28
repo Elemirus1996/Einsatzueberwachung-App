@@ -1,0 +1,54 @@
+# Projektbeschreibung für XcodeGen. Nach Änderungen: `xcodegen` im Ordner ios/ ausführen.
+name: Einsatzueberwachung
+options:
+  bundleIdPrefix: io.github.elemirus1996
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: de
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    CODE_SIGN_STYLE: Automatic
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Einsatzueberwachung:
+    type: application
+    platform: iOS
+    sources: [Einsatzueberwachung]
+    configFiles:
+      Debug: Signierung.xcconfig
+      Release: Signierung.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.elemirus1996.einsatzueberwachung
+        TARGETED_DEVICE_FAMILY: "1"
+        INFOPLIST_FILE: Einsatzueberwachung/Info.plist
+    info:
+      path: Einsatzueberwachung/Info.plist
+      properties:
+        CFBundleDisplayName: Einsatzüberwachung
+        CFBundleDevelopmentRegion: de
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        ITSAppUsesNonExemptEncryption: false
+        NSLocationWhenInUseUsageDescription: "Während der Suche sendet die App deinen Standort an den Server deiner Staffel, damit die Einsatzleitung deinen Laufweg sieht. Nach der Suche wird die Ortung beendet."
+        NSCameraUsageDescription: "Zum Scannen des QR-Codes aus dem Einsatz."
+        UIBackgroundModes: [location, fetch]
+        BGTaskSchedulerPermittedIdentifiers: [io.github.elemirus1996.einsatzueberwachung.status]
+  EinsatzueberwachungTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [EinsatzueberwachungTests]
+    dependencies:
+      - target: Einsatzueberwachung
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+schemes:
+  Einsatzueberwachung:
+    build:
+      targets:
+        Einsatzueberwachung: all
+    test:
+      targets: [EinsatzueberwachungTests]
