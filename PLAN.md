@@ -99,13 +99,13 @@ Anzeige auf dem Server: Marker „EL“ (mit Gerätename, z. B. „Tablet EL“)
 
 ### Phase 1 – Server (Server-Repo, unter Windows)
 - [x] Zustandslogik `OrtungsSteuerung` + Endpunkte Team v1 + App-Token mit Ablauf (Server PR #112)
-- [ ] Endpunkte EL v1, EL-Position speichern und auf Karte/Monitor anzeigen
+- [x] Endpunkte EL v1, EL-Position als Marker „EL“ auf der Einsatzkarte (Server PR #113)
 - [x] Anmeldung über den bestehenden QR-Code, Token-Übergabe von der Team-Seite an die App (PR #112)
-- [ ] Einstellungen: Intervalle, Upload-Takt, Staffel-Anzeigename
+- [x] Einstellungen: Intervall (Traccar-Einstellung), Upload-Takt `AppUploadSekunden`, Staffelname aus den Staffel-Einstellungen
 - [x] nginx: eigener Block `api/team-mobile/app/` (300/min je IP) (PR #112)
-- [ ] `api/el/` nur intern erreichbar (prüfen)
+- [x] `api/el/` nur intern erreichbar (öffentlicher Port 404, getestet) (PR #113)
 - [x] Tests Team: Zustandslogik, 410 nach Einsatzende, Batch mit gepufferten Zeitstempeln (PR #112)
-- [ ] Tests EL: nur aus dem VPN, nur nach Anmeldung
+- [x] Tests EL: nur intern, Token ungültig nach Passwortänderung, pause ohne Einsatz (PR #113)
 
 ### Phase 2 – App, Rolle Team (Mac; erst iOS, dann Android)
 - [ ] Xcode-Projekt in `ios/`, Android-Projekt in `android/`, Startbildschirm „Team“ / „Einsatzleitung“
@@ -116,7 +116,7 @@ Anzeige auf dem Server: Marker „EL“ (mit Gerätename, z. B. „Tablet EL“)
 
 ### Phase 3 – App, Rolle Einsatzleitung (Mac)
 - [ ] VPN-Erkennung (interne Adresse erreichbar?), sonst Hinweis „WireGuard einschalten“
-- [ ] WebView `/el`, nach Anmeldung Geräte-Token holen, EL-Ortung starten
+- [ ] WebView `/el` (interne Adresse einmal eingeben), Token-Übergabe `rolle: el` annehmen, EL-Ortung starten
 - [ ] Stop bei Einsatzende, Abmeldung oder Rollenwechsel
 
 ### Phase 4 – Test (TestFlight / interner Play-Test)
