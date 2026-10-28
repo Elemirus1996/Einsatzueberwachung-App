@@ -185,11 +185,29 @@ struct TeamAnsichtTests {
         #expect(ansicht().gelesen.isEmpty)
     }
 
-    @Test func stopEreignisBeendetOrtung() async {
+    @Test func stopEreignisMit410BeendetOrtung() async {
+        var modi: [Modus] = []
+        let a = ansicht { modi.append($0) }
+        server.lageAntwort = .failure(.beendet)
+        await a.verarbeiten(.stop)
+        #expect(modi == [.stop])
+    }
+
+    /// Server verdrängt die 4. Verbindung eines Teams mit `stop` – das Token gilt aber weiter.
+    @Test func stopEreignisOhne410IstNurVerdraengung() async {
         var modi: [Modus] = []
         let a = ansicht { modi.append($0) }
         await a.verarbeiten(.stop)
-        #expect(modi == [.stop])
+        #expect(!modi.contains(.stop))
+        #expect(modi == [.pause])   // Modus aus /lage übernommen
+    }
+
+    @Test func stopEreignisImFunklochBeendetNichts() async {
+        var modi: [Modus] = []
+        let a = ansicht { modi.append($0) }
+        server.lageAntwort = .failure(.server(status: 503))
+        await a.verarbeiten(.stop)
+        #expect(modi.isEmpty)
     }
 
     @Test func lageEreignisLaedtAllesNeu() async {
