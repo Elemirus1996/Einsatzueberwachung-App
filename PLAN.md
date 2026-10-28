@@ -70,8 +70,8 @@ damit alles flüssig läuft. Die Daten kommen ausschließlich über die Schnitts
 | | iOS (`ios/`) | Android (`android/`) |
 |---|---|---|
 | Sprache / UI | Swift, SwiftUI | Kotlin, Jetpack Compose |
-| Oberflächen | SwiftUI, Karte mit MapLibre | Jetpack Compose, Karte mit MapLibre |
-| Live-Daten | SignalR-Client (Bearer-Token), Rückfall Abfrage per HTTP | SignalR-Client (Bearer-Token), Rückfall Abfrage per HTTP |
+| Oberflächen | SwiftUI, Karte mit MapKit (entschieden 28.10.2026) | Jetpack Compose, Karte offen (MapLibre oder osmdroid) |
+| Live-Daten | Server-Sent Events mit `URLSession` (Bearer-Token im Header), Rückfall Abfrage per HTTP | Server-Sent Events (Bearer-Token im Header), Rückfall Abfrage per HTTP |
 | Push | APNs (sichtbar und still) | Firebase Cloud Messaging (nur Messaging) |
 | Ortung | `CLLocationManager`, `allowsBackgroundLocationUpdates`, `pausesLocationUpdatesAutomatically`, Berechtigung „Beim Verwenden“ (blaue Statusanzeige, „Immer“ wird nicht verlangt) | Foreground-Service Typ `location` mit Benachrichtigung, Fused Location Provider (ausgewogen, Batching) |
 | Puffer | SQLite (Funkloch, Upload mit Originalzeit) | Room/SQLite |
@@ -115,14 +115,14 @@ Nachgebaut wird, was `/el` heute kann (Stand Server 1.11.7):
 | Einsatz starten | Stichwort, Ort, Szenario, Einsatz/Übung (wie `/el/start`) |
 | Übersicht | Teams mit Suchzeit und Warnstufe, Starten (mit Halsband-Auswahl), Pause, Weiter, Stopp, Zurücksetzen; Warnton bei Eskalation; Wetter |
 | Vermisste | Profile anlegen/bearbeiten, Szenario, Checklisten |
-| Karte | Suchgebiete, Halsbänder und Team-Handys live, Tracks, Abdeckung in %, ELW; Kartenkacheln OpenStreetMap/OpenTopoMap über **MapLibre** (beide Plattformen, keine Google-Schlüssel) |
+| Karte | Suchgebiete, Halsbänder und Team-Handys live, Tracks, Abdeckung in %, ELW; iOS mit MapKit, Android offen (keine Google-Schlüssel) |
 | Notizen und Funk | Liste, neue Einträge, Antworten; Funkloch-Puffer wie heute |
 | Einsatz beenden | Ergebnis, Prüfung der Ressourcen, PDF-Optionen (wie `/el/beenden`) |
 | Ortung | Standort der Einsatzleitung für die Karte im ELW (Server fertig, PR #113) |
 
 Bewusst **nicht** in der App: Teams anlegen, Stammdaten, Einstellungen, Archiv – das bleibt im Monitor (Absprache: `/el` ist keine Kopie des Monitors).
 
-Live-Aktualisierung: SignalR-Hub für die App (Bearer-Token), damit Suchzeiten, Positionen, Funk und Notizen ohne Neuladen erscheinen.
+Live-Aktualisierung: Server-Sent Events `/ereignisse` (Bearer-Token im Header), damit Suchzeiten, Positionen, Funk und Notizen ohne Neuladen erscheinen.
 
 Folge: Jede neue EL-Funktion auf dem Server muss in beiden Apps nachgezogen werden (App-Update, bei Apple mit Prüfung).
 
@@ -140,11 +140,11 @@ Neuer Bereich `api/team-mobile/app/v1/` (öffentliche Adresse, eigener nginx-Blo
 | `POST api/team-mobile/app/v1/login/teams`, `POST …/login` | native Anmeldung: Anmelde-Code → Einsatz und Teamliste; Code + Team → Token (Phase 1c) |
 | `GET  api/team-mobile/app/v1/lage`, `POST …/statusmeldung`, `…/mitteilungen` | Daten der Team-Ansicht und Statusmeldungen (Phase 1c) |
 | `POST api/team-mobile/app/v1/push`, `POST api/el/app/v1/push` | Push-Token des Geräts anmelden/abmelden (Phase 1c bzw. 3b) |
-| `/hubs/team-app` | Live-Aktualisierungen für die native Team-Ansicht (Phase 1c) |
+| `api/team-mobile/app/v1/ereignisse` | Live-Aktualisierungen für die native Team-Ansicht (SSE, Phase 1c) |
 | `POST api/el/app/v1/login` | Anmeldung der nativen EL-App mit Staffel-Passwort (nur VPN, Sperre nach Fehlversuchen wie im Browser) → EL-Token |
 | `POST api/el/app/v1/positions`, `GET …/status` | Standort der Einsatzleitung, Antwort mit `mode` (fertig, PR #113) |
 | `api/el/app/v1/einsatz`, `…/teams`, `…/vermisste`, `…/karte`, `…/funk`, `…/notizen`, `…/beenden` | Daten und Aktionen der EL-Oberfläche (Phase 1b) |
-| `/hubs/el-app` | Live-Aktualisierungen für die native EL-App (Phase 1b) |
+| `api/el/app/v1/ereignisse` | Live-Aktualisierungen für die native EL-App (SSE, Phase 1b) |
 
 Auth: `Authorization: Bearer <token>`. Ungültiges Team-Token → `410 Gone` + `{"mode":"stop"}`. Der bestehende Traccar-Endpunkt bleibt in der Übergangszeit unverändert.
 
@@ -153,10 +153,11 @@ Anzeige auf dem Server: Marker „EL“ (mit Gerätename, z. B. „Tablet EL“)
 ## Phasen
 
 ### Phase 0 – Vorbereitung (Nutzer)
-- [ ] Kostenloses Apple-Konto in Xcode anmelden, eigenes iPhone im Entwicklermodus (für die ersten Tests)
+- [x] Kostenloses Apple-Konto in Xcode anmelden, eigenes iPhone im Entwicklermodus (für die ersten Tests) – erster Test 28.10.2026
 - [ ] Später: Apple-Entwicklerkonto (Einzelperson, 99 €/Jahr) für Push und TestFlight, Händlerstatus nach DSA: nicht kommerziell
 - [ ] Google-Play-Entwicklerkonto (einmalig 25 $)
-- [x] App-Kennung: `io.github.elemirus1996.einsatzspur`, Name „EinsatzSpur“ (an den GitHub-Namen gebunden; entschieden 28.10.2026, ersetzt `…einsatzueberwachung`)
+- [x] App-Kennung: `io.github.elemirus1996.einsatzspur` (an den GitHub-Namen gebunden, passend zum App-Namen; entschieden 28.10.2026, ersetzt `…einsatzueberwachung`)
+- [x] App-Name „EinsatzSpur“ und Symbol (Pfote mit Standort-Pin), für alle Staffeln gleich; Marke bei DPMA und TMview ohne Treffer (App PR #6, entschieden 28.10.2026)
 - [ ] Auf dem Mac: Xcode, Android Studio, Claude Code
 
 ### Phase 1 – Server (Server-Repo, unter Windows)
@@ -169,35 +170,42 @@ Anzeige auf dem Server: Marker „EL“ (mit Gerätename, z. B. „Tablet EL“)
 - [x] Tests Team: Zustandslogik, 410 nach Einsatzende, Batch mit gepufferten Zeitstempeln (PR #112)
 - [x] Tests EL: nur intern, Token ungültig nach Passwortänderung, pause ohne Einsatz (PR #113)
 
-### Phase 1b – Server: Schnittstelle für die native Einsatzleitung
-- [ ] Login-Endpunkt für die App (Staffel-Passwort, Sperre, Audit-Log mit Gerätename)
-- [ ] Lesen: Einsatz, Teams (Suchzeit, Warnstufe, Halsband, Handy), Vermisste, Karte (Gebiete, Positionen, Tracks, Abdeckung), Funk, Notizen, Wetter
-- [ ] Aktionen: Einsatz starten, Team starten/pausieren/stoppen/zurücksetzen (Halsband-Rückfrage wie heute), Vermisste speichern, Funk/Notiz senden, Einsatz beenden
-- [ ] SignalR-Hub `/hubs/el-app` mit Bearer-Token, nur intern
-- [ ] Tests für jede Aktion und für „nur intern“; Beschreibung in `docs/APP_API.md`
+### Phase 1b – Server: Schnittstelle für die native Einsatzleitung ([Server #125](https://github.com/Elemirus1996/Einsatzueberwachung.Server/issues/125))
+- [ ] Beschreibung in `docs/APP_API.md`
+- [ ] Anmeldung nativ (Staffel-Passwort, Sperre wie im Browser, Audit-Log mit Gerätename), `/lage`, `/ereignisse` (Server-Sent Events wie bei der Team-Rolle)
+- [ ] Aktionen: Team starten/pausieren/stoppen/zurücksetzen (Halsband-Rückfrage), Notizen, Funk, Mitteilung an Teams – mit `id` gegen doppelte Ausführung
+- [ ] Vermisste, Karte (Gebiete, Positionen, Tracks, Abdeckung)
+- [ ] Einsatz starten und beenden
+- [ ] Tests für jede Aktion und für „nur intern“
 
 ### Phase 1c – Server: Schnittstelle für die native Team-Ansicht
-- [ ] Native Anmeldung: Anmelde-Code → Einsatz + Teamliste, Code + Team → Token (gleiche Regeln wie `/team/login`, Limit gegen Durchprobieren)
-- [ ] Lesen: Lage des Teams (Team, Hund, Suchgebiet, Halsband-Position mit Alter, Mitteilungen der EL)
-- [ ] Aktionen: Statusmeldungen, Mitteilung quittieren
-- [ ] SignalR-Hub `/hubs/team-app` mit Bearer-Token (öffentlich, nur eigenes Team)
-- [ ] Push-Token je Gerät speichern, stille Push bei `pause`→`track` und bei `stop` (erst mit Apple-Mitgliedschaft testbar)
-- [ ] Tests, Beschreibung in `docs/APP_API.md`
+- [x] Native Anmeldung: Anmelde-Code → Einsatz + Teamliste, Code + Team → Token, auch in Übungen (Server #116–#118)
+- [x] Lesen: `/lage`, `/tracks`; Aktion `/statusmeldung` mit Entdoppelung; Mitteilungen der EL gespeichert (Server #122, #123)
+- [x] Live über Server-Sent Events `/ereignisse` statt SignalR (kein Fremd-Client unter iOS nötig), höchstens 10 Verbindungen je Team, eigenes Ereignis `verdraengt` (Server #122–#124)
+- [x] Tests, Beschreibung in `docs/APP_API.md`; Release v1.11.10, auf dem Staffel-Server eingespielt 28.10.2026
+- [ ] Logo der Staffel und feste Server-Kennung für die Heimatstaffel ([Server #121](https://github.com/Elemirus1996/Einsatzueberwachung.Server/issues/121))
+- [ ] Mitteilung quittieren (optional)
+- [ ] Push-Token je Gerät speichern, stille Push bei `pause`→`track` und bei `stop` (erst mit Apple-Mitgliedschaft testbar; nach dem iPhone-Test vorerst nicht nötig, siehe Akzeptanzkriterien)
 
 ### Phase 2 – App, Rolle Team (Mac; erst iOS, dann Android)
-- [ ] Xcode-Projekt in `ios/` (kostenloses Konto), Android-Projekt in `android/`, Startbildschirm „Team“ / „Einsatzleitung“
-- [ ] QR-Scan (nur `https://…/team/login?code=…`) und Code-Eingabe, Bestätigungsdialog mit Servername, native Teamauswahl, Token in Keychain/Keystore
-- [ ] Ortungsdienst iOS und Android, Puffer, Upload, `mode` auswerten (zuerst mit den fertigen Endpunkten aus Phase 1)
-- [ ] Native Team-Ansicht: Karte, Statusmeldungen, Mitteilungen, Live-Aktualisierung
-- [ ] Anzeige: Team, Einsatz, Status „Ortung läuft / pausiert / beendet“, letzter Upload
-- [ ] Aufwecken bei `pause`: zunächst App-Start + `BGAppRefreshTask`; stille Push nach Apple-Mitgliedschaft
+iOS, getestet auf dem iPhone 15 Pro gegen Server v1.11.10 am 28.10.2026:
+- [x] Xcode-Projekt in `ios/` (kostenloses Konto) (App PR #2)
+- [x] QR-Scan und Code-Eingabe, Bestätigung mit Servername, native Teamauswahl, Token im Schlüsselbund (App PR #7)
+- [x] Ortungsdienst, Puffer, Upload, `mode` auswerten, eigener Upload-Takt auch bei Stillstand (App PR #2, #5)
+- [x] Native Team-Ansicht: Karte (MapKit, entschieden 28.10.2026), Statusmeldungen, Mitteilungen, Live (App PR #5)
+- [ ] `stop` im Live-Strom erst nach Bestätigung durch `/lage` (App PR #8), Ereignis `verdraengt` auswerten
+- [ ] Symbol, Name „EinsatzSpur“ und neue App-Kennung einbinden
+- [ ] Heimatstaffel: bei der ersten Verbindung fragen, nur dann Logo und Name der Staffel auf der Startseite; fremde Staffel im gemeinsamen Einsatz ändert nichts; in den Einstellungen änderbar (braucht Server #121)
+
+Android:
+- [ ] Android-Projekt in `android/` nach derselben Vorlage, gebaut vom Mac (Android Studio; entschieden 28.10.2026)
 
 ### Phase 3 – App, Rolle Einsatzleitung nativ (Mac; erst iOS, dann Android)
 - [ ] Einrichtung: interne Adresse einmal eingeben, VPN-Erkennung, sonst Hinweis „WireGuard einschalten“
 - [ ] Anmeldung mit Staffel-Passwort (nativer Dialog), Token in Keychain/Keystore
 - [ ] Übersicht mit Teams und Aktionen, Warnton/Haptik bei Eskalation
 - [ ] Vermisste, Notizen und Funk (mit Funkloch-Puffer), Einsatz starten und beenden
-- [ ] Karte mit MapLibre (Gebiete, Positionen, Tracks, Abdeckung)
+- [ ] Karte (iOS: MapKit; Android: offen) mit Gebieten, Positionen, Tracks, Abdeckung
 - [ ] EL-Ortung, Stop bei Einsatzende, Abmeldung oder Rollenwechsel
 
 ### Phase 3b – Push-Mitteilungen für die Einsatzleitung (entschieden 28.10.2026)
@@ -219,18 +227,17 @@ Anzeige auf dem Server: Marker „EL“ (mit Gerätename, z. B. „Tablet EL“)
 
 ## Akzeptanzkriterien
 
-- [ ] Nach dem QR-Scan läuft die Ortung ohne weitere Eingabe.
-- [ ] Spätestens einen Upload-Takt nach Einsatz- oder Suchende ist GPS am Handy aus.
-- [ ] Neue Suche startet die Ortung ohne Eingabe wieder.
+- [x] Nach dem QR-Scan läuft die Ortung ohne weitere Eingabe. (iPhone, 28.10.2026)
+- [x] Spätestens einen Upload-Takt nach Einsatz- oder Suchende ist GPS am Handy aus. (iPhone, auch gesperrt und bei Stillstand, 28.10.2026)
+- [ ] Neue Suche startet die Ortung ohne Eingabe wieder. (iPhone im Hintergrund bestanden 28.10.2026 nach kurzer Pause; noch mit 15–30 min Pause in einer Übung prüfen)
 - [ ] Ohne Netz stoppt die App spätestens bei Ablauf des Tokens.
-- [ ] Positionen aus Funklöchern kommen mit Originalzeit an.
+- [x] Positionen aus Funklöchern kommen mit Originalzeit an. (iPhone, Flugmodus, 28.10.2026)
 - [ ] Einsatzleitung ist ohne VPN nicht erreichbar, auch nicht über die App.
 - [ ] Der Führungsassistent sieht die Position der Einsatzleitung auf der Karte.
 - [ ] Akkuverbrauch messbar unter Traccar mit sparsamen Werten.
 
 ## Offen
 
-- Name und Symbol der App
 - **Push bei selbst betriebenen Servern:** Der Push-Schlüssel von Apple gilt für alle Geräte mit der App und lässt sich nicht
   auf eine Staffel beschränken. Vorschlag: kleiner Push-Weiterleiter (Zugang je Staffel einzeln sperrbar, nur „wecken“ ohne
   Inhalt, sichtbare Texte Ende-zu-Ende verschlüsselt). Betrieb **nicht zu Hause**; Vorschlag: kleiner eigener Server in
