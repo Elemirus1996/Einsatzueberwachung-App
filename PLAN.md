@@ -50,14 +50,25 @@ Sicherheitsnetz in der App: Läuft `expiresAt` ab, stoppt die App auch ohne Netz
 
 ## Technik
 
-- **.NET MAUI (C#)**, eine Codebasis für iOS und Android, dieselbe Sprache wie der Server.
-- **Oberflächen aus dem Server** in einer eingebetteten WebView (`/team`, `/el`). Neue Funktionen kommen mit dem Server-Update, ohne neue App-Version.
-- **Native Ortung je Plattform** (in MAUI über `Platforms/iOS` und `Platforms/Android`):
-  - iOS: `CLLocationManager` mit `allowsBackgroundLocationUpdates`, `pausesLocationUpdatesAutomatically`, Berechtigung „Beim Verwenden“ (blaue Statusanzeige). „Immer“ wird nicht verlangt.
-  - Android: Foreground-Service vom Typ `location` mit dauerhafter Benachrichtigung, Fused Location Provider mit ausgewogener Genauigkeit und Batching.
-- **Lokaler Puffer** (SQLite) für Funklöcher, Upload gesammelt mit Originalzeit.
-- **QR-Scan** mit der Kamera (ZXing.Net.Maui) bzw. Deeplink `einsatzueberwachung://team?server=…&token=…`.
-- Build: Android unter Windows/Mac, iOS auf dem Mac (Xcode). Später automatisiert über GitHub Actions (macOS-Runner).
+Zwei schlanke **native Apps** im selben Repo (entschieden 28.10.2026). Die schwierige Aufgabe – zuverlässige, akkusparende
+Hintergrund-Ortung, die der Server stoppen kann – ist ohnehin plattformeigen; die Oberflächen kommen vom Server.
+
+| | iOS (`ios/`) | Android (`android/`) |
+|---|---|---|
+| Sprache / UI | Swift, SwiftUI | Kotlin, Jetpack Compose |
+| Oberflächen | `WKWebView` mit `/team` bzw. `/el` | `WebView` mit `/team` bzw. `/el` |
+| Ortung | `CLLocationManager`, `allowsBackgroundLocationUpdates`, `pausesLocationUpdatesAutomatically`, Berechtigung „Beim Verwenden“ (blaue Statusanzeige, „Immer“ wird nicht verlangt) | Foreground-Service Typ `location` mit Benachrichtigung, Fused Location Provider (ausgewogen, Batching) |
+| Puffer | SQLite (Funkloch, Upload mit Originalzeit) | Room/SQLite |
+| QR-Scan | AVFoundation / VisionKit `DataScannerViewController` | CameraX + ML Kit Barcode |
+| Geheimnisse | Keychain | Android Keystore (EncryptedSharedPreferences) |
+| Mindestversion | iOS 16 | Android 8 (API 26) |
+| Build | Xcode auf dem Mac | Android Studio (Mac oder Windows) |
+
+- Reihenfolge: **iPhone zuerst** bauen und testen (Mehrheit der Mitglieder), Android direkt danach nach derselben Vorlage.
+- Beide Apps verhalten sich gleich, weil sie sich an **eine verbindliche Beschreibung der Server-Schnittstelle** halten
+  (im Server-Repo, abgesichert durch Server-Tests).
+- Deeplink beider Apps: `einsatzueberwachung://team?server=…&token=…`
+- Später automatische Builds über GitHub Actions (macOS-Runner für iOS).
 
 ## Server-Schnittstelle v1 (im Server-Repo)
 
@@ -81,7 +92,7 @@ Anzeige auf dem Server: Marker „EL“ (mit Gerätename, z. B. „Tablet EL“)
 - [ ] Apple-Entwicklerkonto (Einzelperson, 99 €/Jahr), Händlerstatus nach DSA: nicht kommerziell
 - [ ] Google-Play-Entwicklerkonto (einmalig 25 $)
 - [ ] App-Kennung festlegen (Vorschlag `de.einsatzueberwachung.app`)
-- [ ] Auf dem Mac: Xcode, .NET 9 SDK, `dotnet workload install maui`, Claude Code
+- [ ] Auf dem Mac: Xcode, Android Studio, Claude Code
 
 ### Phase 1 – Server (Server-Repo, unter Windows)
 - [ ] `TeamTrackingModeService` (Zustandslogik, testbar) + Endpunkte Team v1
@@ -91,8 +102,8 @@ Anzeige auf dem Server: Marker „EL“ (mit Gerätename, z. B. „Tablet EL“)
 - [ ] nginx: eigener Block `api/team-mobile/app/` (Limit wie Traccar), `api/el/` nur intern
 - [ ] Tests: Zustandslogik, 410 bei alter Generation, Batch mit gepufferten Zeitstempeln, EL nur aus VPN
 
-### Phase 2 – App, Rolle Team (Mac)
-- [ ] MAUI-Projekt, Startbildschirm „Team“ / „Einsatzleitung“
+### Phase 2 – App, Rolle Team (Mac; erst iOS, dann Android)
+- [ ] Xcode-Projekt in `ios/`, Android-Projekt in `android/`, Startbildschirm „Team“ / „Einsatzleitung“
 - [ ] QR-Scan + Deeplink, Bestätigungsdialog, Token in Keychain/Keystore
 - [ ] Ortungsdienst iOS und Android, Puffer, Upload, `mode` auswerten
 - [ ] WebView `/team` mit Anmeldung über das Token

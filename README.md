@@ -9,6 +9,6 @@ Jede Staffel nutzt ihren eigenen Server. Die App hat keine fest eingebaute Adres
 
 **Stand:** in Planung, siehe [PLAN.md](PLAN.md).
 
-Technik: .NET MAUI (C#), Oberflächen aus dem Server, native Hintergrund-Ortung für iOS und Android.
+Technik: native Apps – Swift/SwiftUI (`ios/`) und Kotlin/Jetpack Compose (`android/`). Die Oberflächen kommen vom Server, die Apps übernehmen QR-Code, Hintergrund-Ortung und Funkloch-Puffer.
 
 Lizenz: [MIT](LICENSE)

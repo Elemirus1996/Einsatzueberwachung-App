@@ -6,4 +6,5 @@
 - Sicherheit (nicht verhandelbar): keine fest eingebaute Server-Adresse, nur HTTPS, Token nur in Keychain/Keystore, nichts loggen, was Token oder Positionen enthält, keine Analyse- oder Fremd-SDKs. Einsatzleitung nur über das VPN der Staffel.
 - Akku: GPS nur im Modus `track`. Bei `pause` und `stop` muss der Ortungsdienst wirklich beendet sein, nicht nur das Senden.
 - Releases und Veröffentlichung in den Stores nur nach ausdrücklichem OK des Nutzers.
+- Technik: native Apps, iOS in `ios/` (Swift, SwiftUI), Android in `android/` (Kotlin, Jetpack Compose). iPhone zuerst. Beide Apps halten sich exakt an die Schnittstellenbeschreibung im Server-Repo.
 - Commits und PRs: Branch pro Aufgabe, PR nach `main`.
