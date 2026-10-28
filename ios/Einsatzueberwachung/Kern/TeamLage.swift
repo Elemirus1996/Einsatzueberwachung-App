@@ -1,0 +1,162 @@
+import Foundation
+
+struct Koordinate: Codable, Equatable, Sendable {
+    var lat: Double
+    var lng: Double
+}
+
+/// Antwort von `GET /lage` (APP_API.md, Abschnitt 6).
+struct TeamLage: Decodable, Equatable, Sendable {
+    struct Einsatz: Decodable, Equatable, Sendable {
+        var text: String?
+        var uebung: Bool?
+        var staffel: String?
+    }
+
+    struct Team: Decodable, Equatable, Sendable {
+        var teamId: String
+        var teamName: String
+        var dogName: String?
+        var hundefuehrerName: String?
+        var helfer: [String]?
+    }
+
+    struct Suche: Decodable, Equatable, Sendable {
+        enum Status: String, Decodable, Sendable {
+            case bereit, laeuft, kurzpause, beendet
+        }
+        var status: Status
+        var seit: Date?
+        var dauerSec: Int?
+    }
+
+    struct Suchgebiet: Decodable, Equatable, Sendable {
+        var id: String?
+        var name: String?
+        var farbe: String?
+        var punkte: [Koordinate]
+    }
+
+    var mode: Modus?
+    var serverZeit: Date?
+    var einsatz: Einsatz
+    var team: Team
+    var suche: Suche
+    var suchgebiet: Suchgebiet?
+    var halsband: Halsband?
+    var mitteilungen: [Mitteilung]
+}
+
+struct Halsband: Decodable, Equatable, Sendable {
+    var id: String?
+    var name: String?
+    var lat: Double
+    var lng: Double
+    var zeit: Date
+    var akku: Int?
+}
+
+struct Mitteilung: Decodable, Equatable, Identifiable, Sendable {
+    var id: String
+    var text: String
+    var zeit: Date
+}
+
+/// Antwort von `GET /tracks` (Abschnitt 7). `t` in Unix-Millisekunden.
+struct TeamTracks: Decodable, Equatable, Sendable {
+    struct Punkt: Decodable, Equatable, Sendable {
+        var lat: Double
+        var lng: Double
+        var t: Int64?
+    }
+
+    struct Laufend: Decodable, Equatable, Sendable {
+        var hund: [Punkt]
+        var mensch: [Punkt]
+    }
+
+    struct Track: Decodable, Equatable, Sendable {
+        var art: String
+        var farbe: String?
+        var punkte: [Punkt]
+    }
+
+    struct Suche: Decodable, Equatable, Sendable {
+        var sucheId: String?
+        var tracks: [Track]
+    }
+
+    var serverZeit: Int64?
+    var laufend: Laufend
+    var abgeschlossen: [Suche]?
+}
+
+/// Die vier Knöpfe der Team-Seite (Abschnitt 8).
+enum Statusmeldung {
+    enum Code: String, Codable, CaseIterable, Sendable {
+        case imGebiet = "im_gebiet"
+        case pause
+        case funk
+        case beendet
+    }
+}
+
+/// Ereignisse aus `GET /ereignisse` (Abschnitt 9).
+enum TeamEreignis: Equatable, Sendable {
+    case halsband(Halsband)
+    case mitteilung(Mitteilung)
+    case lage
+    case stop
+
+    init?(_ roh: SSELeser.Ereignis) {
+        let daten = Data(roh.daten.utf8)
+        switch roh.name {
+        case "halsband":
+            guard let wert = try? JSONDecoder.server.decode(Halsband.self, from: daten) else { return nil }
+            self = .halsband(wert)
+        case "mitteilung":
+            guard let wert = try? JSONDecoder.server.decode(Mitteilung.self, from: daten) else { return nil }
+            self = .mitteilung(wert)
+        case "lage": self = .lage
+        case "stop": self = .stop
+        default: return nil
+        }
+    }
+}
+
+/// Zerlegt einen Server-Sent-Events-Strom Zeile für Zeile. Eine Leerzeile schließt ein Ereignis ab,
+/// Zeilen mit `:` am Anfang sind Kommentare (`: ping`).
+struct SSELeser {
+    struct Ereignis: Equatable {
+        var name: String
+        var daten: String
+    }
+
+    private var name = ""
+    private var daten: [String] = []
+
+    mutating func zeile(_ zeile: String) -> Ereignis? {
+        if zeile.isEmpty {
+            defer { name = ""; daten = [] }
+            guard !daten.isEmpty else { return nil }
+            return Ereignis(name: name.isEmpty ? "message" : name, daten: daten.joined(separator: "\n"))
+        }
+        if zeile.hasPrefix(":") { return nil }
+        let feld: Substring
+        var wert: Substring
+        if let doppelpunkt = zeile.firstIndex(of: ":") {
+            feld = zeile[..<doppelpunkt]
+            wert = zeile[zeile.index(after: doppelpunkt)...]
+            if wert.hasPrefix(" ") { wert = wert.dropFirst() }
+        } else {
+            feld = Substring(zeile)
+            wert = ""
+        }
+        switch feld {
+        case "event": name = String(wert)
+        case "data": daten.append(String(wert))
+        default: break
+        }
+        return nil
+    }
+}

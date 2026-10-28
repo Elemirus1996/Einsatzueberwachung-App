@@ -38,11 +38,18 @@ struct TeamClient: TeamSchnittstelle {
         try await anfrage("status", methode: "GET", inhalt: nil)
     }
 
-    private func anfrage<T: Decodable>(_ endpunkt: String, methode: String, inhalt: Data?) async throws -> T {
-        var request = URLRequest(url: server.pfad("api/team-mobile/app/v1/\(endpunkt)"))
+    private func request(_ endpunkt: String, methode: String = "GET", query: [URLQueryItem] = []) -> URLRequest {
+        var url = server.pfad("api/team-mobile/app/v1/\(endpunkt)")
+        if !query.isEmpty { url.append(queryItems: query) }
+        var request = URLRequest(url: url)
         request.httpMethod = methode
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        return request
+    }
+
+    private func anfrage<T: Decodable>(_ endpunkt: String, methode: String, inhalt: Data?, query: [URLQueryItem] = []) async throws -> T {
+        var request = request(endpunkt, methode: methode, query: query)
         if let inhalt {
             request.httpBody = inhalt
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -59,11 +66,72 @@ struct TeamClient: TeamSchnittstelle {
     }
 }
 
+/// Endpunkte der nativen Team-Ansicht (APP_API.md, Abschnitte 6–9).
+protocol TeamAnsichtSchnittstelle: Sendable {
+    func lage() async throws -> TeamLage
+    func tracks(seit: Int64?) async throws -> TeamTracks
+    func statusmeldung(id: String, code: Statusmeldung.Code) async throws
+    func ereignisse() async throws -> AsyncThrowingStream<TeamEreignis, Error>
+}
+
+extension TeamClient: TeamAnsichtSchnittstelle {
+    func lage() async throws -> TeamLage {
+        try await anfrage("lage", methode: "GET", inhalt: nil)
+    }
+
+    func tracks(seit: Int64?) async throws -> TeamTracks {
+        try await anfrage("tracks", methode: "GET", inhalt: nil,
+                          query: seit.map { [URLQueryItem(name: "seit", value: String($0))] } ?? [])
+    }
+
+    func statusmeldung(id: String, code: Statusmeldung.Code) async throws {
+        struct Antwort: Decodable { var doppelt: Bool? }
+        let _: Antwort = try await anfrage("statusmeldung", methode: "POST",
+                                           inhalt: try JSONEncoder().encode(["id": id, "code": code.rawValue]))
+    }
+
+    /// Server-Sent Events. Endet, wenn die Verbindung abbricht; 410 beim Verbinden → `beendet`.
+    func ereignisse() async throws -> AsyncThrowingStream<TeamEreignis, Error> {
+        var request = request("ereignisse")
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        let (bytes, antwort) = try await URLSession.ereignisse.bytes(for: request)
+        guard let http = antwort as? HTTPURLResponse else { throw SchnittstellenFehler.antwortUngueltig }
+        if http.statusCode == 410 { throw SchnittstellenFehler.beendet }
+        guard http.statusCode == 200 else { throw SchnittstellenFehler.server(status: http.statusCode) }
+        return AsyncThrowingStream { fortsetzung in
+            let aufgabe = Task {
+                var leser = SSELeser()
+                var zeile: [UInt8] = []
+                do {
+                    // Eigene Zeilenaufteilung: `bytes.lines` verschluckt Leerzeilen, die bei SSE ein Ereignis abschließen
+                    for try await byte in bytes {
+                        guard byte == UInt8(ascii: "\n") else {
+                            zeile.append(byte)
+                            continue
+                        }
+                        if zeile.last == UInt8(ascii: "\r") { zeile.removeLast() }
+                        if let ereignis = leser.zeile(String(decoding: zeile, as: UTF8.self)).flatMap(TeamEreignis.init) {
+                            fortsetzung.yield(ereignis)
+                        }
+                        zeile.removeAll(keepingCapacity: true)
+                    }
+                    fortsetzung.finish()
+                } catch {
+                    fortsetzung.finish(throwing: error)
+                }
+            }
+            fortsetzung.onTermination = { _ in aufgabe.cancel() }
+        }
+    }
+}
+
 enum AnmeldeFehler: Error, Equatable {
     /// 401: Code falsch oder kein laufender Einsatz
     case codeUngueltig
     /// 404: Team gibt es nicht mehr
     case teamUnbekannt
+    /// 429: Limit von nginx, frühestens nach 30 s erneut versuchen
+    case zuVieleVersuche
     case server(status: Int)
     case antwortUngueltig
 }
@@ -78,6 +146,7 @@ struct TeamAuswahl: Decodable, Equatable, Sendable {
     }
 
     var einsatz: String?
+    var uebung: Bool?
     var staffel: String?
     var teams: [Eintrag]
 }
@@ -94,11 +163,13 @@ struct TeamAnmeldung: Sendable {
     func anmelden(teamId: String) async throws -> TeamSitzung {
         struct Antwort: Decodable {
             var token: String
+            var teamId: String?
             var teamName: String
             var expiresAt: Date
         }
         let antwort: Antwort = try await anfrage("login", inhalt: ["code": qr.code, "teamId": teamId])
-        return TeamSitzung(server: qr.server, token: antwort.token, teamName: antwort.teamName, expiresAt: antwort.expiresAt)
+        return TeamSitzung(server: qr.server, token: antwort.token, teamId: antwort.teamId,
+                           teamName: antwort.teamName, expiresAt: antwort.expiresAt)
     }
 
     private func anfrage<T: Decodable>(_ endpunkt: String, inhalt: [String: String]) async throws -> T {
@@ -113,6 +184,7 @@ struct TeamAnmeldung: Sendable {
         case 200..<300: break
         case 401: throw AnmeldeFehler.codeUngueltig
         case 404 where endpunkt == "login": throw AnmeldeFehler.teamUnbekannt
+        case 429: throw AnmeldeFehler.zuVieleVersuche
         default: throw AnmeldeFehler.server(status: http.statusCode)
         }
         do {
@@ -128,6 +200,15 @@ extension URLSession {
     static let einsatz: URLSession = {
         let konfiguration = URLSessionConfiguration.ephemeral
         konfiguration.timeoutIntervalForRequest = 20
+        konfiguration.waitsForConnectivity = false
+        return URLSession(configuration: konfiguration)
+    }()
+
+    /// Für `/ereignisse`: Der Server schickt alle 20 s ein `: ping`, nach 60 s Stille gilt die Verbindung als tot.
+    static let ereignisse: URLSession = {
+        let konfiguration = URLSessionConfiguration.ephemeral
+        konfiguration.timeoutIntervalForRequest = 60
+        konfiguration.timeoutIntervalForResource = 24 * 3600
         konfiguration.waitsForConnectivity = false
         return URLSession(configuration: konfiguration)
     }()
