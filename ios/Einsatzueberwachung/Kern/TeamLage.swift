@@ -107,6 +107,8 @@ enum TeamEreignis: Equatable, Sendable {
     case mitteilung(Mitteilung)
     case lage
     case stop
+    /// Zu viele Live-Verbindungen des Teams: angemeldet bleiben, frühestens nach `wiederholenNachSec` neu verbinden.
+    case verdraengt(wiederholenNachSec: Int)
 
     init?(_ roh: SSELeser.Ereignis) {
         let daten = Data(roh.daten.utf8)
@@ -119,6 +121,10 @@ enum TeamEreignis: Equatable, Sendable {
             self = .mitteilung(wert)
         case "lage": self = .lage
         case "stop": self = .stop
+        case "verdraengt":
+            struct Daten: Decodable { var wiederholenNachSec: Int? }
+            let sekunden = (try? JSONDecoder.server.decode(Daten.self, from: daten))?.wiederholenNachSec
+            self = .verdraengt(wiederholenNachSec: sekunden ?? 60)
         default: return nil
         }
     }

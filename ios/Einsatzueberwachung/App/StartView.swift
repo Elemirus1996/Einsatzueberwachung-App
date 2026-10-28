@@ -18,10 +18,12 @@ struct StartView: View {
     private var rollenAuswahl: some View {
         VStack(spacing: 16) {
             Spacer()
-            Image(systemName: "pawprint.circle.fill")
-                .font(.system(size: 72))
-                .foregroundStyle(.tint)
-            Text("Einsatzüberwachung")
+            Image("AppSymbol")
+                .resizable()
+                .frame(width: 96, height: 96)
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .accessibilityHidden(true)
+            Text("EinsatzSpur")
                 .font(.largeTitle.bold())
             Spacer()
             NavigationLink {

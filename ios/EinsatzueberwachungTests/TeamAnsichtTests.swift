@@ -24,8 +24,9 @@ struct SSELeserTests {
         data: {}
 
         """
-        let ereignisse = lesen(strom)
-        #expect(ereignisse.map(\.name) == ["halsband", "lage", "stop"])
+        let ereignisse = lesen(strom + "\nevent: verdraengt\ndata: {\"wiederholenNachSec\":60}\n\n")
+        #expect(ereignisse.map(\.name) == ["halsband", "lage", "stop", "verdraengt"])
+        #expect(TeamEreignis(ereignisse[3]) == .verdraengt(wiederholenNachSec: 60))
         #expect(TeamEreignis(ereignisse[0]) == .halsband(Halsband(
             lat: 49.312, lng: 8.431, zeit: Date(timeIntervalSince1970: 1_793_178_888), akku: 72)))
         #expect(TeamEreignis(ereignisse[1]) == .lage)
@@ -185,11 +186,37 @@ struct TeamAnsichtTests {
         #expect(ansicht().gelesen.isEmpty)
     }
 
-    @Test func stopEreignisBeendetOrtung() async {
+    @Test func stopEreignisMit410BeendetOrtung() async {
+        var modi: [Modus] = []
+        let a = ansicht { modi.append($0) }
+        server.lageAntwort = .failure(.beendet)
+        await a.verarbeiten(.stop)
+        #expect(modi == [.stop])
+    }
+
+    /// Server verdrängt die 4. Verbindung eines Teams mit `stop` – das Token gilt aber weiter.
+    @Test func stopEreignisOhne410IstNurVerdraengung() async {
         var modi: [Modus] = []
         let a = ansicht { modi.append($0) }
         await a.verarbeiten(.stop)
-        #expect(modi == [.stop])
+        #expect(!modi.contains(.stop))
+        #expect(modi == [.pause])   // Modus aus /lage übernommen
+    }
+
+    @Test func verdraengtBeendetNichtsUndFragtNichtNach() async {
+        var modi: [Modus] = []
+        let a = ansicht { modi.append($0) }
+        await a.verarbeiten(.verdraengt(wiederholenNachSec: 60))
+        #expect(modi.isEmpty)
+        #expect(a.lage == nil)   // keine Rückfrage nötig
+    }
+
+    @Test func stopEreignisImFunklochBeendetNichts() async {
+        var modi: [Modus] = []
+        let a = ansicht { modi.append($0) }
+        server.lageAntwort = .failure(.server(status: 503))
+        await a.verarbeiten(.stop)
+        #expect(modi.isEmpty)
     }
 
     @Test func lageEreignisLaedtAllesNeu() async {

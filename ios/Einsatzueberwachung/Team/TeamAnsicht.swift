@@ -12,6 +12,9 @@ final class TeamAnsicht: ObservableObject {
 
     static let pollTakt: Duration = .seconds(15)
     static let neuVerbindenNach: Duration = .seconds(5)
+    /// Nach einem `stop`, das sich als unecht herausstellt (z. B. vom Server verdrängt, weil schon 3 Geräte
+    /// des Teams verbunden sind): länger warten, damit sich die Geräte nicht gegenseitig hinauswerfen.
+    static let nachVerdraengung: Duration = .seconds(60)
     static let trackTakt: Duration = .seconds(30)
     static let trackVollNach: TimeInterval = 300
 
@@ -34,6 +37,8 @@ final class TeamAnsicht: ObservableObject {
     private var letzteVolleTracks: Date?
     private var aufgaben: [Task<Void, Never>] = []
     private var meldungenLaufen = false
+    /// Wartezeit vor dem nächsten Verbindungsversuch nach einer Verdrängung (sonst `nil`).
+    private var verdraengtWarten: Duration?
 
     init(schnittstelle: TeamAnsichtSchnittstelle, teamId: String, speicher: UserDefaults = .standard,
          jetzt: @escaping () -> Date = Date.init, beiSteuerung: @escaping (Modus) -> Void) {
@@ -90,7 +95,12 @@ final class TeamAnsicht: ObservableObject {
             } catch {}
             live = false
             // Nach einem Abbruch schnell neu verbinden; ohne Live-Verbindung alle 15 s die Lage holen
-            try? await Task.sleep(for: warVerbunden ? Self.neuVerbindenNach : Self.pollTakt)
+            if let warten = verdraengtWarten {
+                verdraengtWarten = nil
+                try? await Task.sleep(for: warten)
+            } else {
+                try? await Task.sleep(for: warVerbunden ? Self.neuVerbindenNach : Self.pollTakt)
+            }
             guard !Task.isCancelled else { return }
             await neuLaden()
         }
@@ -119,7 +129,28 @@ final class TeamAnsicht: ObservableObject {
         case .lage:
             await neuLaden(tracksVoll: true)
         case .stop:
+            // Nur ein Hinweis: Der Server schickt `stop` auch, wenn er die Verbindung verdrängt.
+            // Ob wirklich Schluss ist, sagt /lage (410 → stop); sonst bleibt die Ortung, wie sie ist.
+            if await lageBestaetigtStop() == false { verdraengtWarten = Self.nachVerdraengung }
+        case .verdraengt(let sekunden):
+            // Server ab #124: angemeldet bleiben, nicht sofort neu verbinden (höchstens 10 min warten)
+            verdraengtWarten = .seconds(min(max(sekunden, 5), 600))
+        }
+    }
+
+    /// `true`: 410, Ortung ist beendet. `false`: Token gilt noch. `nil`: kein Netz, weiter wie bisher.
+    private func lageBestaetigtStop() async -> Bool? {
+        do {
+            let neu = try await schnittstelle.lage()
+            lage = neu
+            lageAbgerufen = jetzt()
+            if let mode = neu.mode { beiSteuerung(mode) }
+            return neu.mode == .stop
+        } catch SchnittstellenFehler.beendet {
             beiSteuerung(.stop)
+            return true
+        } catch {
+            return nil
         }
     }
 
