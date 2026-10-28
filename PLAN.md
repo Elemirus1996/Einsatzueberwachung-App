@@ -156,7 +156,7 @@ Anzeige auf dem Server: Marker „EL“ (mit Gerätename, z. B. „Tablet EL“)
 - [ ] Kostenloses Apple-Konto in Xcode anmelden, eigenes iPhone im Entwicklermodus (für die ersten Tests)
 - [ ] Später: Apple-Entwicklerkonto (Einzelperson, 99 €/Jahr) für Push und TestFlight, Händlerstatus nach DSA: nicht kommerziell
 - [ ] Google-Play-Entwicklerkonto (einmalig 25 $)
-- [x] App-Kennung: `io.github.elemirus1996.einsatzueberwachung` (an den GitHub-Namen gebunden, App gehört zum Projekt Einsatzueberwachung.Server; entschieden 28.10.2026)
+- [x] App-Kennung: `io.github.elemirus1996.einsatzspur`, Name „EinsatzSpur“ (an den GitHub-Namen gebunden; entschieden 28.10.2026, ersetzt `…einsatzueberwachung`)
 - [ ] Auf dem Mac: Xcode, Android Studio, Claude Code
 
 ### Phase 1 – Server (Server-Repo, unter Windows)

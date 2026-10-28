@@ -19,6 +19,7 @@
 		5C64E699EFA85FAF73737704 /* ServerAdresse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56F9B9620977557546AA87ED /* ServerAdresse.swift */; };
 		6C7B4127674E4722256EA536 /* TeamAnsichtTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A917F3FBFB4256F935A563E /* TeamAnsichtTests.swift */; };
 		759C53C6DB2F9A40004C24D6 /* TeamModelle.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC0EEBCA567221FF2529112D /* TeamModelle.swift */; };
+		803B4AE407AAFC1F22809B0B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 01EEA4C26487F0027FEABEF9 /* Assets.xcassets */; };
 		8D7BC3821334E2D60C7A796D /* Schluesselbund.swift in Sources */ = {isa = PBXBuildFile; fileRef = 179F8BB87D6F40D69F2E2A8D /* Schluesselbund.swift */; };
 		9C16D7091D48A562D60679C2 /* TeamAnsicht.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42542B191DD57AAC94CE0EC0 /* TeamAnsicht.swift */; };
 		A0AF23349A115130EE14C9AD /* StartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 133295A3FD86DD2CC9E0275C /* StartView.swift */; };
@@ -38,6 +39,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		01EEA4C26487F0027FEABEF9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		133295A3FD86DD2CC9E0275C /* StartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartView.swift; sourceTree = "<group>"; };
 		179F8BB87D6F40D69F2E2A8D /* Schluesselbund.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Schluesselbund.swift; sourceTree = "<group>"; };
 		42542B191DD57AAC94CE0EC0 /* TeamAnsicht.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamAnsicht.swift; sourceTree = "<group>"; };
@@ -75,6 +77,7 @@
 		28DFEE76EF8FD1D34ADF0B58 /* Einsatzueberwachung */ = {
 			isa = PBXGroup;
 			children = (
+				01EEA4C26487F0027FEABEF9 /* Assets.xcassets */,
 				7551F597918FBD4DFF920EFE /* Info.plist */,
 				9EA58FDF7B32E040396D6634 /* App */,
 				D60C6D0B25A81A62BBCCB18D /* Kern */,
@@ -156,6 +159,7 @@
 			buildConfigurationList = 611A7805020466FE2382C3A9 /* Build configuration list for PBXNativeTarget "Einsatzueberwachung" */;
 			buildPhases = (
 				AD8CC9ED2705804A1CF2F689 /* Sources */,
+				FEC753C163290946B668CDA0 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -222,6 +226,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		FEC753C163290946B668CDA0 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				803B4AE407AAFC1F22809B0B /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		AD8CC9ED2705804A1CF2F689 /* Sources */ = {
@@ -361,7 +376,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = io.github.elemirus1996.einsatzueberwachung;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.elemirus1996.einsatzspur;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 1;
 			};
@@ -395,7 +410,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = io.github.elemirus1996.einsatzueberwachung;
+				PRODUCT_BUNDLE_IDENTIFIER = io.github.elemirus1996.einsatzspur;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = 1;
 			};

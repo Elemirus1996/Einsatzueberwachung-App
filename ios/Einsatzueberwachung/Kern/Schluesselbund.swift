@@ -6,7 +6,7 @@ import Security
 struct Schluesselbund: Sendable {
     let dienst: String
 
-    init(dienst: String = Bundle.main.bundleIdentifier ?? "io.github.elemirus1996.einsatzueberwachung") {
+    init(dienst: String = Bundle.main.bundleIdentifier ?? "io.github.elemirus1996.einsatzspur") {
         self.dienst = dienst
     }
 
