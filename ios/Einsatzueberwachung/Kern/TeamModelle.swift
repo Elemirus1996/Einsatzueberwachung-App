@@ -31,6 +31,7 @@ struct TeamConfig: Decodable, Equatable, Sendable {
     var intervalSec: Int
     var uploadEverySec: Int
     var pauseCheckSec: Int
+    var server: ServerInfo?
 
     var steuerung: SteuerAntwort {
         SteuerAntwort(mode: mode, intervalSec: intervalSec, uploadEverySec: uploadEverySec,

@@ -129,8 +129,8 @@ final class TeamAnsicht: ObservableObject {
         case .lage:
             await neuLaden(tracksVoll: true)
         case .stop:
-            // Nur ein Hinweis: Der Server schickt `stop` auch, wenn er die Verbindung verdrängt.
-            // Ob wirklich Schluss ist, sagt /lage (410 → stop); sonst bleibt die Ortung, wie sie ist.
+            // Absicherung: Seit Server #124 heißt `stop` echtes Ende (Verdrängung kommt als `verdraengt`),
+            // ältere Server schickten es auch bei Verdrängung. Ob wirklich Schluss ist, sagt /lage (410 → stop).
             if await lageBestaetigtStop() == false { verdraengtWarten = Self.nachVerdraengung }
         case .verdraengt(let sekunden):
             // Server ab #124: angemeldet bleiben, nicht sofort neu verbinden (höchstens 10 min warten)

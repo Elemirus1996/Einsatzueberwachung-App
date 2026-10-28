@@ -90,6 +90,20 @@ extension TeamClient: TeamAnsichtSchnittstelle {
                                            inhalt: try JSONEncoder().encode(["id": id, "code": code.rawValue]))
     }
 
+    /// Staffellogo als PNG (Abschnitt 10). `nil`, wenn der Server keins hat (404, auch bei SVG-Logo).
+    func logo() async throws -> Data? {
+        var request = request("logo")
+        request.setValue("image/png", forHTTPHeaderField: "Accept")
+        let (daten, antwort) = try await session.data(for: request)
+        guard let http = antwort as? HTTPURLResponse else { throw SchnittstellenFehler.antwortUngueltig }
+        switch http.statusCode {
+        case 200: return daten
+        case 404: return nil
+        case 410: throw SchnittstellenFehler.beendet
+        default: throw SchnittstellenFehler.server(status: http.statusCode)
+        }
+    }
+
     /// Server-Sent Events. Endet, wenn die Verbindung abbricht; 410 beim Verbinden → `beendet`.
     func ereignisse() async throws -> AsyncThrowingStream<TeamEreignis, Error> {
         var request = request("ereignisse")
@@ -148,6 +162,7 @@ struct TeamAuswahl: Decodable, Equatable, Sendable {
     var einsatz: String?
     var uebung: Bool?
     var staffel: String?
+    var server: ServerInfo?
     var teams: [Eintrag]
 }
 
