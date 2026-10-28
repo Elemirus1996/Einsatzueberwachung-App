@@ -25,8 +25,9 @@ final class CoreLocationQuelle: NSObject, OrtungsQuelle, CLLocationManagerDelega
         super.init()
         manager.delegate = self
         manager.activityType = .fitness
-        manager.desiredAccuracy = kCLLocationAccuracyBest
-        manager.distanceFilter = kCLDistanceFilterNone
+        // Akku: 10 m reichen für den Laufweg; ohne Bewegung kommen keine Positionen (Takt dafür in TeamOrtung)
+        manager.desiredAccuracy = kCLLocationAccuracyNearestTenMeters
+        manager.distanceFilter = 5
         // Automatisches Pausieren aus: Danach startet iOS die Ortung im Hintergrund nicht wieder,
         // und Hundeführer stehen während der Suche oft eine Weile still.
         manager.pausesLocationUpdatesAutomatically = false
