@@ -24,8 +24,9 @@ struct SSELeserTests {
         data: {}
 
         """
-        let ereignisse = lesen(strom)
-        #expect(ereignisse.map(\.name) == ["halsband", "lage", "stop"])
+        let ereignisse = lesen(strom + "\nevent: verdraengt\ndata: {\"wiederholenNachSec\":60}\n\n")
+        #expect(ereignisse.map(\.name) == ["halsband", "lage", "stop", "verdraengt"])
+        #expect(TeamEreignis(ereignisse[3]) == .verdraengt(wiederholenNachSec: 60))
         #expect(TeamEreignis(ereignisse[0]) == .halsband(Halsband(
             lat: 49.312, lng: 8.431, zeit: Date(timeIntervalSince1970: 1_793_178_888), akku: 72)))
         #expect(TeamEreignis(ereignisse[1]) == .lage)
@@ -200,6 +201,14 @@ struct TeamAnsichtTests {
         await a.verarbeiten(.stop)
         #expect(!modi.contains(.stop))
         #expect(modi == [.pause])   // Modus aus /lage übernommen
+    }
+
+    @Test func verdraengtBeendetNichtsUndFragtNichtNach() async {
+        var modi: [Modus] = []
+        let a = ansicht { modi.append($0) }
+        await a.verarbeiten(.verdraengt(wiederholenNachSec: 60))
+        #expect(modi.isEmpty)
+        #expect(a.lage == nil)   // keine Rückfrage nötig
     }
 
     @Test func stopEreignisImFunklochBeendetNichts() async {

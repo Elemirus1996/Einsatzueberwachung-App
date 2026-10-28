@@ -37,7 +37,8 @@ final class TeamAnsicht: ObservableObject {
     private var letzteVolleTracks: Date?
     private var aufgaben: [Task<Void, Never>] = []
     private var meldungenLaufen = false
-    private var verdraengt = false
+    /// Wartezeit vor dem nächsten Verbindungsversuch nach einer Verdrängung (sonst `nil`).
+    private var verdraengtWarten: Duration?
 
     init(schnittstelle: TeamAnsichtSchnittstelle, teamId: String, speicher: UserDefaults = .standard,
          jetzt: @escaping () -> Date = Date.init, beiSteuerung: @escaping (Modus) -> Void) {
@@ -94,9 +95,9 @@ final class TeamAnsicht: ObservableObject {
             } catch {}
             live = false
             // Nach einem Abbruch schnell neu verbinden; ohne Live-Verbindung alle 15 s die Lage holen
-            if verdraengt {
-                verdraengt = false
-                try? await Task.sleep(for: Self.nachVerdraengung)
+            if let warten = verdraengtWarten {
+                verdraengtWarten = nil
+                try? await Task.sleep(for: warten)
             } else {
                 try? await Task.sleep(for: warVerbunden ? Self.neuVerbindenNach : Self.pollTakt)
             }
@@ -130,7 +131,10 @@ final class TeamAnsicht: ObservableObject {
         case .stop:
             // Nur ein Hinweis: Der Server schickt `stop` auch, wenn er die Verbindung verdrängt.
             // Ob wirklich Schluss ist, sagt /lage (410 → stop); sonst bleibt die Ortung, wie sie ist.
-            if await lageBestaetigtStop() == false { verdraengt = true }
+            if await lageBestaetigtStop() == false { verdraengtWarten = Self.nachVerdraengung }
+        case .verdraengt(let sekunden):
+            // Server ab #124: angemeldet bleiben, nicht sofort neu verbinden (höchstens 10 min warten)
+            verdraengtWarten = .seconds(min(max(sekunden, 5), 600))
         }
     }
 
