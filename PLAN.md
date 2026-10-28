@@ -198,7 +198,7 @@ iOS, getestet auf dem iPhone 15 Pro gegen Server v1.11.10 am 28.10.2026:
 - [ ] Heimatstaffel: bei der ersten Verbindung fragen, nur dann Logo und Name der Staffel auf der Startseite; fremde Staffel im gemeinsamen Einsatz ändert nichts; in den Einstellungen änderbar (braucht Server #121)
 
 Android:
-- [ ] Android-Projekt in `android/` nach derselben Vorlage (wer baut: offen)
+- [ ] Android-Projekt in `android/` nach derselben Vorlage, gebaut vom Mac (Android Studio; entschieden 28.10.2026)
 
 ### Phase 3 – App, Rolle Einsatzleitung nativ (Mac; erst iOS, dann Android)
 - [ ] Einrichtung: interne Adresse einmal eingeben, VPN-Erkennung, sonst Hinweis „WireGuard einschalten“
