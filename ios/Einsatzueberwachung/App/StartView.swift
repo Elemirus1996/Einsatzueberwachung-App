@@ -5,8 +5,8 @@ struct StartView: View {
 
     var body: some View {
         NavigationStack {
-            if let team = modell.team, let sitzung = modell.teamSitzung {
-                TeamStatusView(ortung: team, sitzung: sitzung)
+            if let team = modell.team, let ansicht = modell.teamAnsicht, let sitzung = modell.teamSitzung {
+                TeamAnsichtView(ortung: team, ansicht: ansicht, sitzung: sitzung)
             } else {
                 rollenAuswahl
             }

@@ -7,6 +7,7 @@ final class AppModell: ObservableObject {
     static let statusAufgabe = "io.github.elemirus1996.einsatzueberwachung.status"
 
     @Published private(set) var team: TeamOrtung?
+    @Published private(set) var teamAnsicht: TeamAnsicht?
     @Published private(set) var teamSitzung: TeamSitzung?
 
     private let schluesselbund = Schluesselbund()
@@ -65,14 +66,20 @@ final class AppModell: ObservableObject {
 
     private func teamStarten(_ sitzung: TeamSitzung) {
         teamSitzung = sitzung
+        let client = TeamClient(sitzung: sitzung)
         team = TeamOrtung(
-            schnittstelle: TeamClient(sitzung: sitzung), quelle: quelle, puffer: puffer,
+            schnittstelle: client, quelle: quelle, puffer: puffer,
             ablauf: sitzung.expiresAt,
             beimBeenden: { [weak self] in self?.teamBeendet() })
+        // Die Ansicht erfährt über /lage und /ereignisse sofort, wenn eine Suche beginnt oder endet
+        teamAnsicht = TeamAnsicht(
+            schnittstelle: client, teamId: sitzung.teamId ?? sitzung.teamName,
+            beiSteuerung: { [weak self] modus in self?.team?.anwenden(SteuerAntwort(mode: modus)) })
         team?.ablaufPruefen()
     }
 
     private func teamBeendet() {
+        teamAnsicht?.vergessen()
         schluesselbund.loeschen(konto: Schluesselbund.kontoTeam)
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.statusAufgabe)
     }
@@ -81,6 +88,7 @@ final class AppModell: ObservableObject {
     func teamSchliessen() {
         guard team?.zustand == .beendet else { return }
         team = nil
+        teamAnsicht = nil
         teamSitzung = nil
     }
 }

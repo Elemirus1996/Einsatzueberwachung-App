@@ -107,7 +107,9 @@ struct TeamAnmeldungView: View {
     private func teamListe(_ qr: TeamQRCode, _ auswahl: TeamAuswahl) -> some View {
         Group {
             Section {
-                if let einsatz = auswahl.einsatz, !einsatz.isEmpty { LabeledContent("Einsatz", value: einsatz) }
+                if let einsatz = auswahl.einsatz, !einsatz.isEmpty {
+                    LabeledContent(auswahl.uebung == true ? "Übung" : "Einsatz", value: einsatz)
+                }
                 if let staffel = auswahl.staffel, !staffel.isEmpty { LabeledContent("Staffel", value: staffel) }
                 LabeledContent("Server", value: qr.server.name)
             }
@@ -182,6 +184,7 @@ struct TeamAnmeldungView: View {
         switch fehler {
         case AnmeldeFehler.codeUngueltig: "Der Anmelde-Code ist ungültig oder es ist gerade kein Einsatz aktiv."
         case AnmeldeFehler.teamUnbekannt: "Dieses Team gibt es nicht mehr. Bitte die Teamliste aktualisieren."
+        case AnmeldeFehler.zuVieleVersuche: "Zu viele Versuche, bitte kurz warten (etwa 30 Sekunden)."
         case AnmeldeFehler.server(let status) where status == 404 || status == 405:
             "Der Server unterstützt die App-Anmeldung noch nicht. Bitte den Server aktualisieren."
         case AnmeldeFehler.server: "Der Server meldet einen Fehler. Bitte später erneut versuchen."

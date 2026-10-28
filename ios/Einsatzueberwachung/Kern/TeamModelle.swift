@@ -51,6 +51,7 @@ struct Position: Codable, Equatable, Sendable {
 struct TeamSitzung: Codable, Equatable, Sendable {
     var server: ServerAdresse
     var token: String
+    var teamId: String?
     var teamName: String
     var expiresAt: Date
 }

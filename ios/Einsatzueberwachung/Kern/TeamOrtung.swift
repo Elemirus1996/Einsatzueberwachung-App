@@ -13,6 +13,8 @@ final class TeamOrtung: ObservableObject {
     @Published private(set) var zustand: Zustand = .wartet
     @Published private(set) var letzterUpload: Date?
     @Published private(set) var gepuffert = 0
+    /// Letzte eigene Position (auch zwischen den gespeicherten), für Karte und Entfernung zum Gebiet.
+    @Published private(set) var letztePosition: Position?
 
     private let schnittstelle: TeamSchnittstelle
     private let quelle: OrtungsQuelle
@@ -78,6 +80,7 @@ final class TeamOrtung: ObservableObject {
     func positionErhalten(_ position: Position) {
         ablaufPruefen()
         guard zustand == .ortet else { return }
+        letztePosition = position
         let zeit = Date(timeIntervalSince1970: TimeInterval(position.timestamp) / 1000)
         if let letzte = letzteAufnahme, zeit.timeIntervalSince(letzte) < intervall { return }
         letzteAufnahme = zeit
