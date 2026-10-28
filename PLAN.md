@@ -10,7 +10,7 @@ Eine App für iPhone und Android mit zwei Rollen:
 |---|---|---|
 | Wer | jedes Staffelmitglied im Einsatz | nur ausgewählte Personen |
 | Zugang | ausschließlich per QR-Code aus dem laufenden Einsatz | ausschließlich im WireGuard-VPN + Anmeldung mit Staffel-Passwort |
-| Oberfläche | Team-Seite des Servers (`/team`) | EL-Ansicht des Servers (`/el`) |
+| Oberfläche | Team-Seite des Servers (`/team`) in der App | **komplett nativ** (SwiftUI / Jetpack Compose), entschieden 28.10.2026 |
 | Ortung | Laufweg des Hundeführers während der Suche | Standort der Einsatzleitung, damit der Führungsassistent im ELW sieht, wo der EL ist |
 | Ende | Server schaltet GPS ab, sobald Suche/Einsatz endet | GPS aus, sobald der Einsatz beendet ist oder die EL sich abmeldet |
 
@@ -71,6 +71,26 @@ Hintergrund-Ortung, die der Server stoppen kann – ist ohnehin plattformeigen; 
   `WKScriptMessageHandler` „einsatzApp“ (iOS) bzw. `@JavascriptInterface` „EinsatzAppAndroid“ (Android).
 - Später automatische Builds über GitHub Actions (macOS-Runner für iOS).
 
+## Einsatzleitung nativ – Umfang
+
+Nachgebaut wird, was `/el` heute kann (Stand Server 1.11.7):
+
+| Bereich | Funktionen |
+|---|---|
+| Einsatz starten | Stichwort, Ort, Szenario, Einsatz/Übung (wie `/el/start`) |
+| Übersicht | Teams mit Suchzeit und Warnstufe, Starten (mit Halsband-Auswahl), Pause, Weiter, Stopp, Zurücksetzen; Warnton bei Eskalation; Wetter |
+| Vermisste | Profile anlegen/bearbeiten, Szenario, Checklisten |
+| Karte | Suchgebiete, Halsbänder und Team-Handys live, Tracks, Abdeckung in %, ELW; Kartenkacheln OpenStreetMap/OpenTopoMap über **MapLibre** (beide Plattformen, keine Google-Schlüssel) |
+| Notizen und Funk | Liste, neue Einträge, Antworten; Funkloch-Puffer wie heute |
+| Einsatz beenden | Ergebnis, Prüfung der Ressourcen, PDF-Optionen (wie `/el/beenden`) |
+| Ortung | Standort der Einsatzleitung für die Karte im ELW (Server fertig, PR #113) |
+
+Bewusst **nicht** in der App: Teams anlegen, Stammdaten, Einstellungen, Archiv – das bleibt im Monitor (Absprache: `/el` ist keine Kopie des Monitors).
+
+Live-Aktualisierung: SignalR-Hub für die App (Bearer-Token), damit Suchzeiten, Positionen, Funk und Notizen ohne Neuladen erscheinen.
+
+Folge: Jede neue EL-Funktion auf dem Server muss in beiden Apps nachgezogen werden (App-Update, bei Apple mit Prüfung).
+
 ## Server-Schnittstelle v1 (im Server-Repo)
 
 **Verbindlich:** [docs/APP_API.md](https://github.com/Elemirus1996/Einsatzueberwachung.Server/blob/main/docs/APP_API.md) im Server-Repo. Die Übersicht hier ist nur eine Zusammenfassung.
@@ -82,8 +102,10 @@ Neuer Bereich `api/team-mobile/app/v1/` (öffentliche Adresse, eigener nginx-Blo
 | `GET  api/team-mobile/app/v1/config` | nach QR-Scan: Team, Einsatz, Staffelname, Intervalle, `expiresAt`, `mode` |
 | `POST api/team-mobile/app/v1/positions` | gesammelte Positionen (lat, lng, accuracy, timestamp, battery), Antwort mit `mode` |
 | `GET  api/team-mobile/app/v1/status` | leichte Abfrage im Pause-Modus |
-| `POST api/el/app/v1/token` | nach EL-Anmeldung in der WebView: kurzlebiges Geräte-Token für die native Ortung |
-| `POST api/el/app/v1/positions` | Standort der Einsatzleitung (nur aus dem VPN), Antwort mit `mode` |
+| `POST api/el/app/v1/login` | Anmeldung der nativen EL-App mit Staffel-Passwort (nur VPN, Sperre nach Fehlversuchen wie im Browser) → EL-Token |
+| `POST api/el/app/v1/positions`, `GET …/status` | Standort der Einsatzleitung, Antwort mit `mode` (fertig, PR #113) |
+| `api/el/app/v1/einsatz`, `…/teams`, `…/vermisste`, `…/karte`, `…/funk`, `…/notizen`, `…/beenden` | Daten und Aktionen der EL-Oberfläche (Phase 1b) |
+| `/hubs/el-app` | Live-Aktualisierungen für die native EL-App (Phase 1b) |
 
 Auth: `Authorization: Bearer <token>`. Ungültiges Team-Token → `410 Gone` + `{"mode":"stop"}`. Der bestehende Traccar-Endpunkt bleibt in der Übergangszeit unverändert.
 
@@ -107,6 +129,13 @@ Anzeige auf dem Server: Marker „EL“ (mit Gerätename, z. B. „Tablet EL“)
 - [x] Tests Team: Zustandslogik, 410 nach Einsatzende, Batch mit gepufferten Zeitstempeln (PR #112)
 - [x] Tests EL: nur intern, Token ungültig nach Passwortänderung, pause ohne Einsatz (PR #113)
 
+### Phase 1b – Server: Schnittstelle für die native Einsatzleitung
+- [ ] Login-Endpunkt für die App (Staffel-Passwort, Sperre, Audit-Log mit Gerätename)
+- [ ] Lesen: Einsatz, Teams (Suchzeit, Warnstufe, Halsband, Handy), Vermisste, Karte (Gebiete, Positionen, Tracks, Abdeckung), Funk, Notizen, Wetter
+- [ ] Aktionen: Einsatz starten, Team starten/pausieren/stoppen/zurücksetzen (Halsband-Rückfrage wie heute), Vermisste speichern, Funk/Notiz senden, Einsatz beenden
+- [ ] SignalR-Hub `/hubs/el-app` mit Bearer-Token, nur intern
+- [ ] Tests für jede Aktion und für „nur intern“; Beschreibung in `docs/APP_API.md`
+
 ### Phase 2 – App, Rolle Team (Mac; erst iOS, dann Android)
 - [ ] Xcode-Projekt in `ios/`, Android-Projekt in `android/`, Startbildschirm „Team“ / „Einsatzleitung“
 - [ ] QR-Scan (nur `https://…/team/login?code=…`), Bestätigungsdialog mit Servername, WebView-Anmeldung, Token-Übergabe annehmen (nur vom selben Server), Token in Keychain/Keystore
@@ -114,10 +143,13 @@ Anzeige auf dem Server: Marker „EL“ (mit Gerätename, z. B. „Tablet EL“)
 - [ ] WebView `/team` mit Anmeldung über das Token
 - [ ] Anzeige: Team, Einsatz, Status „Ortung läuft / pausiert / beendet“, letzter Upload
 
-### Phase 3 – App, Rolle Einsatzleitung (Mac)
-- [ ] VPN-Erkennung (interne Adresse erreichbar?), sonst Hinweis „WireGuard einschalten“
-- [ ] WebView `/el` (interne Adresse einmal eingeben), Token-Übergabe `rolle: el` annehmen, EL-Ortung starten
-- [ ] Stop bei Einsatzende, Abmeldung oder Rollenwechsel
+### Phase 3 – App, Rolle Einsatzleitung nativ (Mac; erst iOS, dann Android)
+- [ ] Einrichtung: interne Adresse einmal eingeben, VPN-Erkennung, sonst Hinweis „WireGuard einschalten“
+- [ ] Anmeldung mit Staffel-Passwort (nativer Dialog), Token in Keychain/Keystore
+- [ ] Übersicht mit Teams und Aktionen, Warnton/Haptik bei Eskalation
+- [ ] Vermisste, Notizen und Funk (mit Funkloch-Puffer), Einsatz starten und beenden
+- [ ] Karte mit MapLibre (Gebiete, Positionen, Tracks, Abdeckung)
+- [ ] EL-Ortung, Stop bei Einsatzende, Abmeldung oder Rollenwechsel
 
 ### Phase 4 – Test (TestFlight / interner Play-Test)
 - [ ] Übung mit 2–3 Teams und Einsatzleitung
@@ -145,4 +177,5 @@ Anzeige auf dem Server: Marker „EL“ (mit Gerätename, z. B. „Tablet EL“)
 
 - Name und Symbol der App
 - Traccar-Endpunkt nach dem Umstieg abschalten oder als Rückfallebene behalten
-- Soll die Einsatzleitung auch ohne laufenden Einsatz geortet werden? (Vorschlag: nein)
+- Soll die Einsatzleitung auch ohne laufenden Einsatz geortet werden? (umgesetzt: nein, `pause`)
+- Push-Mitteilungen (Warnungen, Funk) bei gesperrtem Handy: iOS über Apple (APNs), Android über Google (Firebase) – Inhalte würden über diese Dienste laufen
