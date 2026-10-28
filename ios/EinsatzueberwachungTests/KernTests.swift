@@ -46,6 +46,15 @@ struct ModellTests {
         #expect(config.expiresAt == Date(timeIntervalSince1970: 1_793_268_000))
     }
 
+    /// .NET liefert DateTime mit 0 bis 7 Nachkommastellen
+    @Test(arguments: ["", ".1", ".12", ".123", ".123456", ".1234567"])
+    func zeitenMitBeliebigenNachkommastellen(_ bruch: String) throws {
+        let json = #"{ "mode": "track", "expiresAt": "2026-10-28T20:51:03\#(bruch)Z" }"#
+        let antwort = try JSONDecoder.server.decode(SteuerAntwort.self, from: Data(json.utf8))
+        let sekunden = try #require(antwort.expiresAt).timeIntervalSince1970
+        #expect(abs(sekunden - (1_793_220_663 + (Double("0" + bruch) ?? 0))) < 0.001)
+    }
+
     @Test func antwortMitSekundenbruchteilen() throws {
         let json = #"{ "mode": "pause", "expiresAt": "2026-10-29T10:00:00.123Z", "accepted": 2 }"#
         let antwort = try JSONDecoder.server.decode(SteuerAntwort.self, from: Data(json.utf8))

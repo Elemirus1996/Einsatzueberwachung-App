@@ -178,6 +178,18 @@ struct TeamOrtungTests {
         #expect(o.zustand == .pausiert)
     }
 
+    @Test func taktFragtOhneBewegungNachUndSchaltetGpsAb() async throws {
+        let o = ortung(uhr: Date.init)
+        server.antwort = .success(SteuerAntwort(mode: .pause))
+        o.anwenden(SteuerAntwort(mode: .track, uploadEverySec: 5))
+        #expect(quelle.aktiv)
+        // keine einzige Position: Hundeführer steht still, Suche wird beendet
+        try await Task.sleep(for: .seconds(6))
+        #expect(server.statusAbfragen >= 1)
+        #expect(o.zustand == .pausiert)
+        #expect(!quelle.aktiv)
+    }
+
     @Test func neuerAblaufAusAntwortWirdUebernommen() {
         var t = zeit
         let o = ortung(ablauf: 60, uhr: { t })
