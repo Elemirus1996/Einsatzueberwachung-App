@@ -11,6 +11,8 @@ struct StartView: View {
                 rollenAuswahl
             }
         }
+        // Nach An- oder Abmeldung neu aufbauen, damit keine Anmeldeseite auf dem Stapel liegen bleibt
+        .id(modell.team == nil)
     }
 
     private var rollenAuswahl: some View {

@@ -31,21 +31,41 @@ struct ServerAdresse: Codable, Hashable, Sendable {
     }
 }
 
-/// Inhalt des bestehenden Team-QR-Codes: `https://<server>/team/login?code=<Anmelde-Code>`.
+/// Inhalt des bestehenden Team-QR-Codes: `https://<server>/team/login/<Anmelde-Code>`
+/// (ältere Form `https://<server>/team/login?code=<Anmelde-Code>`).
 struct TeamQRCode: Equatable, Sendable {
     let server: ServerAdresse
     let code: String
 
+    init(server: ServerAdresse, code: String) {
+        self.server = server
+        self.code = code
+    }
+
     init?(_ text: String) {
         guard let url = URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines)),
               let server = ServerAdresse(url),
-              let teile = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              teile.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")).lowercased() == "team/login",
-              let code = teile.queryItems?.first(where: { $0.name == "code" })?.value?
-                  .trimmingCharacters(in: .whitespaces),
-              !code.isEmpty
+              let teile = URLComponents(url: url, resolvingAgainstBaseURL: false)
         else { return nil }
+        let pfad = teile.path.split(separator: "/").map(String.init)
+        guard pfad.count >= 2, pfad[0].lowercased() == "team", pfad[1].lowercased() == "login" else { return nil }
+        let roh: String?
+        switch pfad.count {
+        case 3: roh = pfad[2]
+        case 2: roh = teile.queryItems?.first(where: { $0.name == "code" })?.value
+        default: roh = nil
+        }
+        guard let code = Self.bereinigt(roh) else { return nil }
         self.server = server
         self.code = code
+    }
+
+    /// Wie auf der Anmeldeseite: Leerzeichen raus, Großbuchstaben. Nur Buchstaben und Ziffern.
+    static func bereinigt(_ code: String?) -> String? {
+        let ergebnis = (code ?? "").filter { !$0.isWhitespace }.uppercased()
+        guard !ergebnis.isEmpty, ergebnis.count <= 64,
+              ergebnis.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber) })
+        else { return nil }
+        return ergebnis
     }
 }
