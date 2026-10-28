@@ -26,6 +26,7 @@ final class TeamOrtung: ObservableObject {
     private var letzteAufnahme: Date?
     private var letzteAnfrage: Date?
     private var anfrageLaeuft = false
+    private var takt: Task<Void, Never>?
 
     init(schnittstelle: TeamSchnittstelle, quelle: OrtungsQuelle, puffer: PositionsSpeicher,
          ablauf: Date, jetzt: @escaping () -> Date = Date.init, beimBeenden: @escaping () -> Void) {
@@ -61,8 +62,10 @@ final class TeamOrtung: ObservableObject {
         case .track:
             quelle.starten(intervall: intervall)
             zustand = .ortet
+            taktStarten()
         case .pause:
             quelle.beenden()
+            taktBeenden()
             zustand = .pausiert
         case .stop:
             beenden()
@@ -143,7 +146,27 @@ final class TeamOrtung: ObservableObject {
         return jetzt() >= ablauf
     }
 
+    /// Während der Ortung regelmäßig hochladen bzw. den Status fragen, auch wenn der Hundeführer stillsteht
+    /// und darum keine Positionen kommen. Sonst bliebe das GPS nach Suchende an.
+    private func taktStarten() {
+        guard takt == nil else { return }
+        takt = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let pause = self?.uploadTakt else { return }
+                try? await Task.sleep(for: .seconds(pause))
+                guard !Task.isCancelled, let self, self.zustand == .ortet else { return }
+                if self.istFaellig { await self.hochladen() }
+            }
+        }
+    }
+
+    private func taktBeenden() {
+        takt?.cancel()
+        takt = nil
+    }
+
     private func beenden() {
+        taktBeenden()
         quelle.beenden()
         puffer.leeren()
         gepuffert = 0
