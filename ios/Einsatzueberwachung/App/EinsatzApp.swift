@@ -7,7 +7,7 @@ struct EinsatzApp: App {
 
     var body: some Scene {
         WindowGroup {
-            StartView()
+            StartView(heimat: modell.heimat)
                 .environmentObject(modell)
         }
         .onChange(of: phase) { _, neu in

@@ -9,6 +9,10 @@ final class AppModell: ObservableObject {
     @Published private(set) var team: TeamOrtung?
     @Published private(set) var teamAnsicht: TeamAnsicht?
     @Published private(set) var teamSitzung: TeamSitzung?
+    /// Offene Frage „Ist das deine eigene Staffel?“ nach der ersten Anmeldung an einem Server.
+    @Published private(set) var heimatFrage: (info: ServerInfo, name: String)?
+
+    let heimat = HeimatStaffel()
 
     private let schluesselbund = Schluesselbund()
     private let quelle = CoreLocationQuelle()
@@ -17,11 +21,31 @@ final class AppModell: ObservableObject {
     init() {
         if let sitzung = schluesselbund.lesen(TeamSitzung.self, konto: Schluesselbund.kontoTeam) {
             teamStarten(sitzung)
+            Task { await teamKonfigurieren() }
         }
     }
 
     /// Nach erfolgreicher Anmeldung (native Anmeldung folgt mit Server-Phase 1c).
-    func teamAnmelden(_ sitzung: TeamSitzung) {
+    func teamAnmelden(_ sitzung: TeamSitzung, server: ServerInfo?, staffel: String?) {
+        if let server, heimat.sollFragen(server) {
+            heimatFrage = (server, server.staffel ?? staffel ?? sitzung.server.name)
+        }
+        teamAnmelden(sitzung)
+    }
+
+    func heimatBeantworten(_ eigeneStaffel: Bool) {
+        guard let frage = heimatFrage else { return }
+        heimatFrage = nil
+        guard eigeneStaffel else {
+            heimat.ablehnen(frage.info)
+            return
+        }
+        heimat.uebernehmen(frage.info, name: frage.name)
+        guard let sitzung = teamSitzung else { return }
+        Task { await heimat.aktualisieren(frage.info) { try await TeamClient(sitzung: sitzung).logo() } }
+    }
+
+    private func teamAnmelden(_ sitzung: TeamSitzung) {
         team?.anwenden(.stop)
         guard schluesselbund.speichern(sitzung, konto: Schluesselbund.kontoTeam) else { return }
         teamStarten(sitzung)
@@ -55,8 +79,12 @@ final class AppModell: ObservableObject {
     private func teamKonfigurieren() async {
         guard let sitzung = teamSitzung, let team else { return }
         do {
-            let config = try await TeamClient(sitzung: sitzung).config()
+            let client = TeamClient(sitzung: sitzung)
+            let config = try await client.config()
             team.anwenden(config.steuerung)
+            if let server = config.server {
+                await heimat.aktualisieren(server) { try await client.logo() }
+            }
         } catch SchnittstellenFehler.beendet {
             team.anwenden(.stop)
         } catch {

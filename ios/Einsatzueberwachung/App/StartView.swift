@@ -2,6 +2,12 @@ import SwiftUI
 
 struct StartView: View {
     @EnvironmentObject private var modell: AppModell
+    @ObservedObject private var heimat: HeimatStaffel
+    @State private var einstellungenOffen = false
+
+    init(heimat: HeimatStaffel) {
+        self.heimat = heimat
+    }
 
     var body: some View {
         NavigationStack {
@@ -13,18 +19,48 @@ struct StartView: View {
         }
         // Nach An- oder Abmeldung neu aufbauen, damit keine Anmeldeseite auf dem Stapel liegen bleibt
         .id(modell.team == nil)
+        .alert("Ist „\(modell.heimatFrage?.name ?? "")“ deine eigene Staffel?",
+               isPresented: Binding(get: { modell.heimatFrage != nil }, set: { _ in })) {
+            Button("Ja, meine Staffel") { modell.heimatBeantworten(true) }
+            Button("Nein", role: .cancel) { modell.heimatBeantworten(false) }
+        } message: {
+            Text("Dann zeigt EinsatzSpur ihren Namen und ihr Logo auf der Startseite. Bei einem gemeinsamen Einsatz mit einer anderen Staffel: Nein. Änderbar in den Einstellungen.")
+        }
+        .sheet(isPresented: $einstellungenOffen) {
+            EinstellungenView(heimat: heimat)
+        }
+    }
+
+    private var kopf: some View {
+        VStack(spacing: 12) {
+            Group {
+                if let logo = heimat.logo {
+                    Image(uiImage: logo)
+                        .resizable()
+                        .scaledToFit()
+                } else {
+                    Image("AppSymbol")
+                        .resizable()
+                        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                }
+            }
+            .frame(width: 96, height: 96)
+            .accessibilityHidden(true)
+            Text("EinsatzSpur")
+                .font(.largeTitle.bold())
+            if let staffel = heimat.eintrag?.staffel {
+                Text(staffel)
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+        }
     }
 
     private var rollenAuswahl: some View {
         VStack(spacing: 16) {
             Spacer()
-            Image("AppSymbol")
-                .resizable()
-                .frame(width: 96, height: 96)
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                .accessibilityHidden(true)
-            Text("EinsatzSpur")
-                .font(.largeTitle.bold())
+            kopf
             Spacer()
             NavigationLink {
                 TeamAnmeldungView()
@@ -36,6 +72,12 @@ struct StartView: View {
             Spacer()
         }
         .padding()
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { einstellungenOffen = true } label: { Image(systemName: "gearshape") }
+                    .accessibilityLabel("Einstellungen")
+            }
+        }
     }
 }
 

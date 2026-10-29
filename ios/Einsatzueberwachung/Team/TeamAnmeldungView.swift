@@ -174,7 +174,9 @@ struct TeamAnmeldungView: View {
         laedt = true
         defer { laedt = false }
         do {
-            modell.teamAnmelden(try await TeamAnmeldung(qr: qr).anmelden(teamId: team.teamId))
+            let auswahl = self.auswahl?.teams
+            modell.teamAnmelden(try await TeamAnmeldung(qr: qr).anmelden(teamId: team.teamId),
+                                server: auswahl?.server, staffel: auswahl?.staffel)
         } catch {
             fehler = text(fuer: error)
         }

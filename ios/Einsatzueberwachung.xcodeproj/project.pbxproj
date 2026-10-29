@@ -15,6 +15,7 @@
 		2CE2CBDF74B1E03F805333FA /* TeamSchnittstelle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 602266F6E27237F5A6F9575F /* TeamSchnittstelle.swift */; };
 		2D47A3B7AAAEEDEA83923B8C /* TeamLage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F2569C9D22B3E5711A81F0 /* TeamLage.swift */; };
 		47806CDB947BFF78B4392CF0 /* PositionsPuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5AB257A4D6CC10859BDCE63 /* PositionsPuffer.swift */; };
+		515B5D3C7DD9A320E1E7361A /* EinstellungenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4796A57686D309891516479C /* EinstellungenView.swift */; };
 		5A6F46FC11967E1EDF36B4A3 /* EinsatzApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F3419961231647750EF748 /* EinsatzApp.swift */; };
 		5C64E699EFA85FAF73737704 /* ServerAdresse.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56F9B9620977557546AA87ED /* ServerAdresse.swift */; };
 		6C7B4127674E4722256EA536 /* TeamAnsichtTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A917F3FBFB4256F935A563E /* TeamAnsichtTests.swift */; };
@@ -23,7 +24,9 @@
 		8D7BC3821334E2D60C7A796D /* Schluesselbund.swift in Sources */ = {isa = PBXBuildFile; fileRef = 179F8BB87D6F40D69F2E2A8D /* Schluesselbund.swift */; };
 		9C16D7091D48A562D60679C2 /* TeamAnsicht.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42542B191DD57AAC94CE0EC0 /* TeamAnsicht.swift */; };
 		A0AF23349A115130EE14C9AD /* StartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 133295A3FD86DD2CC9E0275C /* StartView.swift */; };
+		AC8F19C87FD06F962F9B94B2 /* HeimatStaffelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C49A3C66952DBE5E6E35822 /* HeimatStaffelTests.swift */; };
 		C0D161ED59E066250EC86B7A /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDE0E5851EA7EDFF57DB8F64 /* QRScannerView.swift */; };
+		C78C9719322BA2789C1B70A6 /* HeimatStaffel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C766A51FD148218A0B29EE /* HeimatStaffel.swift */; };
 		D9316212B2329978232AA34B /* TeamOrtung.swift in Sources */ = {isa = PBXBuildFile; fileRef = F92EA3A1472DD75C912F9D1D /* TeamOrtung.swift */; };
 		DEA130868989542425090850 /* KernTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90922EA3579F26D42494A74A /* KernTests.swift */; };
 /* End PBXBuildFile section */
@@ -42,7 +45,10 @@
 		01EEA4C26487F0027FEABEF9 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		133295A3FD86DD2CC9E0275C /* StartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StartView.swift; sourceTree = "<group>"; };
 		179F8BB87D6F40D69F2E2A8D /* Schluesselbund.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Schluesselbund.swift; sourceTree = "<group>"; };
+		40C766A51FD148218A0B29EE /* HeimatStaffel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeimatStaffel.swift; sourceTree = "<group>"; };
 		42542B191DD57AAC94CE0EC0 /* TeamAnsicht.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamAnsicht.swift; sourceTree = "<group>"; };
+		4796A57686D309891516479C /* EinstellungenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EinstellungenView.swift; sourceTree = "<group>"; };
+		4C49A3C66952DBE5E6E35822 /* HeimatStaffelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeimatStaffelTests.swift; sourceTree = "<group>"; };
 		56F9B9620977557546AA87ED /* ServerAdresse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerAdresse.swift; sourceTree = "<group>"; };
 		602266F6E27237F5A6F9575F /* TeamSchnittstelle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamSchnittstelle.swift; sourceTree = "<group>"; };
 		69CEBC84429C31F7F8C4A672 /* TeamOrtungTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamOrtungTests.swift; sourceTree = "<group>"; };
@@ -89,6 +95,7 @@
 		93C807C15E3601B3F4E883D1 /* EinsatzueberwachungTests */ = {
 			isa = PBXGroup;
 			children = (
+				4C49A3C66952DBE5E6E35822 /* HeimatStaffelTests.swift */,
 				90922EA3579F26D42494A74A /* KernTests.swift */,
 				7A917F3FBFB4256F935A563E /* TeamAnsichtTests.swift */,
 				69CEBC84429C31F7F8C4A672 /* TeamOrtungTests.swift */,
@@ -101,6 +108,7 @@
 			children = (
 				D0A1C0F7850179783614D223 /* AppModell.swift */,
 				B2F3419961231647750EF748 /* EinsatzApp.swift */,
+				4796A57686D309891516479C /* EinstellungenView.swift */,
 				133295A3FD86DD2CC9E0275C /* StartView.swift */,
 			);
 			path = App;
@@ -120,6 +128,7 @@
 		D60C6D0B25A81A62BBCCB18D /* Kern */ = {
 			isa = PBXGroup;
 			children = (
+				40C766A51FD148218A0B29EE /* HeimatStaffel.swift */,
 				AB3AF33B59FBD33F2C44B2E5 /* OrtungsQuelle.swift */,
 				C5AB257A4D6CC10859BDCE63 /* PositionsPuffer.swift */,
 				179F8BB87D6F40D69F2E2A8D /* Schluesselbund.swift */,
@@ -245,6 +254,8 @@
 			files = (
 				08DFB2CA7502DC3325DBE06D /* AppModell.swift in Sources */,
 				5A6F46FC11967E1EDF36B4A3 /* EinsatzApp.swift in Sources */,
+				515B5D3C7DD9A320E1E7361A /* EinstellungenView.swift in Sources */,
+				C78C9719322BA2789C1B70A6 /* HeimatStaffel.swift in Sources */,
 				1D85C57C6B2C8932F9BC62A4 /* OrtungsQuelle.swift in Sources */,
 				47806CDB947BFF78B4392CF0 /* PositionsPuffer.swift in Sources */,
 				C0D161ED59E066250EC86B7A /* QRScannerView.swift in Sources */,
@@ -265,6 +276,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AC8F19C87FD06F962F9B94B2 /* HeimatStaffelTests.swift in Sources */,
 				DEA130868989542425090850 /* KernTests.swift in Sources */,
 				6C7B4127674E4722256EA536 /* TeamAnsichtTests.swift in Sources */,
 				14A4774D80FC0A5F4D45954E /* TeamOrtungTests.swift in Sources */,
