@@ -1,0 +1,16 @@
+EinsatzSpur – verwendete Bibliotheken
+
+EinsatzSpur
+MIT-Lizenz, Copyright (c) 2024 Paul S. (Elemirus1996) & Eric M. (Freakwave)
+
+ZXing Core 3.5.4 (com.google.zxing:core) – QR-Code-Auswertung
+Apache License 2.0, Copyright (C) ZXing authors
+https://github.com/zxing/zxing
+
+AndroidX / Jetpack (Compose, Activity, Lifecycle, Core, CameraX)
+Apache License 2.0, Copyright The Android Open Source Project
+
+Kotlin Standardbibliothek und kotlinx.coroutines
+Apache License 2.0, Copyright JetBrains s.r.o. und Kotlin-Mitwirkende
+
+Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0
