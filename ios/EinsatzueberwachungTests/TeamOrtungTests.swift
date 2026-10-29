@@ -6,14 +6,19 @@ import Testing
 final class TestQuelle: OrtungsQuelle {
     var beiPosition: ((Position) -> Void)?
     private(set) var aktiv = false
+    private(set) var stufe: OrtungsStufe?
     private(set) var starts = 0
 
-    func starten(intervall: TimeInterval) {
+    func starten(stufe: OrtungsStufe) {
         aktiv = true
+        self.stufe = stufe
         starts += 1
     }
 
-    func beenden() { aktiv = false }
+    func beenden() {
+        aktiv = false
+        stufe = nil
+    }
 }
 
 @MainActor
@@ -73,11 +78,12 @@ struct TeamOrtungTests {
         o.anwenden(SteuerAntwort(mode: .track, intervalSec: 20))
         #expect(quelle.aktiv)
         #expect(o.zustand == .ortet)
+        #expect(quelle.stufe == .fein)
         o.anwenden(SteuerAntwort(mode: .pause))
-        #expect(!quelle.aktiv)
+        #expect(quelle.stufe == .grob, "Pause: kein GPS, nur Grob-Ortung zum Wachhalten")
         #expect(o.zustand == .pausiert)
         o.anwenden(SteuerAntwort(mode: .track))
-        #expect(quelle.aktiv, "Neue Suche startet die Ortung ohne Eingabe wieder")
+        #expect(quelle.stufe == .fein, "Neue Suche startet die Ortung ohne Eingabe wieder")
     }
 
     @Test func stopBeendetAllesEndgueltig() {
@@ -128,7 +134,7 @@ struct TeamOrtungTests {
         #expect(server.gesendet[0].count == 2)
         #expect(puffer.anzahl() == 0)
         #expect(o.zustand == .pausiert)
-        #expect(!quelle.aktiv)
+        #expect(quelle.stufe == .grob)
     }
 
     @Test func grosserPufferGehtInPaketenZu500() async {
@@ -187,7 +193,31 @@ struct TeamOrtungTests {
         try await Task.sleep(for: .seconds(6))
         #expect(server.statusAbfragen >= 1)
         #expect(o.zustand == .pausiert)
-        #expect(!quelle.aktiv)
+        #expect(quelle.stufe == .grob)
+    }
+
+    /// Fehler aus dem iPhone-Test: In der Pause schlief die gesperrte App, Suche 2 wurde nicht bemerkt.
+    /// Jetzt fragt der Takt in der Pause selbst nach und schaltet bei `track` auf fein.
+    @Test func pauseTaktBemerktNeueSucheUndSchaltetAufFein() async throws {
+        let o = ortung(uhr: Date.init)
+        server.antwort = .success(SteuerAntwort(mode: .pause))
+        o.anwenden(SteuerAntwort(mode: .pause, pauseCheckSec: 5))
+        #expect(quelle.stufe == .grob)
+        server.antwort = .success(SteuerAntwort(mode: .track))   // EL startet Suche 2
+        try await Task.sleep(for: .seconds(6))
+        #expect(server.statusAbfragen >= 1)
+        #expect(o.zustand == .ortet)
+        #expect(quelle.stufe == .fein)
+    }
+
+    @Test func pauseSammeltKeinePositionen() {
+        let t = zeit
+        let o = ortung(uhr: { t })
+        o.anwenden(SteuerAntwort(mode: .pause))
+        o.positionErhalten(position(t))
+        #expect(puffer.anzahl() == 0)
+        o.anwenden(.stop)
+        #expect(!quelle.aktiv && quelle.stufe == nil, "stop: Ortungsdienst ganz aus")
     }
 
     @Test func moduswechselAusStatusWirdGemeldetAusLageNicht() async {

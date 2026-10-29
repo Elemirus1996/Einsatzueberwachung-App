@@ -47,6 +47,8 @@ final class TeamOrtung: ObservableObject {
 
     var intervall: TimeInterval { TimeInterval(max(steuerung.intervalSec ?? 20, 1)) }
     var uploadTakt: TimeInterval { TimeInterval(max(steuerung.uploadEverySec ?? 60, 5)) }
+    /// In der Pause höchstens jede Minute /status fragen (Server-Vorgabe pauseCheckSec, wenn kürzer).
+    var pauseTakt: TimeInterval { TimeInterval(min(max(steuerung.pauseCheckSec ?? 60, 5), 60)) }
 
     /// Übernimmt eine Antwort des Servers und schaltet die Ortung entsprechend.
     /// `melden: false`, wenn der Modus aus /lage kommt (die Anzeige ist dann schon aktuell).
@@ -66,13 +68,14 @@ final class TeamOrtung: ObservableObject {
         if melden, antwort.mode != vorher { beiModuswechsel?(antwort.mode) }
         switch antwort.mode {
         case .track:
-            quelle.starten(intervall: intervall)
+            quelle.starten(stufe: .fein)
             zustand = .ortet
             taktStarten()
         case .pause:
-            quelle.beenden()
-            taktBeenden()
+            // Kein GPS, aber Grob-Ortung hält die App wach, damit der Takt eine neue Suche bemerkt
+            quelle.starten(stufe: .grob)
             zustand = .pausiert
+            taktStarten()
         case .stop:
             beenden()
         }
@@ -152,16 +155,23 @@ final class TeamOrtung: ObservableObject {
         return jetzt() >= ablauf
     }
 
-    /// Während der Ortung regelmäßig hochladen bzw. den Status fragen, auch wenn der Hundeführer stillsteht
-    /// und darum keine Positionen kommen. Sonst bliebe das GPS nach Suchende an.
+    /// Bei `track` regelmäßig hochladen bzw. den Status fragen, auch wenn der Hundeführer stillsteht und darum
+    /// keine Positionen kommen (sonst bliebe das GPS nach Suchende an). Bei `pause` jede Minute /status,
+    /// damit eine neue Suche auch bei gesperrtem Handy bemerkt wird.
     private func taktStarten() {
         guard takt == nil else { return }
         takt = Task { [weak self] in
             while !Task.isCancelled {
-                guard let pause = self?.uploadTakt else { return }
-                try? await Task.sleep(for: .seconds(pause))
-                guard !Task.isCancelled, let self, self.zustand == .ortet else { return }
-                if self.istFaellig { await self.hochladen() }
+                guard let self else { return }
+                let warten = self.zustand == .pausiert ? self.pauseTakt : self.uploadTakt
+                try? await Task.sleep(for: .seconds(warten))
+                guard !Task.isCancelled else { return }
+                switch self.zustand {
+                case .ortet: if self.istFaellig { await self.hochladen() }
+                case .pausiert: await self.statusPruefen()
+                case .wartet: continue
+                case .beendet: return
+                }
             }
         }
     }

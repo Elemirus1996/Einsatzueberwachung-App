@@ -270,7 +270,7 @@ struct TeamAnsichtView: View {
     private var ortungText: String {
         switch ortung.zustand {
         case .ortet: "Handy ortet"
-        case .pausiert: "Handy-GPS aus"
+        case .pausiert: "wartet auf neue Suche"
         case .wartet: "verbinde …"
         case .beendet: "beendet"
         }
