@@ -1,6 +1,14 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+}
+
+// Testschlüssel für die Test-APK liegt außerhalb des Repos (~/.einsatzspur/test-signierung.properties)
+val testSignierung = Properties().apply {
+    val datei = File(System.getProperty("user.home"), ".einsatzspur/test-signierung.properties")
+    if (datei.exists()) datei.inputStream().use { load(it) }
 }
 
 android {
@@ -17,6 +25,25 @@ android {
 
     buildFeatures {
         compose = true
+    }
+
+    signingConfigs {
+        if (!testSignierung.isEmpty) {
+            create("test") {
+                storeFile = File(testSignierung.getProperty("storeFile"))
+                storePassword = testSignierung.getProperty("storePassword")
+                keyAlias = testSignierung.getProperty("keyAlias")
+                keyPassword = testSignierung.getProperty("keyPassword")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            isMinifyEnabled = false
+            // Ohne Testschlüssel bleibt die Release-APK unsigniert (nicht installierbar)
+            signingConfig = signingConfigs.findByName("test")
+        }
     }
 
     compileOptions {

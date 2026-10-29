@@ -43,6 +43,8 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import android.content.Intent
+import io.github.elemirus1996.einsatzspur.kern.GeraeteHinweis
 import io.github.elemirus1996.einsatzspur.kern.Koordinate
 import io.github.elemirus1996.einsatzspur.kern.Statusmeldung
 import io.github.elemirus1996.einsatzspur.kern.TeamAnsicht
@@ -61,9 +63,12 @@ fun TeamAnsichtScreen(
     ortung: TeamOrtung,
     ansicht: TeamAnsicht,
     sitzung: TeamSitzung,
+    hinweise: List<GeraeteHinweis>,
+    einstellungOeffnen: (Intent) -> Unit,
     abmelden: () -> Unit,
     schliessen: () -> Unit,
 ) {
+    var ausgeblendet by remember { mutableStateOf(emptySet<String>()) }
     val zustand by ortung.zustand.collectAsState()
     val lage by ansicht.lage.collectAsState()
     val tracks by ansicht.tracks.collectAsState()
@@ -121,6 +126,18 @@ fun TeamAnsichtScreen(
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 Lageskizze(lage, tracks, ich?.let { Koordinate(it.lat, it.lng) }, Modifier.fillMaxSize())
                 Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    hinweise.filter { it.titel !in ausgeblendet }.forEach { h ->
+                        Card(Modifier.fillMaxWidth()) {
+                            Column(Modifier.padding(10.dp)) {
+                                Text(h.titel, fontWeight = FontWeight.Bold, color = Color(0xFFD9530F))
+                                Text(h.text, style = MaterialTheme.typography.bodySmall)
+                                Row {
+                                    TextButton(onClick = { einstellungOeffnen(h.einstellung) }) { Text("Einstellung öffnen") }
+                                    TextButton(onClick = { ausgeblendet = ausgeblendet + h.titel }) { Text("Später") }
+                                }
+                            }
+                        }
+                    }
                     (lage?.mitteilungen ?: emptyList()).filter { it.id !in gelesen }.takeLast(3).forEach { m ->
                         Card(Modifier.fillMaxWidth()) {
                             Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {

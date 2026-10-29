@@ -208,6 +208,18 @@ class TeamOrtungTest {
         assertEquals(OrtungsStufe.FEIN, quelle.stufe)
     }
 
+    /** Außerhalb eines Einsatzes darf nichts laufen: nach stop kein Takt, keine Anfrage, keine Ortung. */
+    @Test
+    fun nachStopLaeuftNichtsMehr() = runTest {
+        val o = ortung()
+        o.anwenden(SteuerAntwort(Modus.PAUSE, pauseCheckSec = 5))
+        o.anwenden(SteuerAntwort.STOP)
+        val vorher = server.statusAbfragen
+        advanceTimeBy(3_600_000)
+        assertEquals(vorher, server.statusAbfragen)
+        assertNull(quelle.stufe)
+    }
+
     @Test
     fun pauseSammeltKeinePositionen() = runTest {
         val o = ortung()

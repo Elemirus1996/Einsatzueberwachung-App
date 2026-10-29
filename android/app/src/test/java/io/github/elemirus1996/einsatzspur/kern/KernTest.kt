@@ -3,6 +3,7 @@ package io.github.elemirus1996.einsatzspur.kern
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class KernTest {
@@ -40,6 +41,16 @@ class KernTest {
             assertEquals(1_793_220_663_000L + ((("0$bruch").toDouble()) * 1000).toLong(), ms)
         }
         assertNull(isoZuMs("kaputt"))
+    }
+
+    @Test
+    fun herstellerHinweise() {
+        assertTrue(GeraeteHinweise.herstellerHinweis("samsung")!!.startsWith("Samsung"))
+        assertTrue(GeraeteHinweise.herstellerHinweis("Xiaomi")!!.contains("Autostart"))
+        assertTrue(GeraeteHinweise.herstellerHinweis(" HONOR ")!!.startsWith("Huawei/Honor"))
+        assertTrue(GeraeteHinweise.herstellerHinweis("OnePlus")!!.startsWith("OPPO"))
+        assertNull(GeraeteHinweise.herstellerHinweis("Google"))
+        assertNull(GeraeteHinweise.herstellerHinweis(null))
     }
 
     @Test
