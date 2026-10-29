@@ -26,6 +26,8 @@ final class ELAnsicht: ObservableObject {
     var beiWarnung: ((Int) -> Void)?
     /// Neue Notiz bzw. neuer Funkspruch (Liste neu laden)
     var beiNotiz: (() async -> Void)?
+    /// Live-Position für die Karte
+    var beiPosition: ((ELPosition) -> Void)?
     /// Nach jeder erfolgreich geladenen Lage (wartende Aktionen senden)
     var nachLage: (() async -> Void)?
 
@@ -101,8 +103,10 @@ final class ELAnsicht: ObservableObject {
             verdraengtWarten = .seconds(min(max(sekunden, 5), 600))
         case .notiz, .funk:
             await beiNotiz?()
-        case .position, .vermisste:
-            break   // Karte und Vermisste folgen in den nächsten Stufen
+        case .position(let p):
+            beiPosition?(p)
+        case .vermisste:
+            break   // Vermisste folgen
         }
     }
 

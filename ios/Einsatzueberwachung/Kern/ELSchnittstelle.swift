@@ -71,7 +71,7 @@ struct ELLage: Decodable, Equatable, Sendable {
 /// Live-Ereignisse der Einsatzleitung (Abschnitt 8).
 enum ELEreignis: Equatable, Sendable {
     case team(teamId: String?)
-    case position
+    case position(ELPosition)
     case notiz
     case funk
     case vermisste
@@ -84,7 +84,9 @@ enum ELEreignis: Equatable, Sendable {
         let json = (try? JSONSerialization.jsonObject(with: Data(roh.daten.utf8))) as? [String: Any] ?? [:]
         switch roh.name {
         case "team": self = .team(teamId: json["teamId"] as? String)
-        case "position": self = .position
+        case "position":
+            guard let p = try? JSONDecoder.server.decode(ELPosition.self, from: Data(roh.daten.utf8)) else { return nil }
+            self = .position(p)
         case "notiz": self = .notiz
         case "funk": self = .funk
         case "vermisste": self = .vermisste
@@ -165,7 +167,7 @@ protocol ELLageSchnittstelle: Sendable {
     func ereignisse() async throws -> AsyncThrowingStream<ELEreignis, Error>
 }
 
-struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle {
+struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle, ELKartenSchnittstelle {
     let sitzung: ELSitzung
     var session: URLSession = .einsatz
 
@@ -207,6 +209,12 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle 
 
     func notizen(vor: String?) async throws -> ELNotizSeite {
         try await anfrage(vor.map { "notizen?vor=\($0)&anzahl=50" } ?? "notizen?anzahl=50", methode: "GET", inhalt: nil)
+    }
+
+    func karte() async throws -> ELKarte { try await anfrage("karte", methode: "GET", inhalt: nil) }
+
+    func tracks(seit: Int64?) async throws -> ELTracks {
+        try await anfrage(seit.map { "tracks?seit=\($0)" } ?? "tracks", methode: "GET", inhalt: nil)
     }
 
     func halsbaender() async throws -> ELHalsbaender { try await anfrage("halsbaender", methode: "GET", inhalt: nil) }
