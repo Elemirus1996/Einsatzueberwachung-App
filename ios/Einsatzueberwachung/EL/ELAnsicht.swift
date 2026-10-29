@@ -26,6 +26,8 @@ final class ELAnsicht: ObservableObject {
     var beiWarnung: ((Int) -> Void)?
     /// Neue Notiz bzw. neuer Funkspruch (Liste neu laden)
     var beiNotiz: (() async -> Void)?
+    /// Vermisste geändert (auch durch /el im Browser)
+    var beiVermisste: (() async -> Void)?
     /// Live-Position für die Karte
     var beiPosition: ((ELPosition) -> Void)?
     /// Nach jeder erfolgreich geladenen Lage (wartende Aktionen senden)
@@ -106,7 +108,7 @@ final class ELAnsicht: ObservableObject {
         case .position(let p):
             beiPosition?(p)
         case .vermisste:
-            break   // Vermisste folgen
+            await beiVermisste?()
         }
     }
 

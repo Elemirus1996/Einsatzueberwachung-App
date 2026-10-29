@@ -22,6 +22,7 @@ final class AppModell: ObservableObject {
     @Published private(set) var elAnsicht: ELAnsicht?
     @Published private(set) var elBetrieb: ELBetrieb?
     @Published private(set) var elKarte: ELKartenAnsicht?
+    @Published private(set) var elVermisste: ELVermissteAnsicht?
     /// Hinweis nach Ende der EL-Sitzung durch den Server (Token abgelaufen, Passwort geändert).
     @Published private(set) var elHinweis: String?
     private var elAbmeldungDurchNutzer = false
@@ -179,6 +180,9 @@ final class AppModell: ObservableObject {
         let karte = ELKartenAnsicht(schnittstelle: client)
         ansicht.beiPosition = { [weak karte] in karte?.position($0) }
         elKarte = karte
+        let vermisste = ELVermissteAnsicht(schnittstelle: client)
+        ansicht.beiVermisste = { [weak vermisste] in await vermisste?.laden() }
+        elVermisste = vermisste
         elOrtung = ortung
         elAnsicht = ansicht
         elBetrieb = betrieb
@@ -199,6 +203,7 @@ final class AppModell: ObservableObject {
         elBetrieb = nil
         elKarte?.anhalten()
         elKarte = nil
+        elVermisste = nil
     }
 
     /// App kommt in den Vordergrund: Ablauf prüfen und Status holen.

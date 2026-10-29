@@ -9,6 +9,7 @@ struct ELUebersichtView: View {
     @ObservedObject var ortung: TeamOrtung
     @ObservedObject var betrieb: ELBetrieb
     let karte: ELKartenAnsicht
+    let vermisste: ELVermissteAnsicht
     @State private var gewaehltesTeam: ELLage.Team?
     @State private var startOffen = false
     @State private var beendenOffen = false
@@ -56,6 +57,11 @@ struct ELUebersichtView: View {
         }
         .navigationTitle("Einsatzleitung")
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    ELVermissteView(vermisste: vermisste, betrieb: betrieb)
+                } label: { Label("Vermisste", systemImage: "person.fill.questionmark") }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink {
                     ELKarteView(karte: karte, teams: ansicht.lage?.teams ?? [])
