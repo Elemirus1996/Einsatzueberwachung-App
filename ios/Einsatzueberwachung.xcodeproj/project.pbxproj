@@ -24,6 +24,7 @@
 		8D7BC3821334E2D60C7A796D /* Schluesselbund.swift in Sources */ = {isa = PBXBuildFile; fileRef = 179F8BB87D6F40D69F2E2A8D /* Schluesselbund.swift */; };
 		9C16D7091D48A562D60679C2 /* TeamAnsicht.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42542B191DD57AAC94CE0EC0 /* TeamAnsicht.swift */; };
 		A0AF23349A115130EE14C9AD /* StartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 133295A3FD86DD2CC9E0275C /* StartView.swift */; };
+		A7B4A6D3B2797E85F7592FF0 /* LageMeldungen.swift in Sources */ = {isa = PBXBuildFile; fileRef = F8C0A9707EAB2B06820D5174 /* LageMeldungen.swift */; };
 		AC8F19C87FD06F962F9B94B2 /* HeimatStaffelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C49A3C66952DBE5E6E35822 /* HeimatStaffelTests.swift */; };
 		C0D161ED59E066250EC86B7A /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDE0E5851EA7EDFF57DB8F64 /* QRScannerView.swift */; };
 		C78C9719322BA2789C1B70A6 /* HeimatStaffel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C766A51FD148218A0B29EE /* HeimatStaffel.swift */; };
@@ -65,6 +66,7 @@
 		C5AB257A4D6CC10859BDCE63 /* PositionsPuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionsPuffer.swift; sourceTree = "<group>"; };
 		D0A1C0F7850179783614D223 /* AppModell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModell.swift; sourceTree = "<group>"; };
 		EBA23EF762B87148EB23B089 /* EinsatzueberwachungTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = EinsatzueberwachungTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F8C0A9707EAB2B06820D5174 /* LageMeldungen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LageMeldungen.swift; sourceTree = "<group>"; };
 		F92EA3A1472DD75C912F9D1D /* TeamOrtung.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamOrtung.swift; sourceTree = "<group>"; };
 		FC0EEBCA567221FF2529112D /* TeamModelle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamModelle.swift; sourceTree = "<group>"; };
 		FDE0E5851EA7EDFF57DB8F64 /* QRScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerView.swift; sourceTree = "<group>"; };
@@ -129,6 +131,7 @@
 			isa = PBXGroup;
 			children = (
 				40C766A51FD148218A0B29EE /* HeimatStaffel.swift */,
+				F8C0A9707EAB2B06820D5174 /* LageMeldungen.swift */,
 				AB3AF33B59FBD33F2C44B2E5 /* OrtungsQuelle.swift */,
 				C5AB257A4D6CC10859BDCE63 /* PositionsPuffer.swift */,
 				179F8BB87D6F40D69F2E2A8D /* Schluesselbund.swift */,
@@ -256,6 +259,7 @@
 				5A6F46FC11967E1EDF36B4A3 /* EinsatzApp.swift in Sources */,
 				515B5D3C7DD9A320E1E7361A /* EinstellungenView.swift in Sources */,
 				C78C9719322BA2789C1B70A6 /* HeimatStaffel.swift in Sources */,
+				A7B4A6D3B2797E85F7592FF0 /* LageMeldungen.swift in Sources */,
 				1D85C57C6B2C8932F9BC62A4 /* OrtungsQuelle.swift in Sources */,
 				47806CDB947BFF78B4392CF0 /* PositionsPuffer.swift in Sources */,
 				C0D161ED59E066250EC86B7A /* QRScannerView.swift in Sources */,

@@ -37,6 +37,10 @@ final class TeamAnsicht: ObservableObject {
     private var letzteVolleTracks: Date?
     private var aufgaben: [Task<Void, Never>] = []
     private var meldungenLaufen = false
+    private var imHintergrund = false
+
+    /// Lokale Mitteilungen bei Änderungen der Lage (Suche, Gebiet, Halsband, Mitteilungen der EL).
+    var beiMeldungen: (([LageMeldung]) -> Void)?
     /// Wartezeit vor dem nächsten Verbindungsversuch nach einer Verdrängung (sonst `nil`).
     private var verdraengtWarten: Duration?
 
@@ -61,6 +65,7 @@ final class TeamAnsicht: ObservableObject {
     // MARK: Ablauf
 
     func starten() {
+        if imHintergrund { anhalten() }
         guard aufgaben.isEmpty else { return }
         aufgaben = [
             Task { await liveSchleife() },
@@ -73,6 +78,22 @@ final class TeamAnsicht: ObservableObject {
         aufgaben.forEach { $0.cancel() }
         aufgaben = []
         live = false
+        imHintergrund = false
+    }
+
+    /// App im Hintergrund: keine Live-Verbindung und keine Laufwege, aber jede Minute die Lage,
+    /// damit Änderungen und Mitteilungen der EL als lokale Mitteilung ankommen (die App ist durch die Ortung wach).
+    func hintergrund() {
+        anhalten()
+        imHintergrund = true
+        aufgaben = [Task { [weak self] in
+            while !Task.isCancelled {
+                guard let takt = self?.lageTakt else { return }
+                try? await Task.sleep(for: takt)
+                guard !Task.isCancelled else { return }
+                await self?.neuLaden(tracksVoll: false, mitTracks: false)
+            }
+        }]
     }
 
     /// Bei Abmeldung oder Einsatzende: nichts auf dem Gerät zurücklassen.
@@ -125,7 +146,7 @@ final class TeamAnsicht: ObservableObject {
     /// Die Ortung hat von /positions oder /status einen neuen Modus erfahren: Anzeige nachziehen.
     func modusGeaendert() {
         guard !aufgaben.isEmpty else { return }
-        Task { await neuLaden(tracksVoll: true) }
+        Task { await neuLaden(tracksVoll: true, mitTracks: !imHintergrund) }
     }
 
     private func trackSchleife() async {
@@ -138,16 +159,20 @@ final class TeamAnsicht: ObservableObject {
 
     func verarbeiten(_ ereignis: TeamEreignis) async {
         switch ereignis {
-        case .halsband(let halsband):
+        case .halsband(var halsband):
+            // Das Ereignis enthält nur die Position; Kennung und Name bleiben aus der Lage
+            halsband.id = lage?.halsband?.id
+            halsband.name = lage?.halsband?.name
             lage?.halsband = halsband
             if lage?.suche.status == .laeuft {
                 tracks?.laufend.hund.append(.init(lat: halsband.lat, lng: halsband.lng,
                                                   t: Int64(halsband.zeit.timeIntervalSince1970 * 1000)))
             }
         case .mitteilung(let mitteilung):
-            guard lage?.mitteilungen.contains(where: { $0.id == mitteilung.id }) == false else { return }
-            lage?.mitteilungen.append(mitteilung)
-            if let anzahl = lage?.mitteilungen.count, anzahl > 20 { lage?.mitteilungen.removeFirst(anzahl - 20) }
+            guard var neu = lage, !neu.mitteilungen.contains(where: { $0.id == mitteilung.id }) else { return }
+            neu.mitteilungen.append(mitteilung)
+            if neu.mitteilungen.count > 20 { neu.mitteilungen.removeFirst(neu.mitteilungen.count - 20) }
+            lageUebernehmen(neu)
         case .lage:
             await neuLaden(tracksVoll: true)
         case .stop:
@@ -164,8 +189,7 @@ final class TeamAnsicht: ObservableObject {
     private func lageBestaetigtStop() async -> Bool? {
         do {
             let neu = try await schnittstelle.lage()
-            lage = neu
-            lageAbgerufen = jetzt()
+            lageUebernehmen(neu)
             if let mode = neu.mode { beiSteuerung(mode) }
             return neu.mode == .stop
         } catch SchnittstellenFehler.beendet {
@@ -176,12 +200,21 @@ final class TeamAnsicht: ObservableObject {
         }
     }
 
-    func neuLaden(tracksVoll: Bool = true) async {
+    /// Neue Lage übernehmen und Änderungen gegenüber der bisherigen melden. Die erste Lage meldet nichts.
+    private func lageUebernehmen(_ neu: TeamLage) {
+        let alt = lage
+        lage = neu
+        lageAbgerufen = jetzt()
+        guard let alt else { return }
+        let meldungen = LageMeldung.vergleichen(alt: alt, neu: neu)
+        if !meldungen.isEmpty { beiMeldungen?(meldungen) }
+    }
+
+    func neuLaden(tracksVoll: Bool = true, mitTracks: Bool = true) async {
         do {
             let neu = try await schnittstelle.lage()
             if let serverZeit = neu.serverZeit { zeitVersatz = serverZeit.timeIntervalSince(jetzt()) }
-            lage = neu
-            lageAbgerufen = jetzt()
+            lageUebernehmen(neu)
             verbindungsfehler = false
             if let mode = neu.mode { beiSteuerung(mode) }
         } catch SchnittstellenFehler.beendet {
@@ -191,7 +224,7 @@ final class TeamAnsicht: ObservableObject {
             verbindungsfehler = true
         }
         await meldungenSenden()
-        await tracksLaden(voll: tracksVoll)
+        if mitTracks { await tracksLaden(voll: tracksVoll) }
     }
 
     private func tracksLaden(voll: Bool = false) async {
