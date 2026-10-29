@@ -165,7 +165,7 @@ protocol ELLageSchnittstelle: Sendable {
     func ereignisse() async throws -> AsyncThrowingStream<ELEreignis, Error>
 }
 
-struct ELClient: TeamSchnittstelle, ELLageSchnittstelle {
+struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle {
     let sitzung: ELSitzung
     var session: URLSession = .einsatz
 
@@ -189,6 +189,26 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle {
         default: throw SchnittstellenFehler.server(status: http.statusCode)
         }
     }
+
+    func ausfuehren(_ aktion: ELAktion) async throws {
+        var inhalt = aktion.inhalt
+        inhalt["id"] = .text(aktion.id)
+        let (daten, http) = try await roh(aktion.pfad, methode: "POST", inhalt: try JSONEncoder().encode(inhalt))
+        switch http.statusCode {
+        case 200..<300: return
+        case 410: throw SchnittstellenFehler.beendet
+        case 400, 409:
+            let text = ((try? JSONSerialization.jsonObject(with: daten)) as? [String: Any])?["error"] as? String
+            throw ELAktionsFehler.abgelehnt(text ?? "Nicht möglich.")
+        default: throw SchnittstellenFehler.server(status: http.statusCode)
+        }
+    }
+
+    func notizen(vor: String?) async throws -> [ELNotiz] {
+        try await anfrage(vor.map { "notizen?vor=\($0)&anzahl=50" } ?? "notizen?anzahl=50", methode: "GET", inhalt: nil)
+    }
+
+    func halsbaender() async throws -> ELHalsbaender { try await anfrage("halsbaender", methode: "GET", inhalt: nil) }
 
     /// Token auf dem Server ungültig machen (best effort).
     func abmelden() async {
@@ -229,7 +249,16 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle {
     }
 
     private func request(_ endpunkt: String, methode: String) -> URLRequest {
-        var request = URLRequest(url: sitzung.server.pfad("api/el/app/v1/\(endpunkt)"))
+        // Abfrageteil getrennt anhängen, sonst kodiert appending(path:) das „?“ mit
+        let teile = endpunkt.split(separator: "?", maxSplits: 1).map(String.init)
+        var url = sitzung.server.pfad("api/el/app/v1/\(teile[0])")
+        if teile.count == 2 {
+            url.append(queryItems: teile[1].split(separator: "&").map { paar in
+                let kv = paar.split(separator: "=", maxSplits: 1).map(String.init)
+                return URLQueryItem(name: kv[0], value: kv.count > 1 ? kv[1] : nil)
+            })
+        }
+        var request = URLRequest(url: url)
         request.httpMethod = methode
         request.setValue("Bearer \(sitzung.token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")

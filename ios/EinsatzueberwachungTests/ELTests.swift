@@ -152,3 +152,93 @@ struct ELAnsichtTests {
         #expect(quelle.stufe == .fein)
     }
 }
+
+final class TestELAktionen: ELAktionsSchnittstelle, @unchecked Sendable {
+    var fehler: Error?
+    private(set) var ausgefuehrt: [ELAktion] = []
+    var notizListe: [ELNotiz] = []
+    func ausfuehren(_ aktion: ELAktion) async throws {
+        ausgefuehrt.append(aktion)
+        if let fehler { throw fehler }
+    }
+    func notizen(vor: String?) async throws -> [ELNotiz] { notizListe }
+    func halsbaender() async throws -> ELHalsbaender {
+        try JSONDecoder.server.decode(ELHalsbaender.self, from: Data(#"[ { "id": "HB-1", "name": "Halsband 1", "akku": 80 } ]"#.utf8))
+    }
+}
+
+@MainActor
+struct ELBetriebTests {
+    let speicher = UserDefaults(suiteName: "elbetrieb-\(UUID().uuidString)")!
+    let server = TestELAktionen()
+
+    func betrieb(_ stop: @escaping () -> Void = {}) -> ELBetrieb {
+        ELBetrieb(schnittstelle: server, speicher: speicher, beiStop: stop)
+    }
+
+    @Test func aktionGehtRausUndLaedtLage() async {
+        let b = betrieb()
+        var nachher = 0
+        b.nachAktion = { nachher += 1 }
+        await b.ausfuehren(.teamStart("t1", name: "Team Rex", halsbandId: "HB-1"))
+        #expect(server.ausgefuehrt.map(\.pfad) == ["teams/t1/start"])
+        #expect(server.ausgefuehrt[0].inhalt["halsbandId"] == .text("HB-1"))
+        #expect(b.offen.isEmpty)
+        #expect(nachher == 1)
+        #expect(b.hinweis?.fehler == false)
+    }
+
+    @Test func ablehnungZeigtTextDesServers() async {
+        let b = betrieb()
+        server.fehler = ELAktionsFehler.abgelehnt("Halsband vergeben")
+        await b.ausfuehren(.teamStart("t1", name: "Team Rex", halsbandId: "HB-1"))
+        #expect(b.hinweis?.text == "Halsband vergeben")
+        #expect(b.hinweis?.fehler == true)
+        #expect(b.offen.isEmpty, "abgelehnt wird nicht wiederholt")
+    }
+
+    @Test func funklochWiederholtMitGleicherId() async {
+        let b = betrieb()
+        server.fehler = URLError(.notConnectedToInternet)
+        await b.ausfuehren(.funk("Team Rex bitte melden", teamId: "t1", antwortAuf: nil))
+        #expect(b.offen.count == 1)
+        let neu = betrieb()   // App neu gestartet
+        #expect(neu.offen.count == 1)
+        server.fehler = nil
+        await neu.senden()
+        #expect(neu.offen.isEmpty)
+        #expect(server.ausgefuehrt[0].id == server.ausgefuehrt[1].id)
+        neu.vergessen()
+        #expect(betrieb().offen.isEmpty)
+    }
+
+    @Test func http410IstStop() async {
+        var gestoppt = false
+        let b = betrieb { gestoppt = true }
+        server.fehler = SchnittstellenFehler.beendet
+        await b.ausfuehren(.teamPause("t1", name: "Team Rex"))
+        #expect(gestoppt)
+    }
+
+    @Test func koerperDerAktionen() throws {
+        let funk = ELAktion.funk("Verstanden", teamId: nil, antwortAuf: "f1")
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(funk.inhalt)) as? [String: Any]
+        #expect(json?["text"] as? String == "Verstanden")
+        #expect(json?["antwortAuf"] as? String == "f1")
+        #expect(json?["teamId"] is NSNull)
+        #expect(ELAktion.notizLoeschen("n7").pfad == "notizen/n7/loeschen")
+        #expect(ELAktion.mitteilung("t1", name: "Team Rex", text: "Bitte zurück").inhalt["text"] == .text("Bitte zurück"))
+    }
+
+    @Test func notizenUndHalsbaenderDekodieren() throws {
+        let notizen = try JSONDecoder.server.decode([ELNotiz].self, from: Data(#"""
+            [ { "id": "f1", "art": "funk", "text": "Team Rex im Gebiet", "zeit": "2026-10-29T20:00:00Z", "von": "Einsatzleitung", "teamId": "t1",
+                "antworten": [ { "id": "a1", "text": "Verstanden", "zeit": "2026-10-29T20:01:00Z", "von": "Team Rex" } ] },
+              { "id": "n1", "art": "notiz", "text": "Wetter wird schlechter", "zeit": "2026-10-29T19:50:00Z", "von": null, "teamId": null } ]
+            """#.utf8))
+        #expect(notizen.first?.antworten?.first?.text == "Verstanden")
+        let mitZuletzt = try JSONDecoder.server.decode(ELHalsbaender.self, from: Data(#"{ "frei": [ { "id": "HB-2" } ], "zuletzt": [ { "teamId": "t1", "halsbandId": "HB-2" } ] }"#.utf8))
+        #expect(mitZuletzt.frei.map(\.id) == ["HB-2"])
+        #expect(mitZuletzt.zuletzt?.first?.halsbandId == "HB-2")
+    }
+}

@@ -20,6 +20,7 @@ final class AppModell: ObservableObject {
     @Published private(set) var elSitzung: ELSitzung?
     @Published private(set) var elOrtung: TeamOrtung?
     @Published private(set) var elAnsicht: ELAnsicht?
+    @Published private(set) var elBetrieb: ELBetrieb?
     /// Hinweis nach Ende der EL-Sitzung durch den Server (Token abgelaufen, Passwort geändert).
     @Published private(set) var elHinweis: String?
     private var elAbmeldungDurchNutzer = false
@@ -170,13 +171,19 @@ final class AppModell: ObservableObject {
         let ansicht = ELAnsicht(schnittstelle: client) { [weak self] modus in
             self?.elOrtung?.anwenden(SteuerAntwort(mode: modus), melden: false)
         }
+        let betrieb = ELBetrieb(schnittstelle: client) { [weak self] in self?.elOrtung?.anwenden(.stop) }
+        betrieb.nachAktion = { [weak ansicht] in await ansicht?.neuLaden() }
+        ansicht.beiNotiz = { [weak betrieb] in await betrieb?.notizenLaden() }
+        ansicht.nachLage = { [weak betrieb] in await betrieb?.senden() }
         elOrtung = ortung
         elAnsicht = ansicht
+        elBetrieb = betrieb
         ortung.ablaufPruefen()
     }
 
     private func elBeendet() {
         elAnsicht?.anhalten()
+        elBetrieb?.vergessen()
         schluesselbund.loeschen(konto: Schluesselbund.kontoEL)
         if !elAbmeldungDurchNutzer {
             elHinweis = "Die Anmeldung der Einsatzleitung ist abgelaufen oder das Staffel-Passwort wurde geändert. Bitte neu anmelden."
@@ -185,6 +192,7 @@ final class AppModell: ObservableObject {
         elSitzung = nil
         elOrtung = nil
         elAnsicht = nil
+        elBetrieb = nil
     }
 
     /// App kommt in den Vordergrund: Ablauf prüfen und Status holen.

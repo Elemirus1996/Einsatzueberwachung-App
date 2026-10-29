@@ -11,8 +11,8 @@ struct StartView: View {
 
     var body: some View {
         NavigationStack {
-            if let ansicht = modell.elAnsicht, let ortung = modell.elOrtung {
-                ELUebersichtView(ansicht: ansicht, ortung: ortung)
+            if let ansicht = modell.elAnsicht, let ortung = modell.elOrtung, let betrieb = modell.elBetrieb {
+                ELUebersichtView(ansicht: ansicht, ortung: ortung, betrieb: betrieb)
             } else if let team = modell.team, let ansicht = modell.teamAnsicht, let sitzung = modell.teamSitzung {
                 TeamAnsichtView(ortung: team, ansicht: ansicht, sitzung: sitzung)
             } else if let wahl = modell.teamWahl {
