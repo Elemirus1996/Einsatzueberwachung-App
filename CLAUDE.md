@@ -15,6 +15,7 @@
 - **iOS:** baut die Sitzung auf dem Mac in diesem Repo (Xcode, Simulator, iPhone per Kabel).
 - **Server:** baut nur die Server-Sitzung (Windows, VS Code, Repo Einsatzueberwachung.Server). Eigene PRs der Leitung am Server nur nach Absprache.
 - **Aufträge:** als Issue mit „App:“ im Titel im Server-Repo bzw. als Karte im Board, dazu eine kurze Nachricht an die Sitzung. Rückmeldungen gehen an die Leitung.
+- **Kommunikation nur über die Leitung** (entschieden 29.10.2026): Fragen, Rückfragen, Entscheidungen und Anleitungen für den Nutzer gehen an die Leitung, nicht direkt an den Nutzer. Ausnahme: Anweisungen beim Test am Gerät, solange der Nutzer dort sitzt.
 - **Board:** Aufgabenboard der Leitung als claude.ai-Artifact (Link in der Leitungssitzung). Mac und Windows tragen ihren Stand dort und im GitHub-Projektboard ein.
 - **Reihenfolge:** Die Server-Sitzung beschreibt zuerst die Schnittstelle in `docs/APP_API.md`, die App wird parallel dagegen gebaut, danach setzt der Server sie mit Tests um und meldet den PR an die Leitung.
 - PRs nach `main` führt der Nutzer zusammen oder eine Sitzung nach seinem OK. Einspielen auf dem Staffel-Server und Store-Veröffentlichung nur nach ausdrücklichem OK.
