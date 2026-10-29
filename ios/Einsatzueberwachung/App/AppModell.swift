@@ -16,6 +16,22 @@ final class AppModell: ObservableObject {
     /// Server und Anmelde-Code des laufenden Einsatzes (Schlüsselbund), solange der Einsatz läuft.
     @Published private(set) var einsatzZugang: TeamQRCode?
 
+    // Rolle Einsatzleitung (nur im VPN). Immer nur eine Rolle aktiv, beide teilen sich die Ortung.
+    @Published private(set) var elSitzung: ELSitzung?
+    @Published private(set) var elOrtung: TeamOrtung?
+    @Published private(set) var elAnsicht: ELAnsicht?
+    /// Hinweis nach Ende der EL-Sitzung durch den Server (Token abgelaufen, Passwort geändert).
+    @Published private(set) var elHinweis: String?
+    private var elAbmeldungDurchNutzer = false
+    private lazy var elPuffer = PositionsPuffer(datei: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        .appending(path: "el-positionen.sqlite"))
+
+    /// Zuletzt verwendete interne Adresse (nicht geheim)
+    var elServerAdresse: String {
+        get { UserDefaults.standard.string(forKey: "el.server") ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: "el.server") }
+    }
+
     /// Wie eine Ortung endet: entscheidet über Mitteilung und darüber, ob der Anmelde-Code bleibt.
     enum Abmeldung: Equatable {
         /// Server: Einsatzende, Team gelöscht, Token abgelaufen (410/stop)
@@ -39,6 +55,9 @@ final class AppModell: ObservableObject {
 
     init() {
         einsatzZugang = schluesselbund.lesen(TeamQRCode.self, konto: Schluesselbund.kontoEinsatzZugang)
+        if let el = schluesselbund.lesen(ELSitzung.self, konto: Schluesselbund.kontoEL) {
+            elStarten(el)
+        }
         if let sitzung = schluesselbund.lesen(TeamSitzung.self, konto: Schluesselbund.kontoTeam) {
             teamStarten(sitzung)
             Task { await teamKonfigurieren() }
@@ -64,8 +83,11 @@ final class AppModell: ObservableObject {
             return
         }
         heimat.uebernehmen(frage.info, name: frage.name)
-        guard let sitzung = teamSitzung else { return }
-        Task { await heimat.aktualisieren(frage.info) { try await TeamClient(sitzung: sitzung).logo() } }
+        if let sitzung = teamSitzung {
+            Task { await heimat.aktualisieren(frage.info) { try await TeamClient(sitzung: sitzung).logo() } }
+        } else if let el = elSitzung {
+            Task { await heimat.aktualisieren(frage.info) { try await ELClient(sitzung: el).logo() } }
+        }
     }
 
     private func teamAnmelden(_ sitzung: TeamSitzung) {
@@ -113,8 +135,63 @@ final class AppModell: ObservableObject {
         teamWahl = nil
     }
 
+    // MARK: Einsatzleitung
+
+    /// Anmeldung mit dem Staffel-Passwort an der internen Adresse (nur im VPN erreichbar).
+    func elAnmelden(server: ServerAdresse, passwort: String, geraet: String?) async throws {
+        let (sitzung, info) = try await ELAnmeldung(server: server).anmelden(passwort: passwort, geraet: geraet)
+        guard schluesselbund.speichern(sitzung, konto: Schluesselbund.kontoEL) else { return }
+        elServerAdresse = server.name
+        elHinweis = nil
+        mitteiler.erlaubnisErfragen()
+        if let info, heimat.sollFragen(info) {
+            heimatFrage = (info, info.staffel ?? server.name)
+        } else if let info {
+            Task { await heimat.aktualisieren(info) { try await ELClient(sitzung: sitzung).logo() } }
+        }
+        elStarten(sitzung)
+    }
+
+    /// Abmelden: Token auf dem Server ungültig machen, Ortung aus, Token löschen.
+    func elAbmelden() async {
+        guard let sitzung = elSitzung else { return }
+        elAbmeldungDurchNutzer = true
+        await ELClient(sitzung: sitzung).abmelden()
+        elOrtung?.anwenden(.stop)
+    }
+
+    private func elStarten(_ sitzung: ELSitzung) {
+        elSitzung = sitzung
+        let client = ELClient(sitzung: sitzung)
+        let ortung = TeamOrtung(
+            schnittstelle: client, quelle: quelle, puffer: elPuffer, ablauf: sitzung.expiresAt,
+            beimBeenden: { [weak self] in self?.elBeendet() })
+        let ansicht = ELAnsicht(schnittstelle: client) { [weak self] modus in
+            self?.elOrtung?.anwenden(SteuerAntwort(mode: modus), melden: false)
+        }
+        elOrtung = ortung
+        elAnsicht = ansicht
+        ortung.ablaufPruefen()
+    }
+
+    private func elBeendet() {
+        elAnsicht?.anhalten()
+        schluesselbund.loeschen(konto: Schluesselbund.kontoEL)
+        if !elAbmeldungDurchNutzer {
+            elHinweis = "Die Anmeldung der Einsatzleitung ist abgelaufen oder das Staffel-Passwort wurde geändert. Bitte neu anmelden."
+        }
+        elAbmeldungDurchNutzer = false
+        elSitzung = nil
+        elOrtung = nil
+        elAnsicht = nil
+    }
+
     /// App kommt in den Vordergrund: Ablauf prüfen und Status holen.
     func aktiviert() async {
+        if let elOrtung {
+            elOrtung.ablaufPruefen()
+            await elOrtung.statusPruefen()
+        }
         guard let team else { return }
         team.ablaufPruefen()
         await team.statusPruefen()

@@ -11,7 +11,9 @@ struct StartView: View {
 
     var body: some View {
         NavigationStack {
-            if let team = modell.team, let ansicht = modell.teamAnsicht, let sitzung = modell.teamSitzung {
+            if let ansicht = modell.elAnsicht, let ortung = modell.elOrtung {
+                ELUebersichtView(ansicht: ansicht, ortung: ortung)
+            } else if let team = modell.team, let ansicht = modell.teamAnsicht, let sitzung = modell.teamSitzung {
                 TeamAnsichtView(ortung: team, ansicht: ansicht, sitzung: sitzung)
             } else if let wahl = modell.teamWahl {
                 TeamAnmeldungView(vorgabe: wahl)
@@ -25,7 +27,7 @@ struct StartView: View {
             }
         }
         // Nach An- oder Abmeldung neu aufbauen, damit keine Anmeldeseite auf dem Stapel liegen bleibt
-        .id("\(modell.team == nil)-\(modell.teamWahl == nil)")
+        .id("\(modell.team == nil)-\(modell.teamWahl == nil)-\(modell.elSitzung == nil)")
         .alert("Ist „\(modell.heimatFrage?.name ?? "")“ deine eigene Staffel?",
                isPresented: Binding(get: { modell.heimatFrage != nil }, set: { _ in })) {
             Button("Ja, meine Staffel") { modell.heimatBeantworten(true) }
@@ -76,8 +78,11 @@ struct StartView: View {
             } label: {
                 RollenKnopf(titel: "Team", text: "QR-Code aus dem Einsatz scannen", symbol: "qrcode.viewfinder")
             }
-            RollenKnopf(titel: "Einsatzleitung", text: "Kommt in einer späteren Version", symbol: "lock.shield")
-                .opacity(0.4)
+            NavigationLink {
+                ELAnmeldungView()
+            } label: {
+                RollenKnopf(titel: "Einsatzleitung", text: "Nur im VPN der Staffel", symbol: "lock.shield")
+            }
             Spacer()
         }
         .padding()
