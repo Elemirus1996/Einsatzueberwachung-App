@@ -102,7 +102,8 @@ final class AppModell: ObservableObject {
         // Die Ansicht erfährt über /lage und /ereignisse sofort, wenn eine Suche beginnt oder endet
         teamAnsicht = TeamAnsicht(
             schnittstelle: client, teamId: sitzung.teamId ?? sitzung.teamName,
-            beiSteuerung: { [weak self] modus in self?.team?.anwenden(SteuerAntwort(mode: modus)) })
+            beiSteuerung: { [weak self] modus in self?.team?.anwenden(SteuerAntwort(mode: modus), melden: false) })
+        team?.beiModuswechsel = { [weak self] _ in self?.teamAnsicht?.modusGeaendert() }
         team?.ablaufPruefen()
     }
 

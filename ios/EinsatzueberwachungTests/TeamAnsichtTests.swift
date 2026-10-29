@@ -102,8 +102,14 @@ final class TestAnsichtSchnittstelle: TeamAnsichtSchnittstelle, @unchecked Senda
         if let meldungFehler { throw meldungFehler }
     }
 
+    /// `true`: Live-Verbindung bleibt offen, liefert aber nichts (verpasstes `lage`-Ereignis)
+    var offenerStrom = false
+    private var offen: AsyncThrowingStream<TeamEreignis, Error>.Continuation?
+
     func ereignisse() async throws -> AsyncThrowingStream<TeamEreignis, Error> {
-        AsyncThrowingStream { $0.finish() }
+        AsyncThrowingStream { fortsetzung in
+            if offenerStrom { offen = fortsetzung } else { fortsetzung.finish() }
+        }
     }
 }
 
@@ -121,9 +127,44 @@ struct TeamAnsichtTests {
     let server = TestAnsichtSchnittstelle(lage: lage)
     let jetzt = Date(timeIntervalSince1970: 1_800_000_000)
 
-    func ansicht(_ modi: @escaping (Modus) -> Void = { _ in }) -> TeamAnsicht {
+    func ansicht(lageTakt: Duration = .seconds(60), _ modi: @escaping (Modus) -> Void = { _ in }) -> TeamAnsicht {
         let t = jetzt
-        return TeamAnsicht(schnittstelle: server, teamId: "t1", speicher: speicher, jetzt: { t }, beiSteuerung: modi)
+        return TeamAnsicht(schnittstelle: server, teamId: "t1", speicher: speicher, jetzt: { t },
+                           lageTakt: lageTakt, beiSteuerung: modi)
+    }
+
+    /// Fehler aus dem iPhone-Test: Live-Verbindung steht, aber das `lage`-Ereignis zur neuen Suche kommt nicht.
+    /// Die App muss die Lage trotzdem regelmäßig holen und die Ortung wieder starten.
+    @Test func verpasstesLageEreignisWirdDurchTaktAufgefangen() async throws {
+        var modi: [Modus] = []
+        server.offenerStrom = true
+        let a = ansicht(lageTakt: .milliseconds(200)) { modi.append($0) }
+        a.starten()
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(a.live)
+        #expect(modi == [.pause])
+
+        var neueSuche = Self.lage
+        neueSuche.mode = .track
+        neueSuche.suche = .init(status: .laeuft, dauerSec: 0)
+        server.lageAntwort = .success(neueSuche)   // Server: Suche 2 läuft, kein Ereignis
+        try await Task.sleep(for: .milliseconds(500))
+        a.anhalten()
+        #expect(modi.last == .track)
+        #expect(a.lage?.suche.status == .laeuft)
+    }
+
+    @Test func moduswechselDerOrtungLaedtDieLage() async throws {
+        let a = ansicht()
+        a.starten()
+        try await Task.sleep(for: .milliseconds(100))
+        var neu = Self.lage
+        neu.suche = .init(status: .beendet, dauerSec: 600)
+        server.lageAntwort = .success(neu)
+        a.modusGeaendert()
+        try await Task.sleep(for: .milliseconds(100))
+        a.anhalten()
+        #expect(a.lage?.suche.status == .beendet)
     }
 
     @Test func lageGibtModusAnDieOrtungWeiter() async {
