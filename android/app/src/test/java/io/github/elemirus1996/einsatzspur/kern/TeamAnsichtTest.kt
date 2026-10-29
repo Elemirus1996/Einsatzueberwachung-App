@@ -38,7 +38,11 @@ class TestAnsichtSchnittstelle(var lageAntwort: Result<TeamLage> = Result.succes
     val trackAbrufe = mutableListOf<Long?>()
     var offenerStrom = false
 
-    override suspend fun lage() = lageAntwort.getOrThrow()
+    var lageAbrufe = 0
+    override suspend fun lage(): TeamLage {
+        lageAbrufe++
+        return lageAntwort.getOrThrow()
+    }
     override suspend fun tracks(seit: Long?): TeamTracks {
         trackAbrufe += seit
         return TeamTracks(emptyList(), emptyList(), emptyList())
@@ -159,6 +163,16 @@ class TeamAnsichtTest {
         a.anhalten()
         assertEquals(Modus.TRACK, modi.last())
         assertEquals(listOf(LageMeldung("Suche gestartet – Ortung läuft")), gemeldet)
+    }
+
+    @Test
+    fun nachVergessenKeineAbrufeMehr() = runTest {
+        val a = ansicht()
+        a.hintergrund()
+        a.vergessen()
+        val vorher = server.lageAbrufe
+        advanceTimeBy(3_600_000)
+        assertEquals(vorher, server.lageAbrufe)
     }
 
     @Test

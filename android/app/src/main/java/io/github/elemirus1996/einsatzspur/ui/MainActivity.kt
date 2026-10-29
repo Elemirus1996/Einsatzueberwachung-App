@@ -13,6 +13,9 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import io.github.elemirus1996.einsatzspur.kern.GeraeteHinweis
+import io.github.elemirus1996.einsatzspur.kern.GeraeteHinweise
 import androidx.compose.ui.graphics.Color
 import io.github.elemirus1996.einsatzspur.EinsatzSpurApp
 
@@ -22,7 +25,11 @@ class MainActivity : ComponentActivity() {
     /** „Beim Verwenden“ genügt: Der Vordergrunddienst ortet damit auch bei gesperrtem Handy. */
     private val berechtigungen = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
         modell.dienstSicherstellen()
+        hinweise.value = GeraeteHinweise.pruefen(this)
     }
+
+    /** Was die Ortung auf diesem Gerät verhindern kann (Berechtigungen, Akku-Optimierung); bei jedem Zurückkehren neu. */
+    private val hinweise = mutableStateOf<List<GeraeteHinweis>>(emptyList())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -38,7 +45,11 @@ class MainActivity : ComponentActivity() {
                 val zugang = sitzung
                 val lage = ansicht
                 if (ortung != null && zugang != null && lage != null) {
-                    TeamAnsichtScreen(ortung, lage, zugang, abmelden = modell::abmelden, schliessen = modell::schliessen)
+                    TeamAnsichtScreen(
+                        ortung, lage, zugang, hinweise.value,
+                        einstellungOeffnen = { runCatching { startActivity(it) } },
+                        abmelden = modell::abmelden, schliessen = modell::schliessen,
+                    )
                 } else {
                     StartScreen(anmelden = { sitzung ->
                         berechtigungenAnfragen()
@@ -61,6 +72,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        hinweise.value = GeraeteHinweise.pruefen(this)
         modell.aktiviert()
     }
 
