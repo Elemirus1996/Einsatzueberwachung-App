@@ -74,7 +74,13 @@ class Schluesselbund(context: Context) {
         }.generateKey()
     }
 
+    /** Server und Anmelde-Code des laufenden Einsatzes, für „Team wechseln“ ohne neuen Scan. */
+    fun zugangSpeichern(zugang: TeamQRCode) = speichern(KONTO_ZUGANG, zugang.alsText())
+    fun zugangLesen(): TeamQRCode? = lesen(KONTO_ZUGANG)?.let(TeamQRCode::ausText)
+    fun zugangLoeschen() = loeschen(KONTO_ZUGANG)
+
     companion object {
+        const val KONTO_ZUGANG = "einsatz-zugang"
         const val KONTO_TEAM = "team"
         private const val ALIAS = "einsatzspur-zugang"
         private const val VERFAHREN = "AES/GCM/NoPadding"

@@ -17,6 +17,7 @@ import io.github.elemirus1996.einsatzspur.kern.SteuerAntwort
 import io.github.elemirus1996.einsatzspur.kern.TeamAnsicht
 import io.github.elemirus1996.einsatzspur.kern.TeamClient
 import io.github.elemirus1996.einsatzspur.kern.TeamOrtung
+import io.github.elemirus1996.einsatzspur.kern.TeamQRCode
 import io.github.elemirus1996.einsatzspur.kern.TeamSitzung
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,8 +40,25 @@ class AppModell(private val context: Context) {
 
     private var imVordergrund = false
     private val mitteilungen = LokaleMitteilungen(context) { imVordergrund }
-    /** Abmelden durch den Nutzer meldet kein „Einsatz beendet“. */
-    private var abmeldungDurchNutzer = false
+    /** Wie eine Ortung endet: entscheidet über Mitteilung und darüber, ob der Anmelde-Code bleibt. */
+    enum class Abmeldung(val meldetEinsatzende: Boolean, val behaeltZugang: Boolean) {
+        /** Server: Einsatzende, Team gelöscht, Token abgelaufen (410/stop) */
+        SERVER(meldetEinsatzende = true, behaeltZugang = false),
+        /** Nutzer wechselt das Team im selben Einsatz */
+        TEAM_WECHSEL(meldetEinsatzende = false, behaeltZugang = true),
+        /** Nutzer meldet sich vom Einsatz ab */
+        EINSATZ(meldetEinsatzende = false, behaeltZugang = false),
+    }
+
+    private var abmeldung = Abmeldung.SERVER
+
+    /** Server und Anmelde-Code des laufenden Einsatzes (Keystore), solange der Einsatz läuft. */
+    private val _einsatzZugang = MutableStateFlow(schluesselbund.zugangLesen())
+    val einsatzZugang: StateFlow<TeamQRCode?> = _einsatzZugang
+
+    /** Teamauswahl desselben Einsatzes nach „Team wechseln“ (gespeicherter Code, kein Scan). */
+    private val _teamWahl = MutableStateFlow<TeamQRCode?>(null)
+    val teamWahl: StateFlow<TeamQRCode?> = _teamWahl
     private val ablage = object : Ablage {
         private val prefs = context.getSharedPreferences("ansicht", Context.MODE_PRIVATE)
         override fun lesen(schluessel: String) = prefs.getString(schluessel, null)
@@ -54,7 +72,11 @@ class AppModell(private val context: Context) {
         }
     }
 
-    fun anmelden(sitzung: TeamSitzung) {
+    fun anmelden(sitzung: TeamSitzung, zugang: TeamQRCode) {
+        schluesselbund.zugangSpeichern(zugang)
+        _einsatzZugang.value = zugang
+        _teamWahl.value = null
+        abmeldung = Abmeldung.TEAM_WECHSEL
         _team.value?.anwenden(SteuerAntwort.STOP)
         schluesselbund.sitzungSpeichern(sitzung)
         teamStarten(sitzung)
@@ -62,9 +84,36 @@ class AppModell(private val context: Context) {
         konfigurieren()
     }
 
-    fun abmelden() {
-        abmeldungDurchNutzer = true
-        _team.value?.anwenden(SteuerAntwort.STOP)
+    /**
+     * „Team wechseln“: Puffer hochladen, Ortung des alten Teams beenden, Token löschen, dann Teamauswahl
+     * desselben Einsatzes. `false`, wenn noch Positionen im Puffer liegen und `trotzdem` nicht gesetzt ist.
+     */
+    suspend fun teamWechseln(trotzdem: Boolean = false): Boolean {
+        val team = _team.value ?: return true
+        val zugang = _einsatzZugang.value ?: return true
+        if (team.gepuffert.value > 0) team.hochladen()
+        if (!trotzdem && team.gepuffert.value > 0) return false
+        abmeldung = Abmeldung.TEAM_WECHSEL
+        team.anwenden(SteuerAntwort.STOP)
+        teamEntfernen()
+        _teamWahl.value = zugang
+        return true
+    }
+
+    /** „Vom Einsatz abmelden“: dauerhaft, löscht Token und Anmelde-Code, zurück zum Start. */
+    fun vomEinsatzAbmelden() {
+        abmeldung = Abmeldung.EINSATZ
+        val team = _team.value
+        if (team != null && team.zustand.value != TeamOrtung.Zustand.BEENDET) team.anwenden(SteuerAntwort.STOP) else zugangLoeschen()
+        teamEntfernen()
+        _teamWahl.value = null
+    }
+
+    /** Gespeicherter Code gilt nicht mehr (login/teams → 401): neu scannen. */
+    fun zugangUngueltig() = zugangLoeschen()
+
+    fun teamWahlAbbrechen() {
+        _teamWahl.value = null
     }
 
     /** Activity sichtbar: Live-Verbindung; sonst nur die Lage jede Minute (für Mitteilungen). */
@@ -76,9 +125,18 @@ class AppModell(private val context: Context) {
     /** Nach dem Ende bleibt „beendet“ stehen, bis der Nutzer zurück zum Start geht. */
     fun schliessen() {
         if (_team.value?.zustand?.value != TeamOrtung.Zustand.BEENDET) return
+        teamEntfernen()
+    }
+
+    private fun teamEntfernen() {
         _team.value = null
         _ansicht.value = null
         _sitzung.value = null
+    }
+
+    private fun zugangLoeschen() {
+        schluesselbund.zugangLoeschen()
+        _einsatzZugang.value = null
     }
 
     /** App kommt in den Vordergrund: Ablauf prüfen, Status holen, Dienst sicherstellen. */
@@ -139,8 +197,9 @@ class AppModell(private val context: Context) {
     }
 
     private fun teamBeendet() {
-        if (!abmeldungDurchNutzer) mitteilungen.senden(LageMeldung.EINSATZ_BEENDET)
-        abmeldungDurchNutzer = false
+        if (abmeldung.meldetEinsatzende) mitteilungen.senden(LageMeldung.EINSATZ_BEENDET)
+        if (!abmeldung.behaeltZugang) zugangLoeschen()
+        abmeldung = Abmeldung.SERVER
         _ansicht.value?.vergessen()
         schluesselbund.loeschen(Schluesselbund.KONTO_TEAM)
     }
