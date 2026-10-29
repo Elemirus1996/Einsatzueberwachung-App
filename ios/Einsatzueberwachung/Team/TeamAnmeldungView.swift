@@ -1,8 +1,10 @@
 import SwiftUI
 
 /// Anmeldung der Rolle Team: QR-Code scannen oder Server und Code eintippen, Server bestätigen, Team wählen.
+/// Mit `vorgabe` (gespeicherter Code des laufenden Einsatzes) direkt die Teamauswahl, ohne neuen QR-Scan.
 struct TeamAnmeldungView: View {
     @EnvironmentObject private var modell: AppModell
+    var vorgabe: TeamQRCode?
 
     @State private var scannerOffen = false
     @State private var hinweis: String?
@@ -22,7 +24,10 @@ struct TeamAnmeldungView: View {
                 eingabeBereich
             }
         }
-        .navigationTitle("Team")
+        .navigationTitle(vorgabe == nil ? "Team" : "Team wählen")
+        .task {
+            if let vorgabe, auswahl == nil { await teamsLaden(vorgabe) }
+        }
         .disabled(laedt)
         .overlay { if laedt { ProgressView() } }
         .sheet(isPresented: $scannerOffen) { scanner }
@@ -165,6 +170,11 @@ struct TeamAnmeldungView: View {
         defer { laedt = false }
         do {
             auswahl = (qr, try await TeamAnmeldung(qr: qr).teams())
+        } catch AnmeldeFehler.codeUngueltig where qr == vorgabe {
+            // Gespeicherter Code gilt nicht mehr: neu scannen
+            modell.zugangUngueltig()
+            auswahl = nil
+            fehler = "Der Anmelde-Code gilt nicht mehr, vermutlich wurde ein neuer Einsatz gestartet. Bitte den QR-Code neu scannen."
         } catch {
             fehler = text(fuer: error)
         }
@@ -176,7 +186,7 @@ struct TeamAnmeldungView: View {
         do {
             let auswahl = self.auswahl?.teams
             modell.teamAnmelden(try await TeamAnmeldung(qr: qr).anmelden(teamId: team.teamId),
-                                server: auswahl?.server, staffel: auswahl?.staffel)
+                                zugang: qr, server: auswahl?.server, staffel: auswahl?.staffel)
         } catch {
             fehler = text(fuer: error)
         }

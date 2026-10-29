@@ -13,12 +13,19 @@ struct StartView: View {
         NavigationStack {
             if let team = modell.team, let ansicht = modell.teamAnsicht, let sitzung = modell.teamSitzung {
                 TeamAnsichtView(ortung: team, ansicht: ansicht, sitzung: sitzung)
+            } else if let wahl = modell.teamWahl {
+                TeamAnmeldungView(vorgabe: wahl)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Abbrechen") { modell.teamWahlAbbrechen() }
+                        }
+                    }
             } else {
                 rollenAuswahl
             }
         }
         // Nach An- oder Abmeldung neu aufbauen, damit keine Anmeldeseite auf dem Stapel liegen bleibt
-        .id(modell.team == nil)
+        .id("\(modell.team == nil)-\(modell.teamWahl == nil)")
         .alert("Ist „\(modell.heimatFrage?.name ?? "")“ deine eigene Staffel?",
                isPresented: Binding(get: { modell.heimatFrage != nil }, set: { _ in })) {
             Button("Ja, meine Staffel") { modell.heimatBeantworten(true) }
@@ -28,6 +35,7 @@ struct StartView: View {
         }
         .sheet(isPresented: $einstellungenOffen) {
             EinstellungenView(heimat: heimat)
+                .environmentObject(modell)
         }
     }
 
@@ -63,7 +71,8 @@ struct StartView: View {
             kopf
             Spacer()
             NavigationLink {
-                TeamAnmeldungView()
+                // Läuft der Einsatz noch (Code gespeichert), direkt zur Teamauswahl
+                TeamAnmeldungView(vorgabe: modell.einsatzZugang)
             } label: {
                 RollenKnopf(titel: "Team", text: "QR-Code aus dem Einsatz scannen", symbol: "qrcode.viewfinder")
             }

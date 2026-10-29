@@ -11,17 +11,34 @@ final class AppModell: ObservableObject {
     @Published private(set) var teamSitzung: TeamSitzung?
     /// Offene Frage „Ist das deine eigene Staffel?“ nach der ersten Anmeldung an einem Server.
     @Published private(set) var heimatFrage: (info: ServerInfo, name: String)?
+    /// Teamauswahl desselben Einsatzes nach „Team wechseln“ (gespeicherter Anmelde-Code, kein QR-Scan).
+    @Published private(set) var teamWahl: TeamQRCode?
+    /// Server und Anmelde-Code des laufenden Einsatzes (Schlüsselbund), solange der Einsatz läuft.
+    @Published private(set) var einsatzZugang: TeamQRCode?
+
+    /// Wie eine Ortung endet: entscheidet über Mitteilung und darüber, ob der Anmelde-Code bleibt.
+    enum Abmeldung: Equatable {
+        /// Server: Einsatzende, Team gelöscht, Token abgelaufen (410/stop)
+        case server
+        /// Nutzer wechselt das Team im selben Einsatz
+        case teamWechsel
+        /// Nutzer meldet sich vom Einsatz ab
+        case einsatz
+
+        var meldetEinsatzende: Bool { self == .server }
+        var behaeltZugang: Bool { self == .teamWechsel }
+    }
 
     let heimat = HeimatStaffel()
     private let mitteiler: Mitteiler = LokaleMitteilungen()
-    /// Abmelden durch den Nutzer meldet kein „Einsatz beendet“.
-    private var abmeldungDurchNutzer = false
+    private var abmeldung = Abmeldung.server
 
     private let schluesselbund = Schluesselbund()
     private let quelle = CoreLocationQuelle()
     private lazy var puffer = PositionsPuffer.standard()
 
     init() {
+        einsatzZugang = schluesselbund.lesen(TeamQRCode.self, konto: Schluesselbund.kontoEinsatzZugang)
         if let sitzung = schluesselbund.lesen(TeamSitzung.self, konto: Schluesselbund.kontoTeam) {
             teamStarten(sitzung)
             Task { await teamKonfigurieren() }
@@ -29,8 +46,10 @@ final class AppModell: ObservableObject {
     }
 
     /// Nach erfolgreicher Anmeldung (native Anmeldung folgt mit Server-Phase 1c).
-    func teamAnmelden(_ sitzung: TeamSitzung, server: ServerInfo?, staffel: String?) {
+    func teamAnmelden(_ sitzung: TeamSitzung, zugang: TeamQRCode, server: ServerInfo?, staffel: String?) {
         mitteiler.erlaubnisErfragen()
+        if schluesselbund.speichern(zugang, konto: Schluesselbund.kontoEinsatzZugang) { einsatzZugang = zugang }
+        teamWahl = nil
         if let server, heimat.sollFragen(server) {
             heimatFrage = (server, server.staffel ?? staffel ?? sitzung.server.name)
         }
@@ -50,15 +69,48 @@ final class AppModell: ObservableObject {
     }
 
     private func teamAnmelden(_ sitzung: TeamSitzung) {
+        abmeldung = .teamWechsel
         team?.anwenden(.stop)
         guard schluesselbund.speichern(sitzung, konto: Schluesselbund.kontoTeam) else { return }
         teamStarten(sitzung)
         Task { await teamKonfigurieren() }
     }
 
-    func teamAbmelden() {
-        abmeldungDurchNutzer = true
-        team?.anwenden(.stop)
+    /// „Team wechseln“: Puffer hochladen, Ortung des alten Teams beenden, Token löschen, dann Teamauswahl
+    /// desselben Einsatzes mit dem gespeicherten Code. `false`, wenn noch Positionen im Puffer liegen
+    /// (kein Netz) und `trotzdem` nicht gesetzt ist; die App fragt dann nach.
+    @discardableResult
+    func teamWechseln(trotzdem: Bool = false) async -> Bool {
+        guard let team, let zugang = einsatzZugang else { return true }
+        if team.gepuffert > 0 { await team.hochladen() }
+        guard trotzdem || team.gepuffert == 0 else { return false }
+        abmeldung = .teamWechsel
+        team.anwenden(.stop)
+        teamEntfernen()
+        teamWahl = zugang
+        return true
+    }
+
+    /// „Vom Einsatz abmelden“: dauerhaft, löscht Token und Anmelde-Code, zurück zum Start.
+    func vomEinsatzAbmelden() {
+        abmeldung = .einsatz
+        if let team, team.zustand != .beendet {
+            team.anwenden(.stop)
+        } else {
+            zugangLoeschen()
+        }
+        teamEntfernen()
+        teamWahl = nil
+    }
+
+    /// Der gespeicherte Code gilt nicht mehr (login/teams → 401, z. B. neuer Einsatz): zurück zum QR-Scan.
+    func zugangUngueltig() {
+        zugangLoeschen()
+        teamWahl = nil
+    }
+
+    func teamWahlAbbrechen() {
+        teamWahl = nil
     }
 
     /// App kommt in den Vordergrund: Ablauf prüfen und Status holen.
@@ -116,8 +168,9 @@ final class AppModell: ObservableObject {
     }
 
     private func teamBeendet() {
-        if !abmeldungDurchNutzer { mitteiler.senden(.einsatzBeendet) }
-        abmeldungDurchNutzer = false
+        if abmeldung.meldetEinsatzende { mitteiler.senden(.einsatzBeendet) }
+        if !abmeldung.behaeltZugang { zugangLoeschen() }
+        abmeldung = .server
         teamAnsicht?.vergessen()
         schluesselbund.loeschen(konto: Schluesselbund.kontoTeam)
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.statusAufgabe)
@@ -126,8 +179,17 @@ final class AppModell: ObservableObject {
     /// Nach dem Ende bleibt die Anzeige „beendet“ stehen, bis der Nutzer zurück zum Start geht.
     func teamSchliessen() {
         guard team?.zustand == .beendet else { return }
+        teamEntfernen()
+    }
+
+    private func teamEntfernen() {
         team = nil
         teamAnsicht = nil
         teamSitzung = nil
+    }
+
+    private func zugangLoeschen() {
+        schluesselbund.loeschen(konto: Schluesselbund.kontoEinsatzZugang)
+        einsatzZugang = nil
     }
 }
