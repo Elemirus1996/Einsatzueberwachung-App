@@ -58,7 +58,7 @@ struct ELFunkView: View {
                             }
                             .tint(.blue)
                         }
-                        if notiz.art == "notiz" {
+                        if notiz.loeschbar == true {
                             Button("Löschen", role: .destructive) { Task { await betrieb.ausfuehren(.notizLoeschen(notiz.id)) } }
                         }
                     }

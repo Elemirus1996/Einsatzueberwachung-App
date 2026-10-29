@@ -161,7 +161,7 @@ final class TestELAktionen: ELAktionsSchnittstelle, @unchecked Sendable {
         ausgefuehrt.append(aktion)
         if let fehler { throw fehler }
     }
-    func notizen(vor: String?) async throws -> [ELNotiz] { notizListe }
+    func notizen(vor: String?) async throws -> ELNotizSeite { ELNotizSeite(notizen: notizListe, weitere: false) }
     func halsbaender() async throws -> ELHalsbaender {
         try JSONDecoder.server.decode(ELHalsbaender.self, from: Data(#"[ { "id": "HB-1", "name": "Halsband 1", "akku": 80 } ]"#.utf8))
     }
@@ -237,6 +237,9 @@ struct ELBetriebTests {
               { "id": "n1", "art": "notiz", "text": "Wetter wird schlechter", "zeit": "2026-10-29T19:50:00Z", "von": null, "teamId": null } ]
             """#.utf8))
         #expect(notizen.first?.antworten?.first?.text == "Verstanden")
+        let seite = try JSONDecoder.server.decode(ELNotizSeite.self, from: Data(#"{ "notizen": [ { "id": "n1", "art": "notiz", "text": "x", "zeit": "2026-10-29T19:50:00Z", "loeschbar": true }, { "id": "f1", "art": "funk", "text": "y", "zeit": "2026-10-29T19:49:00Z", "loeschbar": false } ], "weitere": true }"#.utf8))
+        #expect(seite.weitere)
+        #expect(seite.notizen.map(\.loeschbar) == [true, false])
         let mitZuletzt = try JSONDecoder.server.decode(ELHalsbaender.self, from: Data(#"{ "frei": [ { "id": "HB-2" } ], "zuletzt": [ { "teamId": "t1", "halsbandId": "HB-2" } ] }"#.utf8))
         #expect(mitZuletzt.frei.map(\.id) == ["HB-2"])
         #expect(mitZuletzt.zuletzt?.first?.halsbandId == "HB-2")

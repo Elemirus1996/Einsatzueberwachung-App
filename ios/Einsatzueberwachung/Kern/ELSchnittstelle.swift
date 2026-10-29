@@ -197,14 +197,15 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle 
         switch http.statusCode {
         case 200..<300: return
         case 410: throw SchnittstellenFehler.beendet
-        case 400, 409:
+        // 400 falsche Eingabe, 404 unbekanntes Team bzw. Notiz, 409 nicht erlaubt (auch: kein Einsatz läuft)
+        case 400, 404, 409:
             let text = ((try? JSONSerialization.jsonObject(with: daten)) as? [String: Any])?["error"] as? String
-            throw ELAktionsFehler.abgelehnt(text ?? "Nicht möglich.")
+            throw ELAktionsFehler.abgelehnt(text ?? (http.statusCode == 404 ? "Nicht gefunden." : "Nicht möglich."))
         default: throw SchnittstellenFehler.server(status: http.statusCode)
         }
     }
 
-    func notizen(vor: String?) async throws -> [ELNotiz] {
+    func notizen(vor: String?) async throws -> ELNotizSeite {
         try await anfrage(vor.map { "notizen?vor=\($0)&anzahl=50" } ?? "notizen?anzahl=50", methode: "GET", inhalt: nil)
     }
 

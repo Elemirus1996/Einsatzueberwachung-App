@@ -72,8 +72,9 @@ final class ELBetrieb: ObservableObject {
 
     func notizenLaden() async {
         do {
-            notizen = try await schnittstelle.notizen(vor: nil)
-            weitereNotizen = notizen.count >= 50
+            let seite = try await schnittstelle.notizen(vor: nil)
+            notizen = seite.notizen
+            weitereNotizen = seite.weitere
         } catch SchnittstellenFehler.beendet {
             beiStop()
         } catch {}
@@ -81,9 +82,9 @@ final class ELBetrieb: ObservableObject {
 
     func aeltereNotizenLaden() async {
         guard weitereNotizen, let letzte = notizen.last else { return }
-        if let mehr = try? await schnittstelle.notizen(vor: letzte.id) {
-            notizen += mehr.filter { neu in !notizen.contains { $0.id == neu.id } }
-            weitereNotizen = mehr.count >= 50
+        if let seite = try? await schnittstelle.notizen(vor: letzte.id) {
+            notizen += seite.notizen.filter { neu in !notizen.contains { $0.id == neu.id } }
+            weitereNotizen = seite.weitere
         }
     }
 

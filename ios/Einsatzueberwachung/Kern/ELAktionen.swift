@@ -85,6 +85,33 @@ struct ELNotiz: Decodable, Equatable, Identifiable, Sendable {
     var von: String?
     var teamId: String?
     var antworten: [Antwort]?
+    /// Nur Notizen der Einsatzleitung dürfen gelöscht werden (Server Stufe 3)
+    var loeschbar: Bool?
+}
+
+/// Antwort von `GET /notizen` (Server Stufe 3): Seite neueste zuerst und ob es ältere gibt.
+struct ELNotizSeite: Decodable, Equatable, Sendable {
+    var notizen: [ELNotiz]
+    var weitere: Bool
+
+    init(notizen: [ELNotiz], weitere: Bool) {
+        self.notizen = notizen
+        self.weitere = weitere
+    }
+
+    init(from decoder: Decoder) throws {
+        // Erste Beschreibung: reine Liste; umgesetzt: { notizen, weitere }
+        if let liste = try? [ELNotiz](from: decoder) {
+            notizen = liste
+            weitere = liste.count >= 50
+            return
+        }
+        let c = try decoder.container(keyedBy: Schluessel.self)
+        notizen = try c.decode([ELNotiz].self, forKey: .notizen)
+        weitere = try c.decodeIfPresent(Bool.self, forKey: .weitere) ?? false
+    }
+
+    private enum Schluessel: String, CodingKey { case notizen, weitere }
 }
 
 /// Freie Halsbänder für die Rückfrage beim Teamstart (`GET /halsbaender`).
@@ -121,6 +148,6 @@ struct ELHalsbaender: Decodable, Equatable, Sendable {
 /// Was die Aktionen der Einsatzleitung brauchen (testbar ohne Netz).
 protocol ELAktionsSchnittstelle: Sendable {
     func ausfuehren(_ aktion: ELAktion) async throws
-    func notizen(vor: String?) async throws -> [ELNotiz]
+    func notizen(vor: String?) async throws -> ELNotizSeite
     func halsbaender() async throws -> ELHalsbaender
 }
