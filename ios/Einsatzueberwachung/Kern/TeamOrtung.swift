@@ -23,13 +23,18 @@ final class TeamOrtung: ObservableObject {
     private let beimBeenden: () -> Void
 
     private(set) var steuerung: SteuerAntwort
+    /// Einsatzleitung (Entscheidung Paul 29.10.2026): in der Pause (kein Einsatz) Ortung ganz aus, kein Takt.
+    /// Geprüft wird nur beim Öffnen der App und bei Live-Ereignissen im Vordergrund. Teams: Grob-Ortung.
+    private let pauseOhneOrtung: Bool
     private var letzteAufnahme: Date?
     private var letzteAnfrage: Date?
     private var anfrageLaeuft = false
     private var takt: Task<Void, Never>?
 
     init(schnittstelle: TeamSchnittstelle, quelle: OrtungsQuelle, puffer: PositionsSpeicher,
-         ablauf: Date, jetzt: @escaping () -> Date = Date.init, beimBeenden: @escaping () -> Void) {
+         ablauf: Date, jetzt: @escaping () -> Date = Date.init, pauseOhneOrtung: Bool = false,
+         beimBeenden: @escaping () -> Void) {
+        self.pauseOhneOrtung = pauseOhneOrtung
         self.schnittstelle = schnittstelle
         self.quelle = quelle
         self.puffer = puffer
@@ -71,6 +76,10 @@ final class TeamOrtung: ObservableObject {
             quelle.starten(stufe: .fein)
             zustand = .ortet
             taktStarten()
+        case .pause where pauseOhneOrtung:
+            quelle.beenden()
+            taktBeenden()
+            zustand = .pausiert
         case .pause:
             // Kein GPS, aber Grob-Ortung hält die App wach, damit der Takt eine neue Suche bemerkt
             quelle.starten(stufe: .grob)

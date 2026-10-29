@@ -97,7 +97,7 @@ struct ELUebersichtView: View {
                     }
                 } else {
                     Text("Kein Einsatz aktiv").font(.title2.bold())
-                    Text("Ein Einsatz wird im Monitor gestartet (in der App folgt das in einer späteren Version). Die Ortung der Einsatzleitung ist pausiert.")
+                    Text("Ein Einsatz wird im Monitor gestartet (in der App folgt das in einer späteren Version). Die Ortung der Einsatzleitung ist aus und startet, sobald ein Einsatz läuft.")
                         .font(.subheadline).foregroundStyle(.secondary)
                 }
             }
