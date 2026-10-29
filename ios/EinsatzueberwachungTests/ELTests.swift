@@ -245,3 +245,80 @@ struct ELBetriebTests {
         #expect(mitZuletzt.zuletzt?.first?.halsbandId == "HB-2")
     }
 }
+
+final class TestELKarte: ELKartenSchnittstelle, @unchecked Sendable {
+    var karteAntwort: ELKarte
+    var tracksVoll: ELTracks
+    var tracksNeu = ELTracks(serverZeit: nil, laufend: [], abgeschlossen: nil)
+    private(set) var seitAbrufe: [Int64?] = []
+    init(karte: ELKarte, tracks: ELTracks) {
+        karteAntwort = karte
+        tracksVoll = tracks
+    }
+    func karte() async throws -> ELKarte { karteAntwort }
+    func tracks(seit: Int64?) async throws -> ELTracks {
+        seitAbrufe.append(seit)
+        return seit == nil ? tracksVoll : tracksNeu
+    }
+}
+
+@MainActor
+struct ELKarteTests {
+    static func karte() throws -> ELKarte {
+        try JSONDecoder.server.decode(ELKarte.self, from: Data(#"""
+            { "suchgebiete": [ { "id": "g1", "name": "Gebiet A", "farbe": "#2f6fd6", "teamId": "t1", "abdeckungProzent": 42.5,
+                                 "punkte": [ { "lat": 49.31, "lng": 8.43 }, { "lat": 49.32, "lng": 8.44 }, { "lat": 49.31, "lng": 8.45 } ] } ],
+              "positionen": [ { "art": "halsband", "id": "HB-7", "name": "Halsband 7", "teamId": "t1", "lat": 49.312, "lng": 8.431, "zeit": "2026-10-29T20:00:00Z", "akku": 72 },
+                              { "art": "el", "id": "iPad ELW", "teamId": null, "lat": 49.30, "lng": 8.40, "zeit": "2026-10-29T20:00:00Z" } ] }
+            """#.utf8))
+    }
+
+    static func tracks() throws -> ELTracks {
+        try JSONDecoder.server.decode(ELTracks.self, from: Data(#"""
+            { "serverZeit": 1793300000000,
+              "laufend": [ { "teamId": "t1", "hund": [ { "lat": 49.31, "lng": 8.43, "t": 1793299000000 } ], "mensch": [] } ],
+              "abgeschlossen": [ { "sucheId": "s1", "teamId": "t1", "tracks": [ { "art": "hund", "farbe": "#d32f2f", "punkte": [] } ] } ] }
+            """#.utf8))
+    }
+
+    @Test func karteUndTracksAusDerBeschreibung() throws {
+        let k = try Self.karte()
+        #expect(k.suchgebiete.first?.abdeckungProzent == 42.5)
+        #expect(k.positionen.map(\.art) == ["halsband", "el"])
+        let t = try Self.tracks()
+        #expect(t.letzterZeitpunkt == 1_793_299_000_000)
+        #expect(t.abgeschlossen?.first?.teamId == "t1")
+    }
+
+    @Test func livePositionBewegtMarker() async throws {
+        let a = ELKartenAnsicht(schnittstelle: TestELKarte(karte: try Self.karte(), tracks: try Self.tracks()))
+        await a.laden(voll: true)
+        a.position(ELPosition(art: "halsband", id: "HB-7", teamId: "t1", lat: 49.4, lng: 8.5))
+        a.position(ELPosition(art: "handy", id: "t1", teamId: "t1", lat: 49.35, lng: 8.45))
+        #expect(a.karte?.positionen.count == 3)
+        #expect(a.karte?.positionen.first?.lat == 49.4)
+        #expect(a.karte?.positionen.first?.name == "Halsband 7", "Name bleibt, wenn das Ereignis keinen trägt")
+    }
+
+    @Test func tracksNachladenMitSeit() async throws {
+        let server = TestELKarte(karte: try Self.karte(), tracks: try Self.tracks())
+        server.tracksNeu = ELTracks(serverZeit: nil, laufend: [
+            .init(teamId: "t1", hund: [.init(lat: 49.32, lng: 8.44, t: 1_793_299_500_000)], mensch: []),
+            .init(teamId: "t2", hund: [], mensch: [.init(lat: 49.2, lng: 8.3, t: 1_793_299_600_000)]),
+        ], abgeschlossen: nil)
+        let a = ELKartenAnsicht(schnittstelle: server)
+        await a.laden(voll: true)
+        await a.laden(voll: false)
+        #expect(server.seitAbrufe == [nil, 1_793_299_000_000])
+        #expect(a.tracks?.laufend.first?.hund.count == 2)
+        #expect(a.tracks?.laufend.count == 2)
+    }
+
+    @Test func positionsEreignisAusDemStrom() {
+        var leser = SSELeser()
+        let e = "event: position\ndata: {\"art\":\"handy\",\"id\":\"t1\",\"teamId\":\"t1\",\"lat\":49.3,\"lng\":8.4,\"zeit\":\"2026-10-29T20:00:00Z\",\"akku\":50}\n\n"
+            .components(separatedBy: "\n").compactMap { leser.zeile($0) }.compactMap(ELEreignis.init)
+        guard case .position(let p)? = e.first else { Issue.record("kein Positionsereignis"); return }
+        #expect(p.art == "handy" && p.akku == 50)
+    }
+}

@@ -8,6 +8,7 @@ struct ELUebersichtView: View {
     @ObservedObject var ansicht: ELAnsicht
     @ObservedObject var ortung: TeamOrtung
     @ObservedObject var betrieb: ELBetrieb
+    let karte: ELKartenAnsicht
     @State private var gewaehltesTeam: ELLage.Team?
     @Environment(\.scenePhase) private var phase
     @Environment(\.horizontalSizeClass) private var breite
@@ -53,6 +54,11 @@ struct ELUebersichtView: View {
         }
         .navigationTitle("Einsatzleitung")
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    ELKarteView(karte: karte, teams: ansicht.lage?.teams ?? [])
+                } label: { Label("Lagekarte", systemImage: "map") }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink {
                     ELFunkView(betrieb: betrieb, teams: ansicht.lage?.teams ?? [])
