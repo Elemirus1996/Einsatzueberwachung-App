@@ -36,6 +36,7 @@ interface TeamAnsichtSchnittstelle {
     suspend fun lage(): TeamLage
     suspend fun tracks(seit: Long?): TeamTracks
     suspend fun statusmeldung(id: String, meldung: Statusmeldung)
+    suspend fun suche(id: String, aktion: Suchaktion): SuchAntwort
 
     /** Server-Sent Events; endet, wenn die Verbindung abbricht. 410 beim Verbinden → [SchnittstellenFehler.Beendet]. */
     fun ereignisse(): Flow<TeamEreignis>
@@ -50,6 +51,23 @@ class TeamClient(private val sitzung: TeamSitzung) : TeamSchnittstelle, TeamAnsi
 
     override suspend fun statusmeldung(id: String, meldung: Statusmeldung) {
         anfrage("statusmeldung", "POST", JSONObject().put("id", id).put("code", meldung.code))
+    }
+
+    override suspend fun suche(id: String, aktion: Suchaktion): SuchAntwort {
+        val (status, text) = http(
+            sitzung.server.pfad("api/team-mobile/app/v1/suche"), "POST",
+            JSONObject().put("id", id).put("aktion", aktion.code), sitzung.token,
+        )
+        val json = runCatching { JSONObject(text) }.getOrNull()
+        val suche = json?.optJSONObject("suche")?.let { runCatching { TeamLage.suche(it) }.getOrNull() }
+        val fehler = json?.optString("error")?.ifEmpty { null }
+        return when (status) {
+            in 200..299 -> SuchAntwort(Modus.aus(json?.optString("mode")), suche)
+            409 -> throw SuchFehler.Abgelehnt(fehler, suche)
+            403 -> throw SuchFehler.Verboten(fehler)
+            410 -> throw SchnittstellenFehler.Beendet
+            else -> throw SchnittstellenFehler.Server(status)
+        }
     }
 
     override fun ereignisse(): Flow<TeamEreignis> = callbackFlow {

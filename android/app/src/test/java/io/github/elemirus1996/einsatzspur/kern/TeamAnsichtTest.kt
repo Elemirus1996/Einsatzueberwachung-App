@@ -48,6 +48,13 @@ class TestAnsichtSchnittstelle(var lageAntwort: Result<TeamLage> = Result.succes
         return TeamTracks(emptyList(), emptyList(), emptyList())
     }
 
+    var sucheAntwort: Result<SuchAntwort> = Result.success(SuchAntwort(Modus.TRACK, TeamLage.Suche(TeamLage.SucheStatus.LAEUFT, darfSteuern = true)))
+    val aktionen = mutableListOf<Pair<String, Suchaktion>>()
+    override suspend fun suche(id: String, aktion: Suchaktion): SuchAntwort {
+        aktionen += id to aktion
+        return sucheAntwort.getOrThrow()
+    }
+
     override suspend fun statusmeldung(id: String, meldung: Statusmeldung) {
         meldungen += id to meldung
         meldungFehler?.let { throw it }
@@ -246,5 +253,66 @@ class TeamLageTest {
             LageMeldung.vergleichen(BASIS_LAGE, neu),
         )
         assertTrue(LageMeldung.vergleichen(BASIS_LAGE, BASIS_LAGE.copy(halsband = BASIS_LAGE.halsband?.copy(lat = 49.5))).isEmpty())
+    }
+}
+
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class TeamsteuerungTest {
+    private val ablage = MapAblage()
+    private val server = TestAnsichtSchnittstelle(Result.success(BASIS_LAGE.copy(suche = TeamLage.Suche(TeamLage.SucheStatus.BEREIT, darfSteuern = true))))
+    private val modi = mutableListOf<Modus>()
+
+    private fun TestScope.ansicht() = TeamAnsicht(server, "t1", ablage, backgroundScope, { 1_800_000_000_000L }) { modi += it }
+
+    @Test
+    fun nurGueltigeUebergaenge() {
+        assertEquals(listOf(Suchaktion.STARTEN), Suchaktion.moeglich(TeamLage.SucheStatus.BEREIT))
+        assertEquals(listOf(Suchaktion.PAUSE, Suchaktion.BEENDEN), Suchaktion.moeglich(TeamLage.SucheStatus.LAEUFT))
+        assertEquals(listOf(Suchaktion.WEITER, Suchaktion.BEENDEN), Suchaktion.moeglich(TeamLage.SucheStatus.KURZPAUSE))
+    }
+
+    @Test
+    fun startenGibtModusSofortWeiter() = runTest {
+        val a = ansicht()
+        a.neuLaden()
+        a.steuern(Suchaktion.STARTEN)
+        assertEquals(Modus.TRACK, modi.last())
+        assertEquals(TeamLage.SucheStatus.LAEUFT, a.lage.value?.suche?.status)
+        assertTrue(a.offeneAktionen.value.isEmpty())
+    }
+
+    @Test
+    fun abgelehntUndVerboten() = runTest {
+        val a = ansicht()
+        a.neuLaden()
+        server.sucheAntwort = Result.failure(SuchFehler.Abgelehnt("Suche läuft bereits", TeamLage.Suche(TeamLage.SucheStatus.LAEUFT, darfSteuern = true)))
+        a.steuern(Suchaktion.STARTEN)
+        assertEquals(TeamLage.SucheStatus.LAEUFT, a.lage.value?.suche?.status)
+        assertEquals("Suche läuft bereits", a.suchHinweis.value?.first)
+        server.sucheAntwort = Result.failure(SuchFehler.Verboten(null))
+        a.steuern(Suchaktion.PAUSE)
+        assertTrue(!a.darfSteuern)
+    }
+
+    @Test
+    fun funklochWiederholtMitGleicherId() = runTest {
+        val a = ansicht()
+        a.neuLaden()
+        server.sucheAntwort = Result.failure(java.io.IOException("Funkloch"))
+        a.steuern(Suchaktion.STARTEN)
+        assertEquals(1, a.offeneAktionen.value.size)
+        val neu = ansicht()
+        assertEquals(1, neu.offeneAktionen.value.size)
+        server.sucheAntwort = Result.success(SuchAntwort(Modus.TRACK, TeamLage.Suche(TeamLage.SucheStatus.LAEUFT, darfSteuern = true)))
+        neu.neuLaden()
+        assertTrue(neu.offeneAktionen.value.isEmpty())
+        assertEquals(server.aktionen[0].first, server.aktionen[1].first)
+    }
+
+    @Test
+    fun darfSteuernAusDerLage() {
+        assertTrue(TeamLage.suche(JSONObject("""{ "status": "laeuft", "dauerSec": 0, "darfSteuern": true }""")).darfSteuern)
+        assertTrue("älterer Server: keine Steuerung", !TeamLage.suche(JSONObject("""{ "status": "bereit" }""")).darfSteuern)
     }
 }
