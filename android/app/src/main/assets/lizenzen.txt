@@ -7,6 +7,16 @@ ZXing Core 3.5.4 (com.google.zxing:core) – QR-Code-Auswertung
 Apache License 2.0, Copyright (C) ZXing authors
 https://github.com/zxing/zxing
 
+MapLibre Native Android 13.7.1 (org.maplibre.gl:android-sdk) – Karte
+BSD 2-Clause License, Copyright MapLibre contributors
+https://github.com/maplibre/maplibre-native
+
+OkHttp 4.12.0, Okio 3.6.0 (Square), Gson, Guava, Timber, Dagger
+Apache License 2.0
+
+Kartendaten: © OpenStreetMap-Mitwirkende (ODbL), SRTM
+Kartendarstellung: © OpenStreetMap (CC-BY-SA) bzw. © OpenTopoMap (CC-BY-SA)
+
 AndroidX / Jetpack (Compose, Activity, Lifecycle, Core, CameraX)
 Apache License 2.0, Copyright The Android Open Source Project
 

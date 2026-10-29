@@ -1,6 +1,5 @@
 package io.github.elemirus1996.einsatzspur.ui
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,11 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -55,7 +50,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.DateFormat
 import java.util.Date
-import kotlin.math.cos
 
 /** Native Team-Ansicht (Nachbau von `/team`, wie iOS `TeamAnsichtView`). Karte vorerst als Lageskizze ohne Kacheln. */
 @Composable
@@ -126,7 +120,7 @@ fun TeamAnsichtScreen(
 
             // Lageskizze und Mitteilungen
             Box(Modifier.weight(1f).fillMaxWidth()) {
-                Lageskizze(lage, tracks, ich?.let { Koordinate(it.lat, it.lng) }, Modifier.fillMaxSize())
+                Karte(lage, tracks, ich?.let { Koordinate(it.lat, it.lng) }, Modifier.fillMaxSize())
                 Column(Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     hinweise.filter { it.titel !in ausgeblendet }.forEach { h ->
                         Card(Modifier.fillMaxWidth()) {
@@ -244,65 +238,6 @@ fun TeamAnsichtScreen(
         )
     }
 }
-
-/**
- * Lageskizze ohne Kartenkacheln: Suchgebiet, Laufwege, Hund und eigene Position, maßstabsgetreu (Norden oben).
- * Die Entscheidung für eine Kartenbibliothek unter Android steht noch aus.
- */
-@Composable
-private fun Lageskizze(lage: TeamLage?, tracks: io.github.elemirus1996.einsatzspur.kern.TeamTracks?, ich: Koordinate?, modifier: Modifier) {
-    val gebiet = lage?.suchgebiet?.punkte.orEmpty()
-    val hund = lage?.halsband?.let { Koordinate(it.lat, it.lng) }
-    val alle = gebiet + listOfNotNull(hund, ich) +
-        (tracks?.hund.orEmpty() + tracks?.mensch.orEmpty()).map { Koordinate(it.lat, it.lng) }
-    val gebietFarbe = farbe(lage?.suchgebiet?.farbe) ?: Color(0xFF1F6FC4)
-    Canvas(modifier.background(MaterialTheme.colorScheme.surfaceVariant)) {
-        if (alle.isEmpty()) return@Canvas
-        val projektion = Projektion(alle, size.width, size.height, 32f)
-        if (gebiet.size > 2) {
-            val pfad = Path().apply {
-                gebiet.forEachIndexed { i, k -> projektion(k).let { if (i == 0) moveTo(it.x, it.y) else lineTo(it.x, it.y) } }
-                close()
-            }
-            drawPath(pfad, gebietFarbe.copy(alpha = 0.15f))
-            drawPath(pfad, gebietFarbe, style = Stroke(4f))
-        }
-        tracks?.abgeschlossen?.forEach { t -> linie(t.punkte.map { Koordinate(it.lat, it.lng) }, projektion, (farbe(t.farbe) ?: Color.Gray).copy(alpha = 0.45f), 3f) }
-        linie(tracks?.mensch.orEmpty().map { Koordinate(it.lat, it.lng) }, projektion, Color(0xFF1F6FC4), 6f)
-        linie(tracks?.hund.orEmpty().map { Koordinate(it.lat, it.lng) }, projektion, Color(0xFFC62828), 6f)
-        hund?.let { drawCircle(Color(0xFFC62828), 14f, projektion(it)); drawCircle(Color.White, 14f, projektion(it), style = Stroke(4f)) }
-        ich?.let { drawCircle(Color(0xFF1F6FC4), 11f, projektion(it)); drawCircle(Color.White, 11f, projektion(it), style = Stroke(4f)) }
-    }
-}
-
-private fun DrawScope.linie(punkte: List<Koordinate>, projektion: Projektion, farbe: Color, breite: Float) {
-    if (punkte.size < 2) return
-    val pfad = Path()
-    punkte.forEachIndexed { i, k -> projektion(k).let { if (i == 0) pfad.moveTo(it.x, it.y) else pfad.lineTo(it.x, it.y) } }
-    drawPath(pfad, farbe, style = Stroke(breite))
-}
-
-/** Einfache flächentreue Näherung für kleine Gebiete: Längengrade mit cos(Breite) gestaucht. */
-private class Projektion(punkte: List<Koordinate>, breite: Float, hoehe: Float, rand: Float) {
-    private val minLat = punkte.minOf { it.lat }
-    private val maxLat = punkte.maxOf { it.lat }
-    private val minLng = punkte.minOf { it.lng }
-    private val maxLng = punkte.maxOf { it.lng }
-    private val stauchung = cos(Math.toRadians((minLat + maxLat) / 2))
-    private val spanneX = ((maxLng - minLng) * stauchung).coerceAtLeast(0.0005)
-    private val spanneY = (maxLat - minLat).coerceAtLeast(0.0005)
-    private val massstab = minOf((breite - 2 * rand) / spanneX, (hoehe - 2 * rand) / spanneY)
-    private val versatzX = (breite - spanneX * massstab) / 2
-    private val versatzY = (hoehe - spanneY * massstab) / 2
-
-    operator fun invoke(k: Koordinate) = Offset(
-        (versatzX + (k.lng - minLng) * stauchung * massstab).toFloat(),
-        (versatzY + (maxLat - k.lat) * massstab).toFloat(),
-    )
-}
-
-private fun farbe(hex: String?): Color? =
-    hex?.removePrefix("#")?.takeIf { it.length == 6 }?.toLongOrNull(16)?.let { Color(0xFF000000 or it) }
 
 private fun sucheText(status: TeamLage.SucheStatus?, fehler: Boolean) = when (status) {
     TeamLage.SucheStatus.LAEUFT -> "Suche läuft"
