@@ -6,3 +6,6 @@ ios/Lokal.xcconfig
 
 # macOS
 .DS_Store
+
+# Claude Code, lokale Einstellungen
+.claude/settings.local.json
