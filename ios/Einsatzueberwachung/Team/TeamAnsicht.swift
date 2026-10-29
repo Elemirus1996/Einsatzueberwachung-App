@@ -10,6 +10,12 @@ final class TeamAnsicht: ObservableObject {
         var zeit: Date
     }
 
+    struct OffeneAktion: Codable, Equatable, Identifiable {
+        var id: String
+        var aktion: Suchaktion
+        var zeit: Date
+    }
+
     static let pollTakt: Duration = .seconds(15)
     static let neuVerbindenNach: Duration = .seconds(5)
     /// Nach einem `stop`, das sich als unecht herausstellt (z. B. vom Server verdrängt, weil schon 3 Geräte
@@ -27,6 +33,11 @@ final class TeamAnsicht: ObservableObject {
     @Published private(set) var gelesen: Set<String>
     /// Zuletzt bestätigte Statusmeldung, für die kurze Rückmeldung unter den Knöpfen.
     @Published private(set) var gesendet: (code: Statusmeldung.Code, zeit: Date)?
+    /// Steuerung der Suche, die im Funkloch auf das Netz wartet (Abschnitt 11).
+    @Published private(set) var offeneAktionen: [OffeneAktion]
+    /// Kurzer Hinweis nach 409/403 oder Bestätigung, z. B. „Suche läuft bereits“.
+    @Published private(set) var suchHinweis: (text: String, zeit: Date)?
+    private var aktionenLaufen = false
 
     private let schnittstelle: TeamAnsichtSchnittstelle
     private let speicher: UserDefaults
@@ -60,6 +71,8 @@ final class TeamAnsicht: ObservableObject {
         self.gelesen = Set(speicher.stringArray(forKey: "\(schluessel).gelesen") ?? [])
         self.offeneMeldungen = (speicher.data(forKey: "\(schluessel).meldungen"))
             .flatMap { try? JSONDecoder().decode([OffeneMeldung].self, from: $0) } ?? []
+        self.offeneAktionen = (speicher.data(forKey: "\(schluessel).aktionen"))
+            .flatMap { try? JSONDecoder().decode([OffeneAktion].self, from: $0) } ?? []
     }
 
     // MARK: Ablauf
@@ -101,8 +114,10 @@ final class TeamAnsicht: ObservableObject {
         anhalten()
         speicher.removeObject(forKey: "\(schluessel).gelesen")
         speicher.removeObject(forKey: "\(schluessel).meldungen")
+        speicher.removeObject(forKey: "\(schluessel).aktionen")
         gelesen = []
         offeneMeldungen = []
+        offeneAktionen = []
     }
 
     private func liveSchleife() async {
@@ -224,6 +239,7 @@ final class TeamAnsicht: ObservableObject {
             verbindungsfehler = true
         }
         await meldungenSenden()
+        await aktionenSenden()
         if mitTracks { await tracksLaden(voll: tracksVoll) }
     }
 
@@ -282,6 +298,61 @@ final class TeamAnsicht: ObservableObject {
 
     private func meldungenSpeichern() {
         speicher.set(try? JSONEncoder().encode(offeneMeldungen), forKey: "\(schluessel).meldungen")
+    }
+
+    // MARK: Steuerung der Suche
+
+    /// Darf das Team steuern? Ohne Angabe des Servers (ältere Version): nein.
+    var darfSteuern: Bool { lage?.suche.darfSteuern == true }
+
+    /// Legt die Aktion in die Warteschlange und sendet sie; dieselbe `id` wird nur einmal ausgeführt.
+    func steuern(_ aktion: Suchaktion) async {
+        offeneAktionen.append(OffeneAktion(id: UUID().uuidString, aktion: aktion, zeit: jetzt()))
+        aktionenSpeichern()
+        await aktionenSenden()
+    }
+
+    func aktionenSenden() async {
+        guard !aktionenLaufen else { return }
+        aktionenLaufen = true
+        defer { aktionenLaufen = false }
+        while let offen = offeneAktionen.first {
+            do {
+                let antwort = try await schnittstelle.suche(id: offen.id, aktion: offen.aktion)
+                sucheUebernehmen(antwort.suche)
+                // Modus sofort an die Ortung (z. B. „Suche beendet“ → pause → Grob-Ortung)
+                if let mode = antwort.mode { beiSteuerung(mode) }
+            } catch SchnittstellenFehler.beendet {
+                beiSteuerung(.stop)
+                return
+            } catch SuchFehler.abgelehnt(let text, let suche) {
+                // Die EL kann inzwischen umgeschaltet haben: Stand übernehmen und kurz anzeigen
+                sucheUebernehmen(suche)
+                suchHinweis = (text ?? "Nicht möglich, der Stand hat sich geändert.", jetzt())
+            } catch SuchFehler.verboten(let text) {
+                if var neu = lage {
+                    neu.suche.darfSteuern = false
+                    lageUebernehmen(neu)
+                }
+                suchHinweis = (text ?? "Die Einsatzleitung steuert die Suche.", jetzt())
+            } catch SchnittstellenFehler.server(let status) where (400..<500).contains(status) && status != 429 {
+                // Vom Server abgelehnt: nicht endlos wiederholen
+            } catch {
+                return
+            }
+            offeneAktionen.removeAll { $0.id == offen.id }
+            aktionenSpeichern()
+        }
+    }
+
+    private func sucheUebernehmen(_ suche: TeamLage.Suche?) {
+        guard let suche, var neu = lage else { return }
+        neu.suche = suche
+        lageUebernehmen(neu)
+    }
+
+    private func aktionenSpeichern() {
+        speicher.set(try? JSONEncoder().encode(offeneAktionen), forKey: "\(schluessel).aktionen")
     }
 
     // MARK: Mitteilungen

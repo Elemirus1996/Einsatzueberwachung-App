@@ -71,6 +71,7 @@ protocol TeamAnsichtSchnittstelle: Sendable {
     func lage() async throws -> TeamLage
     func tracks(seit: Int64?) async throws -> TeamTracks
     func statusmeldung(id: String, code: Statusmeldung.Code) async throws
+    func suche(id: String, aktion: Suchaktion) async throws -> SuchAntwort
     func ereignisse() async throws -> AsyncThrowingStream<TeamEreignis, Error>
 }
 
@@ -99,6 +100,25 @@ extension TeamClient: TeamAnsichtSchnittstelle {
         switch http.statusCode {
         case 200: return daten
         case 404: return nil
+        case 410: throw SchnittstellenFehler.beendet
+        default: throw SchnittstellenFehler.server(status: http.statusCode)
+        }
+    }
+
+    /// `POST /suche` (Abschnitt 11). 409 → `SuchFehler.abgelehnt` mit Stand, 403 → `SuchFehler.verboten`.
+    func suche(id: String, aktion: Suchaktion) async throws -> SuchAntwort {
+        var request = request("suche", methode: "POST")
+        request.httpBody = try JSONEncoder().encode(["id": id, "aktion": aktion.rawValue])
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let (daten, antwort) = try await session.data(for: request)
+        guard let http = antwort as? HTTPURLResponse else { throw SchnittstellenFehler.antwortUngueltig }
+        let inhalt = try? JSONDecoder.server.decode(SuchAntwort.self, from: daten)
+        switch http.statusCode {
+        case 200..<300:
+            guard let inhalt else { throw SchnittstellenFehler.antwortUngueltig }
+            return inhalt
+        case 409: throw SuchFehler.abgelehnt(text: inhalt?.error, suche: inhalt?.suche)
+        case 403: throw SuchFehler.verboten(text: inhalt?.error)
         case 410: throw SchnittstellenFehler.beendet
         default: throw SchnittstellenFehler.server(status: http.statusCode)
         }
@@ -137,6 +157,13 @@ extension TeamClient: TeamAnsichtSchnittstelle {
             fortsetzung.onTermination = { _ in aufgabe.cancel() }
         }
     }
+}
+
+enum SuchFehler: Error, Equatable {
+    /// 409: Übergang nicht erlaubt (z. B. EL hat inzwischen umgeschaltet); Stand des Servers anbei
+    case abgelehnt(text: String?, suche: TeamLage.Suche?)
+    /// 403: Teams dürfen die Suche auf diesem Server nicht steuern
+    case verboten(text: String?)
 }
 
 enum AnmeldeFehler: Error, Equatable {

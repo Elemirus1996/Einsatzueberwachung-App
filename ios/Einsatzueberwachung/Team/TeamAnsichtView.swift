@@ -12,6 +12,7 @@ struct TeamAnsichtView: View {
     @State private var kamera: MapCameraPosition = .automatic
     @State private var satellit = false
     @State private var infoOffen = false
+    @State private var beendenFragen = false
 
     var body: some View {
         Group {
@@ -196,8 +197,29 @@ struct TeamAnsichtView: View {
 
     private var statusKnoepfe: some View {
         VStack(spacing: 4) {
+            if ansicht.darfSteuern, let status = ansicht.lage?.suche.status {
+                HStack(spacing: 8) {
+                    ForEach(Suchaktion.moeglich(bei: status), id: \.self) { aktion in
+                        Button {
+                            if aktion == .beenden {
+                                beendenFragen = true
+                            } else {
+                                Task { await ansicht.steuern(aktion) }
+                            }
+                        } label: {
+                            Label(aktion.titel, systemImage: aktion.symbol)
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(aktion.farbe)
+                        .disabled(!ansicht.offeneAktionen.isEmpty)
+                        .sensoryFeedback(.impact, trigger: ansicht.offeneAktionen.count)
+                    }
+                }
+            }
             HStack(spacing: 8) {
-                ForEach(Statusmeldung.Code.allCases, id: \.self) { code in
+                // Seit #133 nur noch Meldungen; Pause und Ende steuert das Team über die Suche
+                ForEach([Statusmeldung.Code.imGebiet, .funk], id: \.self) { code in
                     Button {
                         Task { await ansicht.melden(code) }
                     } label: {
@@ -215,16 +237,27 @@ struct TeamAnsichtView: View {
             TimelineView(.periodic(from: .now, by: 1)) { kontext in
                 Text(meldungsHinweis(kontext.date))
                     .font(.caption)
-                    .foregroundStyle(ansicht.offeneMeldungen.isEmpty ? Color.green : Color.orange)
+                    .foregroundStyle(ansicht.offeneMeldungen.isEmpty && ansicht.offeneAktionen.isEmpty ? Color.green : Color.orange)
                     .frame(height: 14)
             }
         }
         .padding(.horizontal)
         .padding(.top, 8)
         .background(.bar)
+        .confirmationDialog("Suche wirklich beenden?", isPresented: $beendenFragen, titleVisibility: .visible) {
+            Button("Suche beenden", role: .destructive) { Task { await ansicht.steuern(.beenden) } }
+        } message: {
+            Text("Die Ortung schaltet danach auf Pause. Für eine Kurzpause „Pause“ wählen.")
+        }
     }
 
     private func meldungsHinweis(_ jetzt: Date) -> String {
+        if let offen = ansicht.offeneAktionen.first {
+            return "„\(offen.aktion.titel)“ wartet auf Netz"
+        }
+        if let hinweis = ansicht.suchHinweis, jetzt.timeIntervalSince(hinweis.zeit) < 6 {
+            return hinweis.text
+        }
         if !ansicht.offeneMeldungen.isEmpty {
             let anzahl = ansicht.offeneMeldungen.count
             return anzahl == 1 ? "1 Meldung wartet auf Netz" : "\(anzahl) Meldungen warten auf Netz"
@@ -414,6 +447,25 @@ private struct TeamInfoView: View {
             schliessen()
         } else {
             trotzdemWechselnFragen = true
+        }
+    }
+}
+
+extension Suchaktion {
+    var symbol: String {
+        switch self {
+        case .starten: "play.fill"
+        case .pause: "pause.fill"
+        case .weiter: "play.fill"
+        case .beenden: "stop.fill"
+        }
+    }
+
+    var farbe: Color {
+        switch self {
+        case .starten, .weiter: .green
+        case .pause: .orange
+        case .beenden: .red
         }
     }
 }
