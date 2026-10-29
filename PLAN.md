@@ -213,6 +213,7 @@ Android:
 - [ ] Vermisste, Notizen und Funk (mit Funkloch-Puffer), Einsatz starten und beenden
 - [ ] Karte (iOS: MapKit; Android: MapLibre) mit Gebieten, Positionen, Tracks, Abdeckung
 - [ ] EL-Ortung, Stop bei Einsatzende, Abmeldung oder Rollenwechsel
+- [ ] Tablet (iPad und Android-Tablets): eigenes Layout für die Einsatzleitung (Karte groß, Teamliste daneben); Team-Ansicht läuft mit. Tablets ohne Mobilfunk haben kein GPS, EL-Position dann ungenau oder ohne (entschieden 29.10.2026)
 
 ### Phase 3b – Push-Mitteilungen für die Einsatzleitung (entschieden 28.10.2026)
 - [ ] Jeder EL stellt **in der App selbst** ein, welche Mitteilungen er bekommt (z. B. Zeitwarnung Team, Funkstille Handy/Halsband, Hund außerhalb des Gebiets, neuer Funkspruch, Einsatzende) – alles einzeln abschaltbar, Standard: nur kritische Warnungen
@@ -244,6 +245,7 @@ Android:
 
 ## Offen
 
+- **CarPlay / Android Auto** (Prüfpunkt Dezember 2026, nach dem bezahlten Apple-Konto): Apple erlaubt CarPlay nur für bestimmte App-Arten und mit eigener Freigabe; denkbar wäre höchstens eine sehr einfache Ansicht „Aufgabe während der Fahrt“ (Warnungen, Statusänderungen der Teams). Bis dahin: Mitteilungen auf dem Handy, die im Auto angezeigt bzw. vorgelesen werden.
 - **Push bei selbst betriebenen Servern:** Der Push-Schlüssel von Apple gilt für alle Geräte mit der App und lässt sich nicht
   auf eine Staffel beschränken. Vorschlag: kleiner Push-Weiterleiter (Zugang je Staffel einzeln sperrbar, nur „wecken“ ohne
   Inhalt, sichtbare Texte Ende-zu-Ende verschlüsselt). Betrieb **nicht zu Hause**; Vorschlag: kleiner eigener Server in
