@@ -10,6 +10,7 @@
 		0195198E4DE054DEE6B9DE77 /* ELTeamAktionenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EB5A1859E50907176417C9E /* ELTeamAktionenView.swift */; };
 		08DFB2CA7502DC3325DBE06D /* AppModell.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1C0F7850179783614D223 /* AppModell.swift */; };
 		14A4774D80FC0A5F4D45954E /* TeamOrtungTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69CEBC84429C31F7F8C4A672 /* TeamOrtungTests.swift */; };
+		1B12822F1A247538D970EAB5 /* ELEinsatzView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C68F35498C530D450622E54F /* ELEinsatzView.swift */; };
 		1C98753FDBCCAA574B6AFDF9 /* TeamAnsichtView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFBE4E8B3659C84DE022CA21 /* TeamAnsichtView.swift */; };
 		1D4A891BC4480DB916DAA093 /* ELKarte.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0208DBE8A1D6C6A176561A4 /* ELKarte.swift */; };
 		1D85C57C6B2C8932F9BC62A4 /* OrtungsQuelle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB3AF33B59FBD33F2C44B2E5 /* OrtungsQuelle.swift */; };
@@ -84,6 +85,7 @@
 		C14AEB1CFCD5BFB520E66C48 /* ELAktionen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELAktionen.swift; sourceTree = "<group>"; };
 		C59E8CF5D165989F439B72BD /* TeamAnmeldungView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamAnmeldungView.swift; sourceTree = "<group>"; };
 		C5AB257A4D6CC10859BDCE63 /* PositionsPuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionsPuffer.swift; sourceTree = "<group>"; };
+		C68F35498C530D450622E54F /* ELEinsatzView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELEinsatzView.swift; sourceTree = "<group>"; };
 		D0A1C0F7850179783614D223 /* AppModell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModell.swift; sourceTree = "<group>"; };
 		DC1B71859AD992E6E951AFDE /* ELUebersichtView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELUebersichtView.swift; sourceTree = "<group>"; };
 		EBA23EF762B87148EB23B089 /* EinsatzueberwachungTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = EinsatzueberwachungTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -123,6 +125,7 @@
 				1B3C11402C4425DA07624D1A /* ELAnmeldungView.swift */,
 				8FB7278E7BA2FD11AC8308A2 /* ELAnsicht.swift */,
 				BEB08B86E4BDD277798024C9 /* ELBetrieb.swift */,
+				C68F35498C530D450622E54F /* ELEinsatzView.swift */,
 				0FB762FAB78F2F6881565789 /* ELFunkView.swift */,
 				7D3EA6E63ED7CA80DD21B3F7 /* ELKarteView.swift */,
 				7EB5A1859E50907176417C9E /* ELTeamAktionenView.swift */,
@@ -301,6 +304,7 @@
 				BF3D49BB7ADFB0B1D6B7C8BD /* ELAnmeldungView.swift in Sources */,
 				2BC72B5D65654CD40240362A /* ELAnsicht.swift in Sources */,
 				D71352AEE8F6BE7307B7CB12 /* ELBetrieb.swift in Sources */,
+				1B12822F1A247538D970EAB5 /* ELEinsatzView.swift in Sources */,
 				A9DC701BEE2AD18A751D5621 /* ELFunkView.swift in Sources */,
 				1D4A891BC4480DB916DAA093 /* ELKarte.swift in Sources */,
 				73BA9307343CE5FBC967B675 /* ELKarteView.swift in Sources */,

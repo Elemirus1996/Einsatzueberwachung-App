@@ -10,6 +10,8 @@ struct ELUebersichtView: View {
     @ObservedObject var betrieb: ELBetrieb
     let karte: ELKartenAnsicht
     @State private var gewaehltesTeam: ELLage.Team?
+    @State private var startOffen = false
+    @State private var beendenOffen = false
     @Environment(\.scenePhase) private var phase
     @Environment(\.horizontalSizeClass) private var breite
     @State private var abmeldenFragen = false
@@ -66,6 +68,9 @@ struct ELUebersichtView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
+                    if ansicht.lage?.einsatz.aktiv == true {
+                        Button("Einsatz beenden …") { beendenOffen = true }
+                    }
                     Button("Abmelden", role: .destructive) { abmeldenFragen = true }
                 } label: { Image(systemName: "ellipsis.circle") }
             }
@@ -82,6 +87,12 @@ struct ELUebersichtView: View {
         .onDisappear { ansicht.anhalten() }
         .onChange(of: phase) { _, neu in
             if neu == .active { ansicht.starten() } else if neu == .background { ansicht.anhalten() }
+        }
+        .sheet(isPresented: $startOffen) {
+            ELEinsatzStartView(betrieb: betrieb, eigenePosition: ortung.letztePosition)
+        }
+        .sheet(isPresented: $beendenOffen) {
+            if let lage = ansicht.lage { ELEinsatzBeendenView(betrieb: betrieb, lage: lage) }
         }
         .sheet(item: $gewaehltesTeam) { team in
             ELTeamAktionenView(team: team, betrieb: betrieb)
@@ -123,8 +134,11 @@ struct ELUebersichtView: View {
                     }
                 } else {
                     Text("Kein Einsatz aktiv").font(.title2.bold())
-                    Text("Ein Einsatz wird im Monitor gestartet (in der App folgt das in einer späteren Version). Die Ortung der Einsatzleitung ist aus und startet, sobald ein Einsatz läuft.")
+                    Text("Die Ortung der Einsatzleitung ist aus und startet, sobald ein Einsatz läuft.")
                         .font(.subheadline).foregroundStyle(.secondary)
+                    Button { startOffen = true } label: { Label("Einsatz oder Übung starten", systemImage: "play.fill") }
+                        .buttonStyle(.borderedProminent)
+                        .padding(.top, 8)
                 }
             }
         } else {

@@ -217,6 +217,8 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle,
         try await anfrage(seit.map { "tracks?seit=\($0)" } ?? "tracks", methode: "GET", inhalt: nil)
     }
 
+    func ergebnisse() async throws -> [ELErgebnis] { try await anfrage("einsatz/ergebnisse", methode: "GET", inhalt: nil) }
+
     func halsbaender() async throws -> ELHalsbaender { try await anfrage("halsbaender", methode: "GET", inhalt: nil) }
 
     /// Token auf dem Server ungültig machen (best effort).
