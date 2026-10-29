@@ -48,4 +48,6 @@ extension Schluesselbund {
     static let kontoTeam = "team"
     /// Server und Anmelde-Code des laufenden Einsatzes, für „Team wechseln“ ohne neuen QR-Scan.
     static let kontoEinsatzZugang = "einsatz-zugang"
+    /// Token der Einsatzleitung
+    static let kontoEL = "el"
 }
