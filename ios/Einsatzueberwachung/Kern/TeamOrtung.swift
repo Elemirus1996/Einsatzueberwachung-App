@@ -42,12 +42,17 @@ final class TeamOrtung: ObservableObject {
         }
     }
 
+    /// Meldet, wenn eine Antwort von /positions oder /status den Modus ändert, damit die Anzeige die Lage neu lädt.
+    var beiModuswechsel: ((Modus) -> Void)?
+
     var intervall: TimeInterval { TimeInterval(max(steuerung.intervalSec ?? 20, 1)) }
     var uploadTakt: TimeInterval { TimeInterval(max(steuerung.uploadEverySec ?? 60, 5)) }
 
     /// Übernimmt eine Antwort des Servers und schaltet die Ortung entsprechend.
-    func anwenden(_ antwort: SteuerAntwort) {
+    /// `melden: false`, wenn der Modus aus /lage kommt (die Anzeige ist dann schon aktuell).
+    func anwenden(_ antwort: SteuerAntwort, melden: Bool = true) {
         guard zustand != .beendet else { return }
+        let vorher = steuerung.mode
         steuerung.mode = antwort.mode
         steuerung.intervalSec = antwort.intervalSec ?? steuerung.intervalSec
         steuerung.uploadEverySec = antwort.uploadEverySec ?? steuerung.uploadEverySec
@@ -58,6 +63,7 @@ final class TeamOrtung: ObservableObject {
             beenden()
             return
         }
+        if melden, antwort.mode != vorher { beiModuswechsel?(antwort.mode) }
         switch antwort.mode {
         case .track:
             quelle.starten(intervall: intervall)

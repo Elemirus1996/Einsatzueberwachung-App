@@ -190,6 +190,20 @@ struct TeamOrtungTests {
         #expect(!quelle.aktiv)
     }
 
+    @Test func moduswechselAusStatusWirdGemeldetAusLageNicht() async {
+        let t = zeit
+        let o = ortung(uhr: { t })
+        var gemeldet: [Modus] = []
+        o.beiModuswechsel = { gemeldet.append($0) }
+        o.anwenden(SteuerAntwort(mode: .track), melden: false)   // aus /lage
+        #expect(gemeldet.isEmpty)
+        server.antwort = .success(SteuerAntwort(mode: .pause))
+        await o.statusPruefen()                                    // Suche beendet
+        #expect(gemeldet == [.pause])
+        await o.statusPruefen()                                    // unverändert
+        #expect(gemeldet == [.pause])
+    }
+
     @Test func neuerAblaufAusAntwortWirdUebernommen() {
         var t = zeit
         let o = ortung(ablauf: 60, uhr: { t })

@@ -40,9 +40,15 @@ final class TeamAnsicht: ObservableObject {
     /// Wartezeit vor dem nächsten Verbindungsversuch nach einer Verdrängung (sonst `nil`).
     private var verdraengtWarten: Duration?
 
+    /// Auch bei stehender Live-Verbindung die Lage regelmäßig holen: Ein verpasstes `lage`-Ereignis
+    /// darf Anzeige und Ortung nicht dauerhaft auf altem Stand lassen (Fehler aus dem iPhone-Test 29.10.2026).
+    private let lageTakt: Duration
+
     init(schnittstelle: TeamAnsichtSchnittstelle, teamId: String, speicher: UserDefaults = .standard,
-         jetzt: @escaping () -> Date = Date.init, beiSteuerung: @escaping (Modus) -> Void) {
+         jetzt: @escaping () -> Date = Date.init, lageTakt: Duration = .seconds(60),
+         beiSteuerung: @escaping (Modus) -> Void) {
         self.schnittstelle = schnittstelle
+        self.lageTakt = lageTakt
         self.speicher = speicher
         self.schluessel = "team.\(teamId)"
         self.jetzt = jetzt
@@ -59,6 +65,7 @@ final class TeamAnsicht: ObservableObject {
         aufgaben = [
             Task { await liveSchleife() },
             Task { await trackSchleife() },
+            Task { await lageSchleife() },
         ]
     }
 
@@ -104,6 +111,21 @@ final class TeamAnsicht: ObservableObject {
             guard !Task.isCancelled else { return }
             await neuLaden()
         }
+    }
+
+    private func lageSchleife() async {
+        while !Task.isCancelled {
+            try? await Task.sleep(for: lageTakt)
+            guard !Task.isCancelled else { return }
+            // Ohne Live-Verbindung holt liveSchleife die Lage ohnehin alle 15 s
+            if live { await neuLaden(tracksVoll: false) }
+        }
+    }
+
+    /// Die Ortung hat von /positions oder /status einen neuen Modus erfahren: Anzeige nachziehen.
+    func modusGeaendert() {
+        guard !aufgaben.isEmpty else { return }
+        Task { await neuLaden(tracksVoll: true) }
     }
 
     private func trackSchleife() async {
