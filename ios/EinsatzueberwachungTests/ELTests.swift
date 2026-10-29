@@ -130,14 +130,25 @@ struct ELAnsichtTests {
         #expect(modi == [.stop])
     }
 
-    @Test func ohneEinsatzPausiertDieOrtung() async throws {
+    /// Entscheidung Paul (29.10.2026): Einsatzleitung ohne Einsatz → Ortung ganz aus, keine Grob-Ortung, kein Takt.
+    /// Ein Einsatz (Live-Ereignis bzw. /lage im Vordergrund) startet die feine Ortung.
+    @Test func ohneEinsatzIstDieOrtungGanzAus() async throws {
         let quelle = TestQuelle()
-        let ortung = TeamOrtung(schnittstelle: TestSchnittstelle(), quelle: quelle, puffer: TestPuffer(),
-                                ablauf: Date().addingTimeInterval(3600), beimBeenden: {})
+        let server = TestSchnittstelle()
+        let ortung = TeamOrtung(schnittstelle: server, quelle: quelle, puffer: TestPuffer(),
+                                ablauf: Date().addingTimeInterval(3600), pauseOhneOrtung: true, beimBeenden: {})
         let ohne = try JSONDecoder.server.decode(ELLage.self, from: Data(#"{ "mode": "pause", "einsatz": { "aktiv": false }, "teams": [] }"#.utf8))
-        let a = ELAnsicht(schnittstelle: TestELSchnittstelle(ohne)) { ortung.anwenden(SteuerAntwort(mode: $0), melden: false) }
+        let elServer = TestELSchnittstelle(ohne)
+        let a = ELAnsicht(schnittstelle: elServer) { ortung.anwenden(SteuerAntwort(mode: $0), melden: false) }
+        ortung.anwenden(SteuerAntwort(mode: .track))
         await a.neuLaden()
-        #expect(quelle.stufe == .grob)
+        #expect(quelle.stufe == nil, "kein GPS und keine Grob-Ortung")
         #expect(ortung.zustand == .pausiert)
+        try await Task.sleep(for: .seconds(6))
+        #expect(server.statusAbfragen == 0, "im Hintergrund läuft nichts")
+
+        elServer.lageAntwort = .success(try Self.lage())   // Einsatz gestartet
+        await a.verarbeiten(.einsatz(aktiv: true))
+        #expect(quelle.stufe == .fein)
     }
 }

@@ -165,6 +165,7 @@ final class AppModell: ObservableObject {
         let client = ELClient(sitzung: sitzung)
         let ortung = TeamOrtung(
             schnittstelle: client, quelle: quelle, puffer: elPuffer, ablauf: sitzung.expiresAt,
+            pauseOhneOrtung: true,
             beimBeenden: { [weak self] in self?.elBeendet() })
         let ansicht = ELAnsicht(schnittstelle: client) { [weak self] modus in
             self?.elOrtung?.anwenden(SteuerAntwort(mode: modus), melden: false)
