@@ -165,6 +165,9 @@ final class TestELAktionen: ELAktionsSchnittstelle, @unchecked Sendable {
     func halsbaender() async throws -> ELHalsbaender {
         try JSONDecoder.server.decode(ELHalsbaender.self, from: Data(#"[ { "id": "HB-1", "name": "Halsband 1", "akku": 80 } ]"#.utf8))
     }
+    func ergebnisse() async throws -> [ELErgebnis] {
+        try JSONDecoder.server.decode([ELErgebnis].self, from: Data(#"[ { "wert": "Uebung abgeschlossen", "anzeige": "Übung abgeschlossen" } ]"#.utf8))
+    }
 }
 
 @MainActor
@@ -320,5 +323,34 @@ struct ELKarteTests {
             .components(separatedBy: "\n").compactMap { leser.zeile($0) }.compactMap(ELEreignis.init)
         guard case .position(let p)? = e.first else { Issue.record("kein Positionsereignis"); return }
         #expect(p.art == "handy" && p.akku == 50)
+    }
+}
+
+
+struct ELEinsatzTests {
+    @Test func startKoerperMitKoordinate() throws {
+        var d = ELEinsatzStart()
+        d.stichwort = "VP"; d.ort = "Testwald"; d.szenario = .flaeche; d.uebung = true
+        d.einsatzleiter = "Paul"; d.fuehrungsassistent = "Eric"; d.lat = 49.3; d.lng = 8.4
+        let a = ELAktion.einsatzStart(d)
+        #expect(a.pfad == "einsatz/start")
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(a.inhalt)) as? [String: Any]
+        #expect(json?["szenario"] as? String == "Flaeche")
+        #expect(json?["uebung"] as? Bool == true)
+        #expect(json?["lat"] as? Double == 49.3)
+        #expect(!ELEinsatzStart().vollstaendig, "Ort ist Pflicht")
+    }
+
+    @Test func beendenKoerperMitPdf() throws {
+        let a = ELAktion.einsatzBeenden(ergebnis: "Uebung abgeschlossen", mitTracks: false)
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(a.inhalt)) as? [String: Any]
+        #expect(json?["ressourcenGeprueft"] as? Bool == true)
+        let pdf = json?["pdf"] as? [String: Any]
+        #expect(pdf?["tracks"] as? Bool == false)
+        #expect(pdf?["kartenart"] as? String == "Streets")
+        #expect(pdf?["teamIds"] is NSNull)
+        // Warteschlange speichert und liest verschachtelte Werte
+        let wieder = try JSONDecoder().decode(ELAktion.self, from: JSONEncoder().encode(a))
+        #expect(wieder == a)
     }
 }

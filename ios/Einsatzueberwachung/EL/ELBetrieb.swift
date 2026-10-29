@@ -88,6 +88,10 @@ final class ELBetrieb: ObservableObject {
         }
     }
 
+    func ergebnisse() async -> [ELErgebnis] {
+        (try? await schnittstelle.ergebnisse()) ?? []
+    }
+
     func halsbaender() async -> ELHalsbaender? {
         try? await schnittstelle.halsbaender()
     }
