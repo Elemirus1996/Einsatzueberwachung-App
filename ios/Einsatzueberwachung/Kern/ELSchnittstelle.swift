@@ -167,7 +167,7 @@ protocol ELLageSchnittstelle: Sendable {
     func ereignisse() async throws -> AsyncThrowingStream<ELEreignis, Error>
 }
 
-struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle, ELKartenSchnittstelle {
+struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle, ELKartenSchnittstelle, ELVermissteSchnittstelle {
     let sitzung: ELSitzung
     var session: URLSession = .einsatz
 
@@ -209,6 +209,31 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle,
 
     func notizen(vor: String?) async throws -> ELNotizSeite {
         try await anfrage(vor.map { "notizen?vor=\($0)&anzahl=50" } ?? "notizen?anzahl=50", methode: "GET", inhalt: nil)
+    }
+
+    func vermisste() async throws -> ELVermisste { try await anfrage("vermisste", methode: "GET", inhalt: nil) }
+
+    func vermissteSpeichern(id: String, profilId: String?, version: String?, felder: [String: ELWert]) async throws -> (profilId: String, version: String) {
+        var inhalt = felder
+        inhalt["id"] = .text(id)
+        if let profilId { inhalt["profilId"] = .text(profilId) }
+        if let version { inhalt["version"] = .text(version) }
+        let (daten, http) = try await roh("vermisste", methode: "POST", inhalt: try JSONEncoder().encode(inhalt))
+        struct Antwort: Decodable { var profilId: String; var version: String }
+        struct Konflikt: Decodable { var error: String?; var profil: ELVermisstenprofil? }
+        switch http.statusCode {
+        case 200..<300:
+            guard let a = try? JSONDecoder.server.decode(Antwort.self, from: daten) else { throw SchnittstellenFehler.antwortUngueltig }
+            return (a.profilId, a.version)
+        case 409:
+            let k = try? JSONDecoder.server.decode(Konflikt.self, from: daten)
+            if let profil = k?.profil { throw ELVermissteFehler.geaendert(profil) }
+            throw ELVermissteFehler.abgelehnt(k?.error ?? "Nicht möglich.")
+        case 400:
+            throw ELVermissteFehler.abgelehnt((try? JSONDecoder.server.decode(Konflikt.self, from: daten))?.error ?? "Eingabe ungültig.")
+        case 410: throw SchnittstellenFehler.beendet
+        default: throw SchnittstellenFehler.server(status: http.statusCode)
+        }
     }
 
     func karte() async throws -> ELKarte { try await anfrage("karte", methode: "GET", inhalt: nil) }

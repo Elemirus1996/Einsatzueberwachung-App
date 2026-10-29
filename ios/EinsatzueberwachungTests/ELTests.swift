@@ -358,3 +358,93 @@ struct ELEinsatzTests {
         #expect(wieder == a)
     }
 }
+
+final class TestELVermisste: ELVermissteSchnittstelle, @unchecked Sendable {
+    var stand: ELVermisste
+    var fehler: Error?
+    private(set) var gespeichert: [(profilId: String?, version: String?, felder: [String: ELWert])] = []
+    init(_ stand: ELVermisste) { self.stand = stand }
+    func vermisste() async throws -> ELVermisste { stand }
+    func vermissteSpeichern(id: String, profilId: String?, version: String?, felder: [String: ELWert]) async throws -> (profilId: String, version: String) {
+        gespeichert.append((profilId, version, felder))
+        if let fehler { throw fehler }
+        return (profilId ?? "neu-1", "v2")
+    }
+}
+
+@MainActor
+struct ELVermissteTests {
+    static let beispiel = #"""
+    { "szenario": "Mantrailer", "mehrereErlaubt": false,
+      "profile": [ { "profilId": "p1", "version": "v1", "vollerName": "Erna Muster", "zuletztAktualisiert": "2026-10-29T08:12:00Z",
+        "vorname": "Erna", "nachname": "Muster", "alter": "82", "geburtsdatum": "03.04.1944",
+        "beschreibung": "165 cm", "kleidung": "rote Jacke", "besonderheiten": "Hörgerät",
+        "zuletztGesehenOrt": "Seniorenheim", "zuletztGesehenZeit": "gestern ca. 18:30", "zuletztGesehenVon": "Pflegekraft",
+        "vorerkrankungen": "Demenz", "medikamente": "", "orientierung": "Eingeschraenkt", "mobilitaet": "Rollator",
+        "suizidrisiko": "Nein", "bewaffnet": "Unbekannt", "polizeiKontaktName": "PHK Meier", "polizeiDienstnummer": "", "polizeiTelefon": "",
+        "polizeiVermisstenmeldungAufgenommen": true, "polizeiKoordinationBesprochen": false, "polizeiSuchabschnittAbgestimmt": false,
+        "polizeiRueckmeldepflichtVereinbart": false, "polizeiDatenschutzGeklaert": false,
+        "bosEinheit": "", "bosZugfuehrer": "", "bosFunkrufname": "", "bosAufgabenteilung": "",
+        "bosAbschnittAbgestimmt": false, "bosRessourcenBesprochen": false,
+        "checkliste": { "name": "Mantrailer", "punkte": [
+          { "id": "c1", "text": "Geruchsstück gesichert", "typ": "jaNein", "pflicht": true, "auswahl": [], "wert": "true", "erledigt": true },
+          { "id": "c2", "text": "Art des Geruchsstücks", "typ": "auswahl", "pflicht": false, "auswahl": ["Kleidung", "Bettwäsche"], "wert": null, "erledigt": false } ] } } ] }
+    """#
+
+    static func stand() throws -> ELVermisste { try JSONDecoder.server.decode(ELVermisste.self, from: Data(beispiel.utf8)) }
+
+    @Test func profilAusDerBeschreibung() throws {
+        let p = try #require(try Self.stand().profile.first)
+        #expect(p.text("vorname") == "Erna")
+        #expect(p.text("zuletztGesehenZeit") == "gestern ca. 18:30", "Freitext, keine Zeit")
+        #expect(p.schalter["polizeiVermisstenmeldungAufgenommen"] == true)
+        #expect(p.auswahlen["orientierung"] == "Eingeschraenkt")
+        #expect(p.checkliste?.punkte.map(\.typ) == ["jaNein", "auswahl"])
+    }
+
+    @Test func nurGeaenderteFelderGehenRaus() async throws {
+        let server = TestELVermisste(try Self.stand())
+        let a = ELVermissteAnsicht(schnittstelle: server)
+        let original = try #require(try Self.stand().profile.first)
+        var neu = original
+        neu.texte["kleidung"] = "blaue Jacke"
+        neu.texte["besonderheiten"] = ""          // leeren
+        neu.auswahlen["mobilitaet"] = "Rollstuhl"
+        neu.schalter["polizeiKoordinationBesprochen"] = true
+        let gespeichert = try await a.speichern(neu, original: original)
+        let s = try #require(server.gespeichert.first)
+        #expect(s.profilId == "p1" && s.version == "v1")
+        #expect(s.felder == ["kleidung": .text("blaue Jacke"), "besonderheiten": .text(""),
+                             "mobilitaet": .text("Rollstuhl"), "polizeiKoordinationBesprochen": .wahr(true)])
+        #expect(gespeichert.version == "v2")
+    }
+
+    @Test func neuesProfilOhneKennungUndVersion() async throws {
+        let server = TestELVermisste(try Self.stand())
+        var neu = ELVermisstenprofil()
+        neu.texte["vorname"] = "Max"
+        _ = try await ELVermissteAnsicht(schnittstelle: server).speichern(neu, original: ELVermisstenprofil())
+        #expect(server.gespeichert.first?.profilId == nil && server.gespeichert.first?.version == nil)
+        #expect(server.gespeichert.first?.felder == ["vorname": .text("Max")])
+    }
+
+    @Test func konfliktLiefertNeuenStand() async throws {
+        let server = TestELVermisste(try Self.stand())
+        var aktuell = try #require(try Self.stand().profile.first)
+        aktuell.version = "v9"
+        server.fehler = ELVermissteFehler.geaendert(aktuell)
+        let original = try #require(try Self.stand().profile.first)
+        var neu = original
+        neu.texte["kleidung"] = "x"
+        await #expect(throws: ELVermissteFehler.geaendert(aktuell)) { _ = try await ELVermissteAnsicht(schnittstelle: server).speichern(neu, original: original) }
+    }
+
+    @Test func checklisteUndSzenarioAlsAktion() throws {
+        let p = try #require(try Self.stand().profile.first)
+        let punkt = try #require(p.checkliste?.punkte.last)
+        let a = ELAktion.checkliste("p1", punkt: punkt, wert: "Kleidung")
+        #expect(a.pfad == "vermisste/p1/checkliste")
+        #expect(a.inhalt == ["punktId": .text("c2"), "wert": .text("Kleidung")])
+        #expect(ELAktion.szenario(.flaeche).inhalt == ["szenario": .text("Flaeche")])
+    }
+}
