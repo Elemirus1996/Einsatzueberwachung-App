@@ -41,7 +41,7 @@ struct TeamAnsichtView: View {
         .onAppear { ansicht.starten() }
         .onDisappear { ansicht.anhalten() }
         .onChange(of: phase) { _, neu in
-            if neu == .active { ansicht.starten() } else if neu == .background { ansicht.anhalten() }
+            if neu == .active { ansicht.starten() } else if neu == .background { ansicht.hintergrund() }
         }
         .sensoryFeedback(.warning, trigger: ansicht.ungelesen.count) { alt, neu in neu > alt }
     }

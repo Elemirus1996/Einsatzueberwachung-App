@@ -267,3 +267,95 @@ struct TeamAnsichtTests {
         #expect(server.trackAbrufe == [nil])
     }
 }
+
+@MainActor
+struct LageMeldungTests {
+    static let basis = TeamAnsichtTests.lage
+
+    func mit(_ aendern: (inout TeamLage) -> Void) -> TeamLage {
+        var lage = Self.basis
+        aendern(&lage)
+        return lage
+    }
+
+    @Test func sucheGebietHalsbandUndMitteilung() {
+        let neu = mit {
+            $0.suche = .init(status: .laeuft, dauerSec: 0)
+            $0.suchgebiet = .init(id: "g2", name: "Gebiet B", farbe: nil, punkte: [])
+            $0.halsband?.id = "HB-9"
+            $0.halsband?.name = "Halsband 9"
+            $0.mitteilungen.append(Mitteilung(id: "m2", text: "Bitte Funkkontakt", zeit: Date()))
+        }
+        #expect(LageMeldung.vergleichen(alt: Self.basis, neu: neu) == [
+            LageMeldung(titel: "Suche gestartet – Ortung läuft"),
+            LageMeldung(titel: "Neues Suchgebiet: Gebiet B"),
+            LageMeldung(titel: "Halsband zugewiesen: Halsband 9"),
+            LageMeldung(titel: "Mitteilung der Einsatzleitung", text: "Bitte Funkkontakt"),
+        ])
+    }
+
+    @Test(arguments: [
+        (TeamLage.Suche.Status.kurzpause, "Suche pausiert"),
+        (.beendet, "Suche beendet"),
+    ])
+    func sucheEndeUndPause(_ status: TeamLage.Suche.Status, _ titel: String) {
+        let laeuft = mit { $0.suche = .init(status: .laeuft) }
+        let neu = mit { $0.suche = .init(status: status) }
+        #expect(LageMeldung.vergleichen(alt: laeuft, neu: neu) == [LageMeldung(titel: titel)])
+    }
+
+    @Test func unveraendertMeldetNichts() {
+        var neu = Self.basis
+        neu.halsband?.lat += 0.001        // neue Position, gleiches Halsband
+        neu.suche.dauerSec = 999          // Suchzeit läuft
+        #expect(LageMeldung.vergleichen(alt: Self.basis, neu: neu).isEmpty)
+    }
+}
+
+@MainActor
+struct TeamAnsichtMeldungTests {
+    let speicher = UserDefaults(suiteName: "meldung-\(UUID().uuidString)")!
+    let server = TestAnsichtSchnittstelle(lage: TeamAnsichtTests.lage)
+
+    func ansicht(_ gemeldet: @escaping ([LageMeldung]) -> Void) -> TeamAnsicht {
+        let a = TeamAnsicht(schnittstelle: server, teamId: "t1", speicher: speicher, beiSteuerung: { _ in })
+        a.beiMeldungen = gemeldet
+        return a
+    }
+
+    @Test func ersteLageMeldetNichts() async {
+        var alle: [LageMeldung] = []
+        let a = ansicht { alle += $0 }
+        await a.neuLaden()
+        #expect(alle.isEmpty)
+    }
+
+    /// Dieselbe Mitteilung kommt erst als Ereignis, dann noch einmal mit /lage: nur eine Meldung.
+    @Test func mitteilungUeberEreignisUndLageNurEinmal() async {
+        var alle: [LageMeldung] = []
+        let a = ansicht { alle += $0 }
+        await a.neuLaden()
+        let neu = Mitteilung(id: "m2", text: "Bitte Funkkontakt", zeit: Date())
+        await a.verarbeiten(.mitteilung(neu))
+        var lage = TeamAnsichtTests.lage
+        lage.mitteilungen.append(neu)
+        server.lageAntwort = .success(lage)
+        await a.neuLaden()
+        #expect(alle == [LageMeldung(titel: "Mitteilung der Einsatzleitung", text: "Bitte Funkkontakt")])
+    }
+
+    /// Das Halsband-Ereignis hat keine Kennung; danach darf /lage kein „Halsband zugewiesen“ melden.
+    @Test func halsbandEreignisLoestKeineZuweisungAus() async {
+        var alle: [LageMeldung] = []
+        var lage = TeamAnsichtTests.lage
+        lage.halsband?.id = "HB-7"
+        lage.halsband?.name = "Halsband 7"
+        server.lageAntwort = .success(lage)
+        let a = ansicht { alle += $0 }
+        await a.neuLaden()
+        await a.verarbeiten(.halsband(Halsband(lat: 49.1, lng: 8.1, zeit: Date())))
+        await a.neuLaden()
+        #expect(alle.isEmpty)
+        #expect(a.lage?.halsband?.id == "HB-7")
+    }
+}

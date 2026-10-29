@@ -13,6 +13,9 @@ final class AppModell: ObservableObject {
     @Published private(set) var heimatFrage: (info: ServerInfo, name: String)?
 
     let heimat = HeimatStaffel()
+    private let mitteiler: Mitteiler = LokaleMitteilungen()
+    /// Abmelden durch den Nutzer meldet kein „Einsatz beendet“.
+    private var abmeldungDurchNutzer = false
 
     private let schluesselbund = Schluesselbund()
     private let quelle = CoreLocationQuelle()
@@ -27,6 +30,7 @@ final class AppModell: ObservableObject {
 
     /// Nach erfolgreicher Anmeldung (native Anmeldung folgt mit Server-Phase 1c).
     func teamAnmelden(_ sitzung: TeamSitzung, server: ServerInfo?, staffel: String?) {
+        mitteiler.erlaubnisErfragen()
         if let server, heimat.sollFragen(server) {
             heimatFrage = (server, server.staffel ?? staffel ?? sitzung.server.name)
         }
@@ -53,6 +57,7 @@ final class AppModell: ObservableObject {
     }
 
     func teamAbmelden() {
+        abmeldungDurchNutzer = true
         team?.anwenden(.stop)
     }
 
@@ -104,10 +109,15 @@ final class AppModell: ObservableObject {
             schnittstelle: client, teamId: sitzung.teamId ?? sitzung.teamName,
             beiSteuerung: { [weak self] modus in self?.team?.anwenden(SteuerAntwort(mode: modus), melden: false) })
         team?.beiModuswechsel = { [weak self] _ in self?.teamAnsicht?.modusGeaendert() }
+        teamAnsicht?.beiMeldungen = { [weak self] meldungen in
+            meldungen.forEach { self?.mitteiler.senden($0) }
+        }
         team?.ablaufPruefen()
     }
 
     private func teamBeendet() {
+        if !abmeldungDurchNutzer { mitteiler.senden(.einsatzBeendet) }
+        abmeldungDurchNutzer = false
         teamAnsicht?.vergessen()
         schluesselbund.loeschen(konto: Schluesselbund.kontoTeam)
         BGTaskScheduler.shared.cancel(taskRequestWithIdentifier: Self.statusAufgabe)
