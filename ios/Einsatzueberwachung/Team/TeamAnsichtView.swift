@@ -327,7 +327,8 @@ private struct TeamInfoView: View {
     @ObservedObject var ortung: TeamOrtung
     @ObservedObject var ansicht: TeamAnsicht
     let sitzung: TeamSitzung
-    @State private var abmeldenFragen = false
+    @State private var einsatzAbmeldenFragen = false
+    @State private var trotzdemWechselnFragen = false
 
     var body: some View {
         NavigationStack {
@@ -371,7 +372,19 @@ private struct TeamInfoView: View {
                     }
                 }
                 Section {
-                    Button("Abmelden", role: .destructive) { abmeldenFragen = true }
+                    if modell.einsatzZugang != nil {
+                        Button {
+                            Task { await wechseln(trotzdem: false) }
+                        } label: {
+                            Label("Team wechseln", systemImage: "arrow.left.arrow.right")
+                        }
+                    }
+                } footer: {
+                    Text("Beendet die Ortung für dieses Team und zeigt die Teams desselben Einsatzes, ohne neuen QR-Scan.")
+                }
+                Section {
+                    Button("Vom Einsatz abmelden", role: .destructive) { einsatzAbmeldenFragen = true }
+                        .font(.footnote)
                 }
             }
             .navigationTitle("Team-Info")
@@ -379,12 +392,28 @@ private struct TeamInfoView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Fertig") { schliessen() } }
             }
-            .confirmationDialog("Ortung beenden und abmelden?", isPresented: $abmeldenFragen, titleVisibility: .visible) {
+            .confirmationDialog("Vom Einsatz abmelden?", isPresented: $einsatzAbmeldenFragen, titleVisibility: .visible) {
                 Button("Abmelden", role: .destructive) {
                     schliessen()
-                    modell.teamAbmelden()
+                    modell.vomEinsatzAbmelden()
                 }
+            } message: {
+                Text("Die Ortung endet und der Anmelde-Code wird gelöscht. Für den Einsatz wieder den QR-Code scannen.")
             }
+            .confirmationDialog("\(ortung.gepuffert) Positionen sind noch nicht gesendet (kein Netz).",
+                                isPresented: $trotzdemWechselnFragen, titleVisibility: .visible) {
+                Button("Trotzdem wechseln", role: .destructive) { Task { await wechseln(trotzdem: true) } }
+            } message: {
+                Text("Beim Wechsel gehen sie verloren. Besser kurz warten, bis wieder Netz da ist.")
+            }
+        }
+    }
+
+    private func wechseln(trotzdem: Bool) async {
+        if await modell.teamWechseln(trotzdem: trotzdem) {
+            schliessen()
+        } else {
+            trotzdemWechselnFragen = true
         }
     }
 }

@@ -99,3 +99,27 @@ struct PufferTests {
         #expect(puffer.anzahl() == 0)
     }
 }
+
+@MainActor
+struct TeamWechselTests {
+    @Test func nurTeamwechselBehaeltDenAnmeldeCode() {
+        #expect(AppModell.Abmeldung.teamWechsel.behaeltZugang)
+        #expect(!AppModell.Abmeldung.einsatz.behaeltZugang)
+        #expect(!AppModell.Abmeldung.server.behaeltZugang, "Einsatzende/410 löscht den Code")
+    }
+
+    @Test func nurServerendeMeldetEinsatzBeendet() {
+        #expect(AppModell.Abmeldung.server.meldetEinsatzende)
+        #expect(!AppModell.Abmeldung.teamWechsel.meldetEinsatzende)
+        #expect(!AppModell.Abmeldung.einsatz.meldetEinsatzende)
+    }
+
+    @Test func zugangImSchluesselbund() throws {
+        let bund = Schluesselbund(dienst: "test-\(UUID().uuidString)")
+        let zugang = try #require(TeamQRCode("https://einsatz.example.org/team/login/ABCDEFGH23456789"))
+        #expect(bund.speichern(zugang, konto: Schluesselbund.kontoEinsatzZugang))
+        #expect(bund.lesen(TeamQRCode.self, konto: Schluesselbund.kontoEinsatzZugang) == zugang)
+        bund.loeschen(konto: Schluesselbund.kontoEinsatzZugang)
+        #expect(bund.lesen(TeamQRCode.self, konto: Schluesselbund.kontoEinsatzZugang) == nil)
+    }
+}

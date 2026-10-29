@@ -33,7 +33,7 @@ struct ServerAdresse: Codable, Hashable, Sendable {
 
 /// Inhalt des bestehenden Team-QR-Codes: `https://<server>/team/login/<Anmelde-Code>`
 /// (ältere Form `https://<server>/team/login?code=<Anmelde-Code>`).
-struct TeamQRCode: Equatable, Sendable {
+struct TeamQRCode: Codable, Equatable, Sendable {
     let server: ServerAdresse
     let code: String
 
