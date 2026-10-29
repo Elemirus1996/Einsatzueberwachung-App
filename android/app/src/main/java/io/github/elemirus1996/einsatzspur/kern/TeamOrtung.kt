@@ -57,6 +57,9 @@ class TeamOrtung(
     val letzterUpload: StateFlow<Long?> = _letzterUpload
     private val _gepuffert = MutableStateFlow(puffer.anzahl())
     val gepuffert: StateFlow<Int> = _gepuffert
+    /** Letzte eigene Position (auch zwischen den gespeicherten), für Skizze und Entfernung zum Gebiet. */
+    private val _letztePosition = MutableStateFlow<Position?>(null)
+    val letztePosition: StateFlow<Position?> = _letztePosition
 
     var steuerung = SteuerAntwort(Modus.PAUSE, expiresAtMs = ablaufMs)
         private set
@@ -119,6 +122,7 @@ class TeamOrtung(
     fun positionErhalten(position: Position) {
         ablaufPruefen()
         if (_zustand.value != Zustand.ORTET) return
+        _letztePosition.value = position
         letzteAufnahme?.let { if (position.timestamp - it < intervallMs) return }
         letzteAufnahme = position.timestamp
         puffer.hinzufuegen(position)

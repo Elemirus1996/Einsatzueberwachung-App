@@ -33,10 +33,12 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = if (dunkel) darkColorScheme(primary = orange) else lightColorScheme(primary = orange)) {
                 val team by modell.team.collectAsState()
                 val sitzung by modell.sitzung.collectAsState()
+                val ansicht by modell.ansicht.collectAsState()
                 val ortung = team
                 val zugang = sitzung
-                if (ortung != null && zugang != null) {
-                    TeamStatusScreen(ortung, zugang, abmelden = modell::abmelden, schliessen = modell::schliessen)
+                val lage = ansicht
+                if (ortung != null && zugang != null && lage != null) {
+                    TeamAnsichtScreen(ortung, lage, zugang, abmelden = modell::abmelden, schliessen = modell::schliessen)
                 } else {
                     StartScreen(anmelden = { sitzung ->
                         berechtigungenAnfragen()
@@ -45,6 +47,16 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        modell.vordergrund(true)
+    }
+
+    override fun onStop() {
+        modell.vordergrund(false)
+        super.onStop()
     }
 
     override fun onResume() {

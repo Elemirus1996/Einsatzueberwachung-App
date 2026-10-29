@@ -1,6 +1,11 @@
 package io.github.elemirus1996.einsatzspur.kern
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONException
@@ -26,7 +31,55 @@ interface TeamSchnittstelle {
     suspend fun status(): SteuerAntwort
 }
 
-class TeamClient(private val sitzung: TeamSitzung) : TeamSchnittstelle {
+/** Endpunkte der nativen Team-Ansicht (APP_API.md, Abschnitte 6–9). */
+interface TeamAnsichtSchnittstelle {
+    suspend fun lage(): TeamLage
+    suspend fun tracks(seit: Long?): TeamTracks
+    suspend fun statusmeldung(id: String, meldung: Statusmeldung)
+
+    /** Server-Sent Events; endet, wenn die Verbindung abbricht. 410 beim Verbinden → [SchnittstellenFehler.Beendet]. */
+    fun ereignisse(): Flow<TeamEreignis>
+}
+
+class TeamClient(private val sitzung: TeamSitzung) : TeamSchnittstelle, TeamAnsichtSchnittstelle {
+
+    override suspend fun lage(): TeamLage = TeamLage.aus(anfrage("lage", "GET", null))
+
+    override suspend fun tracks(seit: Long?): TeamTracks =
+        TeamTracks.aus(anfrage(if (seit != null) "tracks?seit=$seit" else "tracks", "GET", null))
+
+    override suspend fun statusmeldung(id: String, meldung: Statusmeldung) {
+        anfrage("statusmeldung", "POST", JSONObject().put("id", id).put("code", meldung.code))
+    }
+
+    override fun ereignisse(): Flow<TeamEreignis> = callbackFlow {
+        val url = URL(sitzung.server.pfad("api/team-mobile/app/v1/ereignisse"))
+        val verbindung = url.openConnection() as HttpsURLConnection
+        verbindung.connectTimeout = 20_000
+        // Der Server schickt alle 20 s „: ping“; nach 60 s Stille gilt die Verbindung als tot
+        verbindung.readTimeout = 60_000
+        verbindung.useCaches = false
+        verbindung.setRequestProperty("Accept", "text/event-stream")
+        verbindung.setRequestProperty("Authorization", "Bearer ${sitzung.token}")
+        launch(Dispatchers.IO) {
+            try {
+                val status = verbindung.responseCode
+                if (status == 410) throw SchnittstellenFehler.Beendet
+                if (status != 200) throw SchnittstellenFehler.Server(status)
+                val leser = SseLeser()
+                verbindung.inputStream.bufferedReader().use { eingabe ->
+                    while (true) {
+                        val zeile = eingabe.readLine() ?: break
+                        leser.zeile(zeile)?.let(TeamEreignis::aus)?.let { send(it) }
+                    }
+                }
+                close()
+            } catch (e: Exception) {
+                close(e)
+            }
+        }
+        awaitClose { verbindung.disconnect() }
+    }.flowOn(Dispatchers.IO)
 
     override suspend fun config(): TeamConfig {
         val json = anfrage("config", "GET", null)

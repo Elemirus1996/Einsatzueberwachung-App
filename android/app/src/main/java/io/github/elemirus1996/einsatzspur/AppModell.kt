@@ -6,11 +6,15 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import io.github.elemirus1996.einsatzspur.dienst.OrtungsDienst
+import io.github.elemirus1996.einsatzspur.kern.Ablage
+import io.github.elemirus1996.einsatzspur.kern.LageMeldung
 import io.github.elemirus1996.einsatzspur.kern.LocationManagerQuelle
+import io.github.elemirus1996.einsatzspur.kern.LokaleMitteilungen
 import io.github.elemirus1996.einsatzspur.kern.Schluesselbund
 import io.github.elemirus1996.einsatzspur.kern.SchnittstellenFehler
 import io.github.elemirus1996.einsatzspur.kern.SqlitePuffer
 import io.github.elemirus1996.einsatzspur.kern.SteuerAntwort
+import io.github.elemirus1996.einsatzspur.kern.TeamAnsicht
 import io.github.elemirus1996.einsatzspur.kern.TeamClient
 import io.github.elemirus1996.einsatzspur.kern.TeamOrtung
 import io.github.elemirus1996.einsatzspur.kern.TeamSitzung
@@ -30,6 +34,18 @@ class AppModell(private val context: Context) {
     val team: StateFlow<TeamOrtung?> = _team
     private val _sitzung = MutableStateFlow<TeamSitzung?>(null)
     val sitzung: StateFlow<TeamSitzung?> = _sitzung
+    private val _ansicht = MutableStateFlow<TeamAnsicht?>(null)
+    val ansicht: StateFlow<TeamAnsicht?> = _ansicht
+
+    private var imVordergrund = false
+    private val mitteilungen = LokaleMitteilungen(context) { imVordergrund }
+    /** Abmelden durch den Nutzer meldet kein „Einsatz beendet“. */
+    private var abmeldungDurchNutzer = false
+    private val ablage = object : Ablage {
+        private val prefs = context.getSharedPreferences("ansicht", Context.MODE_PRIVATE)
+        override fun lesen(schluessel: String) = prefs.getString(schluessel, null)
+        override fun schreiben(schluessel: String, wert: String?) = prefs.edit().putString(schluessel, wert).apply()
+    }
 
     init {
         schluesselbund.sitzungLesen()?.let {
@@ -47,13 +63,21 @@ class AppModell(private val context: Context) {
     }
 
     fun abmelden() {
+        abmeldungDurchNutzer = true
         _team.value?.anwenden(SteuerAntwort.STOP)
+    }
+
+    /** Activity sichtbar: Live-Verbindung; sonst nur die Lage jede Minute (für Mitteilungen). */
+    fun vordergrund(sichtbar: Boolean) {
+        imVordergrund = sichtbar
+        if (sichtbar) _ansicht.value?.starten() else _ansicht.value?.hintergrund()
     }
 
     /** Nach dem Ende bleibt „beendet“ stehen, bis der Nutzer zurück zum Start geht. */
     fun schliessen() {
         if (_team.value?.zustand?.value != TeamOrtung.Zustand.BEENDET) return
         _team.value = null
+        _ansicht.value = null
         _sitzung.value = null
     }
 
@@ -93,13 +117,31 @@ class AppModell(private val context: Context) {
 
     private fun teamStarten(sitzung: TeamSitzung) {
         _sitzung.value = sitzung
-        _team.value = TeamOrtung(
-            schnittstelle = TeamClient(sitzung),
+        val client = TeamClient(sitzung)
+        val team = TeamOrtung(
+            schnittstelle = client,
             quelle = quelle,
             puffer = puffer,
             ablaufMs = sitzung.expiresAtMs,
             bereich = bereich,
-            beimBeenden = { schluesselbund.loeschen(Schluesselbund.KONTO_TEAM) },
-        ).also { it.ablaufPruefen() }
+            beimBeenden = ::teamBeendet,
+        )
+        // Der Modus aus /lage steuert die Ortung; der Suchstatus (Kurzpause) nur die Anzeige
+        val ansicht = TeamAnsicht(client, sitzung.teamId ?: sitzung.teamName, ablage, bereich) { modus ->
+            _team.value?.anwenden(SteuerAntwort(modus), melden = false)
+        }
+        team.beiModuswechsel = { ansicht.modusGeaendert() }
+        ansicht.beiMeldungen = { liste -> liste.forEach(mitteilungen::senden) }
+        _team.value = team
+        _ansicht.value = ansicht
+        if (imVordergrund) ansicht.starten() else ansicht.hintergrund()
+        team.ablaufPruefen()
+    }
+
+    private fun teamBeendet() {
+        if (!abmeldungDurchNutzer) mitteilungen.senden(LageMeldung.EINSATZ_BEENDET)
+        abmeldungDurchNutzer = false
+        _ansicht.value?.vergessen()
+        schluesselbund.loeschen(Schluesselbund.KONTO_TEAM)
     }
 }
