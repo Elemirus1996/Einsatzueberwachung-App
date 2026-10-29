@@ -97,6 +97,14 @@ final class TestAnsichtSchnittstelle: TeamAnsichtSchnittstelle, @unchecked Senda
         return TeamTracks(laufend: .init(hund: [], mensch: []))
     }
 
+    var sucheAntwort: Result<SuchAntwort, Error> = .success(SuchAntwort(mode: .track, suche: .init(status: .laeuft, dauerSec: 0, darfSteuern: true)))
+    private(set) var aktionen: [(id: String, aktion: Suchaktion)] = []
+
+    func suche(id: String, aktion: Suchaktion) async throws -> SuchAntwort {
+        aktionen.append((id, aktion))
+        return try sucheAntwort.get()
+    }
+
     func statusmeldung(id: String, code: Statusmeldung.Code) async throws {
         meldungen.append((id, code))
         if let meldungFehler { throw meldungFehler }
@@ -376,5 +384,98 @@ struct TeamAnsichtMeldungTests {
         await a.neuLaden()
         #expect(alle.isEmpty)
         #expect(a.lage?.halsband?.id == "HB-7")
+    }
+}
+
+
+@MainActor
+struct TeamsteuerungTests {
+    let speicher = UserDefaults(suiteName: "steuerung-\(UUID().uuidString)")!
+    let server = TestAnsichtSchnittstelle(lage: {
+        var l = TeamAnsichtTests.lage
+        l.suche = .init(status: .bereit, darfSteuern: true)
+        return l
+    }())
+
+    func ansicht(_ modi: @escaping (Modus) -> Void = { _ in }) -> TeamAnsicht {
+        TeamAnsicht(schnittstelle: server, teamId: "t1", speicher: speicher, beiSteuerung: modi)
+    }
+
+    @Test func nurGueltigeUebergaenge() {
+        #expect(Suchaktion.moeglich(bei: .bereit) == [.starten])
+        #expect(Suchaktion.moeglich(bei: .beendet) == [.starten])
+        #expect(Suchaktion.moeglich(bei: .laeuft) == [.pause, .beenden])
+        #expect(Suchaktion.moeglich(bei: .kurzpause) == [.weiter, .beenden])
+    }
+
+    @Test func startenGibtModusSofortAnDieOrtung() async {
+        var modi: [Modus] = []
+        let a = ansicht { modi.append($0) }
+        await a.neuLaden()
+        await a.steuern(.starten)
+        #expect(server.aktionen.map(\.aktion) == [.starten])
+        #expect(modi.last == .track)
+        #expect(a.lage?.suche.status == .laeuft)
+        #expect(a.offeneAktionen.isEmpty)
+    }
+
+    @Test func beendenSchaltetAufPause() async {
+        var modi: [Modus] = []
+        let a = ansicht { modi.append($0) }
+        await a.neuLaden()
+        server.sucheAntwort = .success(SuchAntwort(mode: .pause, suche: .init(status: .beendet, dauerSec: 900, darfSteuern: true)))
+        await a.steuern(.beenden)
+        #expect(modi.last == .pause)
+        #expect(a.lage?.suche.status == .beendet)
+    }
+
+    @Test func abgelehntUebernimmtStandUndZeigtHinweis() async {
+        let a = ansicht()
+        await a.neuLaden()
+        server.sucheAntwort = .failure(SuchFehler.abgelehnt(text: "Suche läuft bereits", suche: .init(status: .laeuft, dauerSec: 60, darfSteuern: true)))
+        await a.steuern(.starten)
+        #expect(a.lage?.suche.status == .laeuft)
+        #expect(a.suchHinweis?.text == "Suche läuft bereits")
+        #expect(a.offeneAktionen.isEmpty)
+    }
+
+    @Test func verbotenBlendetSteuerungAus() async {
+        let a = ansicht()
+        await a.neuLaden()
+        #expect(a.darfSteuern)
+        server.sucheAntwort = .failure(SuchFehler.verboten(text: nil))
+        await a.steuern(.starten)
+        #expect(!a.darfSteuern)
+    }
+
+    @Test func funklochWiederholtMitGleicherId() async {
+        let a = ansicht()
+        await a.neuLaden()
+        server.sucheAntwort = .failure(URLError(.notConnectedToInternet))
+        await a.steuern(.starten)
+        #expect(a.offeneAktionen.count == 1)
+        let neu = ansicht()   // App neu gestartet
+        #expect(neu.offeneAktionen.count == 1)
+        server.sucheAntwort = .success(SuchAntwort(mode: .track, suche: .init(status: .laeuft, darfSteuern: true)))
+        await neu.neuLaden()   // sendet Wartendes mit
+        #expect(neu.offeneAktionen.isEmpty)
+        #expect(server.aktionen.count == 2)
+        #expect(server.aktionen[0].id == server.aktionen[1].id)
+    }
+
+    @Test func http410BeiSteuerungIstStop() async {
+        var modi: [Modus] = []
+        let a = ansicht { modi.append($0) }
+        server.sucheAntwort = .failure(SchnittstellenFehler.beendet)
+        await a.steuern(.pause)
+        #expect(modi == [.stop])
+    }
+
+    @Test func antwortUndLageMitDarfSteuern() throws {
+        let antwort = try JSONDecoder.server.decode(SuchAntwort.self, from: Data(#"{ "doppelt": false, "mode": "track", "suche": { "status": "laeuft", "seit": "2026-10-29T20:00:00Z", "dauerSec": 0, "darfSteuern": true } }"#.utf8))
+        #expect(antwort.mode == .track)
+        #expect(antwort.suche?.darfSteuern == true)
+        let ohne = try JSONDecoder.server.decode(TeamLage.Suche.self, from: Data(#"{ "status": "bereit", "seit": null, "dauerSec": 0 }"#.utf8))
+        #expect(ohne.darfSteuern == nil, "Älterer Server: keine Steuerung")
     }
 }

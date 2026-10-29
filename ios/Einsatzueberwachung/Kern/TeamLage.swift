@@ -28,6 +28,8 @@ struct TeamLage: Decodable, Equatable, Sendable {
         var status: Status
         var seit: Date?
         var dauerSec: Int?
+        /// Das Team darf die Suche selbst steuern (APP_API.md Abschnitt 11, Einstellung auf dem Server).
+        var darfSteuern: Bool?
     }
 
     struct Suchgebiet: Decodable, Equatable, Sendable {
@@ -91,7 +93,39 @@ struct TeamTracks: Decodable, Equatable, Sendable {
     var abgeschlossen: [Suche]?
 }
 
-/// Die vier Knöpfe der Team-Seite (Abschnitt 8).
+/// Steuerung der Suche durch das Team (Abschnitt 11). Kurzpause hält die Ortung an (`mode` bleibt `track`).
+enum Suchaktion: String, Codable, CaseIterable, Sendable {
+    case starten, pause, weiter, beenden
+
+    /// Nur die gültigen Übergänge anbieten.
+    static func moeglich(bei status: TeamLage.Suche.Status) -> [Suchaktion] {
+        switch status {
+        case .bereit, .beendet: [.starten]
+        case .laeuft: [.pause, .beenden]
+        case .kurzpause: [.weiter, .beenden]
+        }
+    }
+
+    var titel: String {
+        switch self {
+        case .starten: "Suche starten"
+        case .pause: "Pause"
+        case .weiter: "Weiter"
+        case .beenden: "Suche beendet"
+        }
+    }
+}
+
+/// Antwort von `POST /suche` (200) bzw. Stand bei 409.
+struct SuchAntwort: Decodable, Equatable, Sendable {
+    var doppelt: Bool?
+    var mode: Modus?
+    var suche: TeamLage.Suche?
+    var error: String?
+}
+
+/// Die Statusknöpfe der Team-Seite (Abschnitt 8). „Pause“ und „Beendet“ zeigt die App seit #133 nicht mehr
+/// (ersetzt durch die Steuerung der Suche); die Codes bleiben für Meldungen in der Warteschlange gültig.
 enum Statusmeldung {
     enum Code: String, Codable, CaseIterable, Sendable {
         case imGebiet = "im_gebiet"
