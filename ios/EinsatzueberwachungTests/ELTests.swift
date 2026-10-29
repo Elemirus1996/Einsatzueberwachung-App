@@ -347,7 +347,11 @@ struct ELEinsatzTests {
         #expect(json?["ressourcenGeprueft"] as? Bool == true)
         let pdf = json?["pdf"] as? [String: Any]
         #expect(pdf?["tracks"] as? Bool == false)
-        #expect(pdf?["kartenart"] as? String == "Streets")
+        #expect(pdf?["kartenart"] as? String == "Streets", "Standard")
+        let topo = try JSONSerialization.jsonObject(with: JSONEncoder().encode(
+            ELAktion.einsatzBeenden(ergebnis: "x", mitTracks: true, kartenart: .topographic).inhalt)) as? [String: Any]
+        #expect((topo?["pdf"] as? [String: Any])?["kartenart"] as? String == "Topographic")
+        #expect(ELKartenart.allCases.map(\.rawValue) == ["Streets", "Topographic", "Satellite"])
         #expect(pdf?["teamIds"] is NSNull)
         // Warteschlange speichert und liest verschachtelte Werte
         let wieder = try JSONDecoder().decode(ELAktion.self, from: JSONEncoder().encode(a))

@@ -45,11 +45,11 @@ struct ELAktion: Codable, Equatable, Identifiable, Sendable {
     }
 
     /// Einsatz beenden wie `/el/beenden`; `ressourcenGeprueft` muss wahr sein
-    static func einsatzBeenden(ergebnis: String, mitTracks: Bool) -> ELAktion {
+    static func einsatzBeenden(ergebnis: String, mitTracks: Bool, kartenart: ELKartenart = .streets) -> ELAktion {
         neu("einsatz/beenden", "Einsatz beenden", [
             "ergebnis": .text(ergebnis),
             "ressourcenGeprueft": .wahr(true),
-            "pdf": .objekt(["tracks": .wahr(mitTracks), "kartenart": .text("Streets"), "teamIds": .null]),
+            "pdf": .objekt(["tracks": .wahr(mitTracks), "kartenart": .text(kartenart.rawValue), "teamIds": .null]),
         ])
     }
 
@@ -138,6 +138,19 @@ struct ELNotizSeite: Decodable, Equatable, Sendable {
     }
 
     private enum Schluessel: String, CodingKey { case notizen, weitere }
+}
+
+/// Kartenart im PDF-Bericht (Server PdfBerichtOptionen.Kartenarten); Google bewusst nicht
+enum ELKartenart: String, CaseIterable, Codable, Sendable {
+    case streets = "Streets", topographic = "Topographic", satellite = "Satellite"
+
+    var anzeige: String {
+        switch self {
+        case .streets: "Straßenkarte"
+        case .topographic: "Topografisch"
+        case .satellite: "Satellit"
+        }
+    }
 }
 
 /// Szenario des Einsatzes (Abschnitt 5)
