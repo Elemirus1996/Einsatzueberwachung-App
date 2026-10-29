@@ -35,7 +35,8 @@ data class TeamLage(
     val mitteilungen: List<Mitteilung>,
 ) {
     enum class SucheStatus { BEREIT, LAEUFT, KURZPAUSE, BEENDET }
-    data class Suche(val status: SucheStatus, val seitMs: Long? = null, val dauerSec: Int? = null)
+    /** `darfSteuern`: Das Team darf die Suche selbst steuern (Abschnitt 11); ohne Angabe (älterer Server) nein. */
+    data class Suche(val status: SucheStatus, val seitMs: Long? = null, val dauerSec: Int? = null, val darfSteuern: Boolean = false)
     data class Suchgebiet(val id: String?, val name: String?, val farbe: String?, val punkte: List<Koordinate>)
 
     companion object {
@@ -54,16 +55,7 @@ data class TeamLage(
                 dogName = team.textOderNull("dogName"),
                 hundefuehrerName = team.textOderNull("hundefuehrerName"),
                 helfer = team.optJSONArray("helfer")?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList(),
-                suche = Suche(
-                    status = when (suche.getString("status")) {
-                        "laeuft" -> SucheStatus.LAEUFT
-                        "kurzpause" -> SucheStatus.KURZPAUSE
-                        "beendet" -> SucheStatus.BEENDET
-                        else -> SucheStatus.BEREIT
-                    },
-                    seitMs = isoZuMs(suche.textOderNull("seit")),
-                    dauerSec = if (suche.isNull("dauerSec")) null else suche.optInt("dauerSec"),
-                ),
+                suche = suche(suche),
                 suchgebiet = json.objektOderNull("suchgebiet")?.let { g ->
                     Suchgebiet(g.textOderNull("id"), g.textOderNull("name"), g.textOderNull("farbe"), punkte(g.getJSONArray("punkte")))
                 },
@@ -77,6 +69,18 @@ data class TeamLage(
         } catch (e: NullPointerException) {
             throw SchnittstellenFehler.AntwortUngueltig
         }
+
+        fun suche(suche: JSONObject) = Suche(
+            status = when (suche.getString("status")) {
+                "laeuft" -> SucheStatus.LAEUFT
+                "kurzpause" -> SucheStatus.KURZPAUSE
+                "beendet" -> SucheStatus.BEENDET
+                else -> SucheStatus.BEREIT
+            },
+            seitMs = isoZuMs(suche.textOderNull("seit")),
+            dauerSec = if (!suche.has("dauerSec") || suche.isNull("dauerSec")) null else suche.optInt("dauerSec"),
+            darfSteuern = suche.optBoolean("darfSteuern", false),
+        )
 
         fun halsband(h: JSONObject) = Halsband(
             id = h.textOderNull("id"),
@@ -132,7 +136,36 @@ data class TeamTracks(val hund: List<Punkt>, val mensch: List<Punkt>, val abgesc
     }
 }
 
-/** Die vier Knöpfe der Team-Seite (Abschnitt 8). */
+/** Steuerung der Suche durch das Team (Abschnitt 11). Kurzpause hält die Ortung an (`mode` bleibt `track`). */
+enum class Suchaktion(val code: String, val titel: String) {
+    STARTEN("starten", "Suche starten"),
+    PAUSE("pause", "Pause"),
+    WEITER("weiter", "Weiter"),
+    BEENDEN("beenden", "Suche beendet");
+
+    companion object {
+        /** Nur die gültigen Übergänge anbieten. */
+        fun moeglich(status: TeamLage.SucheStatus): List<Suchaktion> = when (status) {
+            TeamLage.SucheStatus.BEREIT, TeamLage.SucheStatus.BEENDET -> listOf(STARTEN)
+            TeamLage.SucheStatus.LAEUFT -> listOf(PAUSE, BEENDEN)
+            TeamLage.SucheStatus.KURZPAUSE -> listOf(WEITER, BEENDEN)
+        }
+
+        fun aus(code: String) = entries.firstOrNull { it.code == code }
+    }
+}
+
+/** Antwort von `POST /suche` (200). */
+data class SuchAntwort(val mode: Modus?, val suche: TeamLage.Suche?)
+
+sealed class SuchFehler(nachricht: String) : Exception(nachricht) {
+    /** 409: Übergang nicht erlaubt; Stand des Servers anbei */
+    data class Abgelehnt(val text: String?, val suche: TeamLage.Suche?) : SuchFehler("abgelehnt")
+    /** 403: Teams dürfen auf diesem Server nicht steuern */
+    data class Verboten(val text: String?) : SuchFehler("verboten")
+}
+
+/** Die Statusknöpfe der Team-Seite (Abschnitt 8). „Pause“ und „Beendet“ zeigt die App seit #133 nicht mehr. */
 enum class Statusmeldung(val code: String, val titel: String) {
     IM_GEBIET("im_gebiet", "Im Gebiet"),
     PAUSE("pause", "Pause"),

@@ -42,6 +42,7 @@ import android.content.Intent
 import io.github.elemirus1996.einsatzspur.kern.GeraeteHinweis
 import io.github.elemirus1996.einsatzspur.kern.Koordinate
 import io.github.elemirus1996.einsatzspur.kern.Statusmeldung
+import io.github.elemirus1996.einsatzspur.kern.Suchaktion
 import io.github.elemirus1996.einsatzspur.kern.TeamAnsicht
 import io.github.elemirus1996.einsatzspur.kern.TeamLage
 import io.github.elemirus1996.einsatzspur.kern.TeamOrtung
@@ -148,9 +149,40 @@ fun TeamAnsichtScreen(
                 }
             }
 
-            // Statusknöpfe
+            // Steuerung der Suche (nur wenn der Server es erlaubt, nur gültige Übergänge)
+            val aktionen by ansicht.offeneAktionen.collectAsState()
+            val suchHinweis by ansicht.suchHinweis.collectAsState()
+            var beendenFragen by remember { mutableStateOf(false) }
+            val status = lage?.suche?.status
+            if (lage?.suche?.darfSteuern == true && status != null) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Suchaktion.moeglich(status).forEach { a ->
+                        Button(
+                            onClick = { if (a == Suchaktion.BEENDEN) beendenFragen = true else bereich.launch { ansicht.steuern(a) } },
+                            modifier = Modifier.weight(1f),
+                            enabled = aktionen.isEmpty(),
+                            colors = ButtonDefaults.buttonColors(containerColor = when (a) {
+                                Suchaktion.STARTEN, Suchaktion.WEITER -> Color(0xFF2E8540)
+                                Suchaktion.PAUSE -> Color(0xFFF07A2A)
+                                Suchaktion.BEENDEN -> Color(0xFFC62828)
+                            }),
+                        ) { Text(a.titel, maxLines = 1) }
+                    }
+                }
+            }
+            if (beendenFragen) {
+                AlertDialog(
+                    onDismissRequest = { beendenFragen = false },
+                    title = { Text("Suche wirklich beenden?") },
+                    text = { Text("Die Ortung schaltet danach auf Pause. Für eine Kurzpause „Pause“ wählen.") },
+                    confirmButton = { TextButton(onClick = { beendenFragen = false; bereich.launch { ansicht.steuern(Suchaktion.BEENDEN) } }) { Text("Suche beenden") } },
+                    dismissButton = { TextButton(onClick = { beendenFragen = false }) { Text("Abbrechen") } },
+                )
+            }
+
+            // Meldungen (seit #133 nur noch „Im Gebiet“ und „Funk“)
             Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Statusmeldung.entries.forEach { s ->
+                listOf(Statusmeldung.IM_GEBIET, Statusmeldung.FUNK).forEach { s ->
                     OutlinedButton(
                         onClick = { bereich.launch { ansicht.melden(s) } },
                         modifier = Modifier.weight(1f),
@@ -159,6 +191,8 @@ fun TeamAnsichtScreen(
                 }
             }
             val hinweis = when {
+                aktionen.isNotEmpty() -> "„${aktionen.first().aktion.titel}“ wartet auf Netz"
+                suchHinweis != null && jetzt - suchHinweis!!.second < 6000 -> suchHinweis!!.first
                 offen.isNotEmpty() -> if (offen.size == 1) "1 Meldung wartet auf Netz" else "${offen.size} Meldungen warten auf Netz"
                 gesendet != null && jetzt - gesendet!!.second < 4000 -> "„${gesendet!!.first.titel}“ gesendet"
                 else -> ""

@@ -31,6 +31,7 @@ class TeamAnsicht(
     private val beiSteuerung: (Modus) -> Unit,
 ) {
     data class OffeneMeldung(val id: String, val meldung: Statusmeldung, val zeitMs: Long)
+    data class OffeneAktion(val id: String, val aktion: Suchaktion, val zeitMs: Long)
 
     // Vor allen Feldern, die beim Anlegen aus der Ablage lesen
     private val schluessel = "team.$teamId"
@@ -49,6 +50,14 @@ class TeamAnsicht(
     val gelesen: StateFlow<Set<String>> = _gelesen
     private val _gesendet = MutableStateFlow<Pair<Statusmeldung, Long>?>(null)
     val gesendet: StateFlow<Pair<Statusmeldung, Long>?> = _gesendet
+
+    private val _offeneAktionen = MutableStateFlow(ladeAktionen())
+    /** Steuerung der Suche, die im Funkloch auf das Netz wartet (Abschnitt 11). */
+    val offeneAktionen: StateFlow<List<OffeneAktion>> = _offeneAktionen
+    private val _suchHinweis = MutableStateFlow<Pair<String, Long>?>(null)
+    /** Kurzer Hinweis nach 409/403 */
+    val suchHinweis: StateFlow<Pair<String, Long>?> = _suchHinweis
+    private var aktionenLaufen = false
 
     /** Lokale Mitteilungen bei Änderungen der Lage. */
     var beiMeldungen: ((List<LageMeldung>) -> Unit)? = null
@@ -93,8 +102,10 @@ class TeamAnsicht(
         anhalten()
         ablage.schreiben("$schluessel.gelesen", null)
         ablage.schreiben("$schluessel.meldungen", null)
+        ablage.schreiben("$schluessel.aktionen", null)
         _gelesen.value = emptySet()
         _offen.value = emptyList()
+        _offeneAktionen.value = emptyList()
     }
 
     /** Die Ortung hat von /positions oder /status einen neuen Modus erfahren: Anzeige nachziehen. */
@@ -185,6 +196,7 @@ class TeamAnsicht(
             _verbindungsfehler.value = true
         }
         meldungenSenden()
+        aktionenSenden()
         if (mitTracks) tracksLaden(voll = tracksVoll)
     }
 
@@ -265,6 +277,72 @@ class TeamAnsicht(
         (0 until liste.length()).mapNotNull { i ->
             val o = liste.getJSONObject(i)
             Statusmeldung.aus(o.getString("code"))?.let { OffeneMeldung(o.getString("id"), it, o.getLong("zeit")) }
+        }
+    }.getOrDefault(emptyList())
+
+    // MARK: Steuerung der Suche
+
+    val darfSteuern: Boolean get() = _lage.value?.suche?.darfSteuern == true
+
+    /** In die Warteschlange legen und senden; dieselbe `id` führt der Server nur einmal aus. */
+    suspend fun steuern(aktion: Suchaktion) {
+        _offeneAktionen.value = _offeneAktionen.value + OffeneAktion(UUID.randomUUID().toString(), aktion, jetzt())
+        speichereAktionen()
+        aktionenSenden()
+    }
+
+    suspend fun aktionenSenden() {
+        if (aktionenLaufen) return
+        aktionenLaufen = true
+        try {
+            while (true) {
+                val offen = _offeneAktionen.value.firstOrNull() ?: break
+                try {
+                    val antwort = schnittstelle.suche(offen.id, offen.aktion)
+                    sucheUebernehmen(antwort.suche)
+                    // Modus sofort an die Ortung (z. B. „Suche beendet“ → pause → Grob-Ortung)
+                    antwort.mode?.let(beiSteuerung)
+                } catch (e: SchnittstellenFehler.Beendet) {
+                    beiSteuerung(Modus.STOP)
+                    return
+                } catch (e: SuchFehler.Abgelehnt) {
+                    // Die EL kann inzwischen umgeschaltet haben: Stand übernehmen und kurz anzeigen
+                    sucheUebernehmen(e.suche)
+                    _suchHinweis.value = (e.text ?: "Nicht möglich, der Stand hat sich geändert.") to jetzt()
+                } catch (e: SuchFehler.Verboten) {
+                    _lage.value?.let { lageUebernehmen(it.copy(suche = it.suche.copy(darfSteuern = false))) }
+                    _suchHinweis.value = (e.text ?: "Die Einsatzleitung steuert die Suche.") to jetzt()
+                } catch (e: SchnittstellenFehler.Server) {
+                    if (e.status !in 400..499 || e.status == 429) return
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    return
+                }
+                _offeneAktionen.value = _offeneAktionen.value.filterNot { it.id == offen.id }
+                speichereAktionen()
+            }
+        } finally {
+            aktionenLaufen = false
+        }
+    }
+
+    private fun sucheUebernehmen(suche: TeamLage.Suche?) {
+        val alt = _lage.value ?: return
+        if (suche != null) lageUebernehmen(alt.copy(suche = suche))
+    }
+
+    private fun speichereAktionen() {
+        val liste = JSONArray()
+        _offeneAktionen.value.forEach { liste.put(JSONObject().put("id", it.id).put("aktion", it.aktion.code).put("zeit", it.zeitMs)) }
+        ablage.schreiben("$schluessel.aktionen", liste.toString())
+    }
+
+    private fun ladeAktionen(): List<OffeneAktion> = runCatching {
+        val liste = JSONArray(ablage.lesen("$schluessel.aktionen") ?: return emptyList())
+        (0 until liste.length()).mapNotNull { i ->
+            val o = liste.getJSONObject(i)
+            Suchaktion.aus(o.getString("aktion"))?.let { OffeneAktion(o.getString("id"), it, o.getLong("zeit")) }
         }
     }.getOrDefault(emptyList())
 
