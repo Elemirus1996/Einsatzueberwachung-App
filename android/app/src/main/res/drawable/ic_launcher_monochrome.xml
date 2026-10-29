@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- EinsatzSpur, einfarbige Ebene für Designfarben (Android 13). Motiv auf 80 % verkleinert, liegt in der Schutzzone (Kreis 66 dp). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <group android:translateX="14" android:translateY="12.4" android:scaleX="0.8" android:scaleY="0.8">
+        <group android:rotation="-25" android:pivotX="27" android:pivotY="36">
+            <path android:fillColor="#FFFFFFFF" android:pathData="M20.5,36 a6.5,8.5 0 1,0 13.0,0 a6.5,8.5 0 1,0 -13.0,0 z" />
+        </group>
+        <group android:rotation="-8" android:pivotX="40" android:pivotY="24">
+            <path android:fillColor="#FFFFFFFF" android:pathData="M33.5,24 a6.5,9 0 1,0 13.0,0 a6.5,9 0 1,0 -13.0,0 z" />
+        </group>
+        <group android:rotation="8" android:pivotX="60" android:pivotY="24">
+            <path android:fillColor="#FFFFFFFF" android:pathData="M53.5,24 a6.5,9 0 1,0 13.0,0 a6.5,9 0 1,0 -13.0,0 z" />
+        </group>
+        <group android:rotation="25" android:pivotX="73" android:pivotY="36">
+            <path android:fillColor="#FFFFFFFF" android:pathData="M66.5,36 a6.5,8.5 0 1,0 13.0,0 a6.5,8.5 0 1,0 -13.0,0 z" />
+        </group>
+        <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd" android:pathData="M50,88 C44,78 31,69 31,56 A19,19 0 0,1 69,56 C69,69 56,78 50,88 Z M43,56 A7,7 0 1,0 57,56 A7,7 0 1,0 43,56 Z" />
+    </group>
+</vector>
