@@ -71,6 +71,7 @@ final class HeimatStaffel: ObservableObject {
 
     /// Nach `/config` bzw. Anmeldung: Name übernehmen und das Logo nur laden, wenn sich `logoVersion` geändert hat.
     /// `laden` liefert die PNG-Daten oder `nil`, wenn der Server kein Logo hat (404).
+    /// Der Server wandelt PNG, JPG, WEBP und SVG selbst in PNG um.
     func aktualisieren(_ info: ServerInfo, laden: () async throws -> Data?) async {
         guard var neu = eintrag, istHeimat(info) else { return }
         if let name = info.staffel, !name.isEmpty { neu.staffel = name }
@@ -93,7 +94,8 @@ final class HeimatStaffel: ObservableObject {
                 }
             }
         }
-        guard eintrag == nil || eintrag?.kennung == neu.kennung else { return }
+        // Während des Ladens in den Einstellungen entfernt oder gewechselt: nichts zurückschreiben
+        guard eintrag?.kennung == neu.kennung else { return }
         eintrag = neu
         speichern()
     }

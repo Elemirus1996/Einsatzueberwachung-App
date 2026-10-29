@@ -63,7 +63,7 @@ struct HeimatStaffelTests {
         let h = heimat()
         h.uebernehmen(eigene, name: "RHS Musterstadt")
         var abrufe = 0
-        await h.aktualisieren(eigene) { abrufe += 1; return nil }   // 404, z. B. SVG-Logo
+        await h.aktualisieren(eigene) { abrufe += 1; return nil }   // 404, kein Logo hinterlegt
         await h.aktualisieren(eigene) { abrufe += 1; return nil }
         #expect(abrufe == 1)                      // nicht bei jedem Start erneut fragen
         #expect(h.logo == nil)
@@ -81,6 +81,17 @@ struct HeimatStaffelTests {
         #expect(h.eintrag?.logoVersion == nil)
         await h.aktualisieren(eigene) { Self.png }
         #expect(h.logo != nil)
+    }
+
+    @Test func entfernenWaehrendDasLogoLaedtBleibtEntfernt() async {
+        let h = heimat()
+        h.uebernehmen(eigene, name: "RHS Musterstadt")
+        await h.aktualisieren(eigene) {
+            h.entfernen()        // Nutzer entfernt die Heimatstaffel in den Einstellungen
+            return Self.png
+        }
+        #expect(h.eintrag == nil)
+        #expect(heimat().eintrag == nil)
     }
 
     @Test func entfernenFragtWieder() async {

@@ -90,7 +90,7 @@ extension TeamClient: TeamAnsichtSchnittstelle {
                                            inhalt: try JSONEncoder().encode(["id": id, "code": code.rawValue]))
     }
 
-    /// Staffellogo als PNG (Abschnitt 10). `nil`, wenn der Server keins hat (404, auch bei SVG-Logo).
+    /// Staffellogo als PNG (Abschnitt 10, der Server wandelt andere Formate um). `nil`, wenn keins hinterlegt ist (404).
     func logo() async throws -> Data? {
         var request = request("logo")
         request.setValue("image/png", forHTTPHeaderField: "Accept")
