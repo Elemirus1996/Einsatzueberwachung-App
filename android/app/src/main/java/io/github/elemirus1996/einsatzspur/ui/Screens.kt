@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -83,8 +84,21 @@ fun StartScreen(einsatzZugang: TeamQRCode?, anmelden: (TeamSitzung, TeamQRCode) 
             }
             Text("EinsatzSpur", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(32.dp))
-            Rollenknopf("Team", "Anmelde-Code aus dem Einsatz eingeben", aktiv = true) { anmeldungOffen = true }
+            Rollenknopf("Team", "QR-Code aus dem Einsatz scannen", aktiv = true) { anmeldungOffen = true }
             Rollenknopf("Einsatzleitung", "Kommt in einer späteren Version", aktiv = false) {}
+            val context = androidx.compose.ui.platform.LocalContext.current
+            var lizenzen by remember { mutableStateOf<String?>(null) }
+            TextButton(onClick = { lizenzen = context.assets.open("lizenzen.txt").bufferedReader().use { it.readText() } }) {
+                Text("Lizenzen", style = MaterialTheme.typography.bodySmall)
+            }
+            lizenzen?.let { text ->
+                AlertDialog(
+                    onDismissRequest = { lizenzen = null },
+                    title = { Text("Lizenzen") },
+                    text = { Text(text, Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()), style = MaterialTheme.typography.bodySmall) },
+                    confirmButton = { TextButton(onClick = { lizenzen = null }) { Text("OK") } },
+                )
+            }
         }
     }
 }
@@ -118,6 +132,7 @@ fun AnmeldungScreen(
     var auswahl by remember { mutableStateOf<Pair<TeamQRCode, TeamAuswahl>?>(null) }
     var laedt by remember { mutableStateOf(false) }
     var fehler by remember { mutableStateOf<String?>(null) }
+    var scannerOffen by remember { mutableStateOf(false) }
 
     fun ausfuehren(block: suspend () -> Unit) {
         bereich.launch {
@@ -148,11 +163,20 @@ fun AnmeldungScreen(
         }
     }
 
+    if (scannerOffen) {
+        QrScanner(gefunden = { scannerOffen = false; bestaetigen = it }, abbrechen = { scannerOffen = false })
+        return
+    }
+
     Column(Modifier.fillMaxSize().safeDrawingPadding().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         TextButton(onClick = { if (auswahl != null) auswahl = null else zurueck() }) { Text("‹ Zurück") }
         val aktuell = auswahl
         if (aktuell == null) {
             Text("Team anmelden", style = MaterialTheme.typography.headlineSmall)
+            Button(onClick = { scannerOffen = true }, Modifier.fillMaxWidth(), enabled = !laedt) { Text("QR-Code scannen") }
+            Text("Den QR-Code zeigt die Einsatzleitung im Monitor unter „Team-Handys“.", style = MaterialTheme.typography.bodySmall)
+            HorizontalDivider()
+            Text("Oder von Hand", style = MaterialTheme.typography.labelLarge)
             OutlinedTextField(
                 server, { server = it }, Modifier.fillMaxWidth(),
                 label = { Text("Server, z. B. einsatz.staffel.de") }, singleLine = true,
