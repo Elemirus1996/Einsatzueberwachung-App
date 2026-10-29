@@ -66,6 +66,7 @@ struct ELEinsatzBeendenView: View {
     @State private var ergebnis: ELErgebnis?
     @State private var geprueft = false
     @State private var mitTracks = true
+    @State private var kartenart = ELKartenart.streets
     @State private var fragen = false
 
     var body: some View {
@@ -95,6 +96,9 @@ struct ELEinsatzBeendenView: View {
                 }
                 Section("Bericht (PDF)") {
                     Toggle("Tracks in den Bericht", isOn: $mitTracks)
+                    Picker("Karte", selection: $kartenart) {
+                        ForEach(ELKartenart.allCases, id: \.self) { Text($0.anzeige).tag($0) }
+                    }
                 }
             }
             .navigationTitle("Einsatz beenden")
@@ -108,7 +112,7 @@ struct ELEinsatzBeendenView: View {
             .confirmationDialog("Einsatz wirklich beenden?", isPresented: $fragen, titleVisibility: .visible) {
                 Button("Einsatz beenden", role: .destructive) {
                     guard let ergebnis else { return }
-                    Task { await betrieb.ausfuehren(.einsatzBeenden(ergebnis: ergebnis.wert, mitTracks: mitTracks)) }
+                    Task { await betrieb.ausfuehren(.einsatzBeenden(ergebnis: ergebnis.wert, mitTracks: mitTracks, kartenart: kartenart)) }
                     schliessen()
                 }
             } message: {
