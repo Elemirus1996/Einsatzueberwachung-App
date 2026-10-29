@@ -176,6 +176,25 @@ struct TeamAnsichtTests {
         #expect(server.trackAbrufe == [nil])
     }
 
+    /// Entscheidung Server #133: Kurzpause liefert mode = track. Die Ortung folgt nur dem Modus und bleibt fein,
+    /// der Suchstatus „kurzpause“ ist nur Anzeige.
+    @Test func kurzpauseMitTrackBleibtFein() async {
+        let quelle = TestQuelle()
+        let ortung = TeamOrtung(schnittstelle: TestSchnittstelle(), quelle: quelle, puffer: TestPuffer(),
+                                ablauf: jetzt.addingTimeInterval(3600), jetzt: { [jetzt] in jetzt }, beimBeenden: {})
+        var lage = Self.lage
+        lage.mode = .track
+        lage.suche = .init(status: .kurzpause, dauerSec: 600)
+        server.lageAntwort = .success(lage)
+        let a = ansicht { ortung.anwenden(SteuerAntwort(mode: $0), melden: false) }
+        await a.neuLaden()
+        #expect(quelle.stufe == .fein)
+        #expect(ortung.zustand == .ortet)
+        ortung.positionErhalten(Position(lat: 49, lng: 8, accuracy: 5,
+                                         timestamp: Int64(jetzt.timeIntervalSince1970 * 1000), battery: nil))
+        #expect(ortung.gepuffert == 1 || ortung.letzterUpload != nil, "Positionen werden in der Kurzpause gesammelt")
+    }
+
     @Test func halsbandAlterNachServeruhr() async {
         let a = ansicht()
         await a.neuLaden()
