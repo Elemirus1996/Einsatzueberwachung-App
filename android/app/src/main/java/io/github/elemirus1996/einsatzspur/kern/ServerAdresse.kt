@@ -25,7 +25,17 @@ value class ServerAdresse private constructor(val basis: String) {
 
 /** Inhalt des bestehenden Team-QR-Codes: `https://<server>/team/login/<Code>` (ältere Form `…/team/login?code=<Code>`). */
 data class TeamQRCode(val server: ServerAdresse, val code: String) {
+    /** Für den Keystore-Speicher (Team wechseln ohne neuen Scan). */
+    fun alsText(): String = "${server.basis}\n$code"
+
     companion object {
+        fun ausText(text: String): TeamQRCode? {
+            val teile = text.split('\n')
+            if (teile.size != 2) return null
+            val server = ServerAdresse.aus(teile[0]) ?: return null
+            return bereinigt(teile[1])?.let { TeamQRCode(server, it) }
+        }
+
         fun aus(text: String): TeamQRCode? {
             val server = ServerAdresse.aus(text) ?: return null
             val uri = runCatching { URI(text.trim()) }.getOrNull() ?: return null

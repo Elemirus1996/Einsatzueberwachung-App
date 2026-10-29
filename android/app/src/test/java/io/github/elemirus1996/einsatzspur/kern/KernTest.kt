@@ -62,3 +62,27 @@ class KernTest {
         assertEquals(SteuerAntwort(Modus.TRACK), TeamClient.steuerAntwort(JSONObject("""{ "mode": "track" }""")))
     }
 }
+
+class TeamWechselTest {
+    @Test
+    fun nurTeamwechselBehaeltDenAnmeldeCode() {
+        assertTrue(io.github.elemirus1996.einsatzspur.AppModell.Abmeldung.TEAM_WECHSEL.behaeltZugang)
+        assertTrue(!io.github.elemirus1996.einsatzspur.AppModell.Abmeldung.EINSATZ.behaeltZugang)
+        assertTrue("Einsatzende/410 löscht den Code", !io.github.elemirus1996.einsatzspur.AppModell.Abmeldung.SERVER.behaeltZugang)
+    }
+
+    @Test
+    fun nurServerendeMeldetEinsatzBeendet() {
+        assertTrue(io.github.elemirus1996.einsatzspur.AppModell.Abmeldung.SERVER.meldetEinsatzende)
+        assertTrue(!io.github.elemirus1996.einsatzspur.AppModell.Abmeldung.TEAM_WECHSEL.meldetEinsatzende)
+        assertTrue(!io.github.elemirus1996.einsatzspur.AppModell.Abmeldung.EINSATZ.meldetEinsatzende)
+    }
+
+    @Test
+    fun zugangAlsTextHinUndZurueck() {
+        val zugang = TeamQRCode.aus("https://einsatz.example.org:8443/team/login/ABCDEFGH23456789")!!
+        assertEquals(zugang, TeamQRCode.ausText(zugang.alsText()))
+        assertNull(TeamQRCode.ausText("http://unsicher\nABC"))
+        assertNull(TeamQRCode.ausText("kaputt"))
+    }
+}

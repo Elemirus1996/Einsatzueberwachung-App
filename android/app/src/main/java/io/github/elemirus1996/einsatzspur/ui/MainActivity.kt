@@ -16,6 +16,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import io.github.elemirus1996.einsatzspur.kern.GeraeteHinweis
 import io.github.elemirus1996.einsatzspur.kern.GeraeteHinweise
+import io.github.elemirus1996.einsatzspur.kern.TeamQRCode
+import io.github.elemirus1996.einsatzspur.kern.TeamSitzung
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import io.github.elemirus1996.einsatzspur.EinsatzSpurApp
 
@@ -41,6 +46,8 @@ class MainActivity : ComponentActivity() {
                 val team by modell.team.collectAsState()
                 val sitzung by modell.sitzung.collectAsState()
                 val ansicht by modell.ansicht.collectAsState()
+                val einsatzZugang by modell.einsatzZugang.collectAsState()
+                val teamWahl by modell.teamWahl.collectAsState()
                 val ortung = team
                 val zugang = sitzung
                 val lage = ansicht
@@ -48,13 +55,24 @@ class MainActivity : ComponentActivity() {
                     TeamAnsichtScreen(
                         ortung, lage, zugang, hinweise.value,
                         einstellungOeffnen = { runCatching { startActivity(it) } },
-                        abmelden = modell::abmelden, schliessen = modell::schliessen,
+                        kannWechseln = einsatzZugang != null,
+                        teamWechseln = modell::teamWechseln,
+                        vomEinsatzAbmelden = modell::vomEinsatzAbmelden,
+                        schliessen = modell::schliessen,
                     )
                 } else {
-                    StartScreen(anmelden = { sitzung ->
+                    val anmelden = { sitzung: TeamSitzung, zugang: TeamQRCode ->
                         berechtigungenAnfragen()
-                        modell.anmelden(sitzung)
-                    })
+                        modell.anmelden(sitzung, zugang)
+                    }
+                    val wahl = teamWahl
+                    if (wahl != null) {
+                        Surface(Modifier.fillMaxSize()) {
+                            AnmeldungScreen(wahl, anmelden, zurueck = modell::teamWahlAbbrechen, zugangUngueltig = modell::zugangUngueltig)
+                        }
+                    } else {
+                        StartScreen(einsatzZugang, anmelden, zugangUngueltig = modell::zugangUngueltig)
+                    }
                 }
             }
         }

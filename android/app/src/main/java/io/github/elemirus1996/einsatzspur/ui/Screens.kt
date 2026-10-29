@@ -28,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,13 +58,16 @@ import java.io.IOException
 import java.text.DateFormat
 import java.util.Date
 
-/** Startseite: Rollenwahl, dann Anmeldung des Teams (Server und Anmelde-Code; QR-Scan folgt). */
+/**
+ * Startseite: Rollenwahl, dann Anmeldung des Teams (Server und Anmelde-Code; QR-Scan folgt).
+ * Läuft der Einsatz noch (Code gespeichert), führt „Team“ direkt zur Teamauswahl.
+ */
 @Composable
-fun StartScreen(anmelden: (TeamSitzung) -> Unit) {
+fun StartScreen(einsatzZugang: TeamQRCode?, anmelden: (TeamSitzung, TeamQRCode) -> Unit, zugangUngueltig: () -> Unit) {
     var anmeldungOffen by remember { mutableStateOf(false) }
     Surface(Modifier.fillMaxSize()) {
         if (anmeldungOffen) {
-            AnmeldungScreen(fertig = anmelden, zurueck = { anmeldungOffen = false })
+            AnmeldungScreen(einsatzZugang, fertig = anmelden, zurueck = { anmeldungOffen = false }, zugangUngueltig = zugangUngueltig)
             return@Surface
         }
         Column(
@@ -99,9 +103,14 @@ private fun Rollenknopf(titel: String, text: String, aktiv: Boolean, aktion: () 
     }
 }
 
-/** Server und Code eingeben, Server bestätigen, Team wählen. */
+/** Server und Code eingeben, Server bestätigen, Team wählen. Mit `vorgabe` direkt die Teamauswahl ohne Scan. */
 @Composable
-private fun AnmeldungScreen(fertig: (TeamSitzung) -> Unit, zurueck: () -> Unit) {
+fun AnmeldungScreen(
+    vorgabe: TeamQRCode?,
+    fertig: (TeamSitzung, TeamQRCode) -> Unit,
+    zurueck: () -> Unit,
+    zugangUngueltig: () -> Unit,
+) {
     val bereich = rememberCoroutineScope()
     var server by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
@@ -120,6 +129,22 @@ private fun AnmeldungScreen(fertig: (TeamSitzung) -> Unit, zurueck: () -> Unit) 
             } finally {
                 laedt = false
             }
+        }
+    }
+
+    LaunchedEffect(vorgabe) {
+        if (vorgabe == null || auswahl != null) return@LaunchedEffect
+        laedt = true
+        try {
+            auswahl = vorgabe to TeamAnmeldung(vorgabe).teams()
+        } catch (e: AnmeldeFehler.CodeUngueltig) {
+            // Gespeicherter Code gilt nicht mehr: neu eingeben bzw. scannen
+            zugangUngueltig()
+            fehler = "Der Anmelde-Code gilt nicht mehr, vermutlich wurde ein neuer Einsatz gestartet. Bitte den Code neu eingeben."
+        } catch (e: Exception) {
+            fehler = fehlerText(e)
+        } finally {
+            laedt = false
         }
     }
 
@@ -163,7 +188,7 @@ private fun AnmeldungScreen(fertig: (TeamSitzung) -> Unit, zurueck: () -> Unit) 
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(liste.teams, key = TeamEintrag::teamId) { team ->
                     OutlinedButton(
-                        onClick = { ausfuehren { fertig(TeamAnmeldung(zugang).anmelden(team.teamId)) } },
+                        onClick = { ausfuehren { fertig(TeamAnmeldung(zugang).anmelden(team.teamId), zugang) } },
                         enabled = !laedt, modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column(Modifier.fillMaxWidth()) {

@@ -65,7 +65,9 @@ fun TeamAnsichtScreen(
     sitzung: TeamSitzung,
     hinweise: List<GeraeteHinweis>,
     einstellungOeffnen: (Intent) -> Unit,
-    abmelden: () -> Unit,
+    kannWechseln: Boolean,
+    teamWechseln: suspend (trotzdem: Boolean) -> Boolean,
+    vomEinsatzAbmelden: () -> Unit,
     schliessen: () -> Unit,
 ) {
     var ausgeblendet by remember { mutableStateOf(emptySet<String>()) }
@@ -191,7 +193,11 @@ fun TeamAnsichtScreen(
     }
 
     if (info) {
-        var abmeldenFragen by remember { mutableStateOf(false) }
+        // Rückfrage: null = keine, "abmelden" = vom Einsatz abmelden, "puffer" = trotzdem wechseln
+        var rueckfrage by remember { mutableStateOf<String?>(null) }
+        fun wechseln(trotzdem: Boolean) = bereich.launch {
+            if (teamWechseln(trotzdem)) info = false else rueckfrage = "puffer"
+        }
         AlertDialog(
             onDismissRequest = { info = false },
             title = { Text(lage?.teamName ?: sitzung.teamName) },
@@ -202,18 +208,39 @@ fun TeamAnsichtScreen(
                     lage?.suchgebiet?.name?.let { Text("Suchgebiet: $it") }
                     lage?.staffel?.let { Text("Staffel: $it") }
                     Text("Server: ${sitzung.server.name}")
-                    if (abmeldenFragen) Text("Ortung beenden und abmelden?", fontWeight = FontWeight.Bold)
+                    when (rueckfrage) {
+                        "abmelden" -> Text(
+                            "Vom Einsatz abmelden? Die Ortung endet und der Anmelde-Code wird gelöscht.",
+                            fontWeight = FontWeight.Bold,
+                        )
+                        "puffer" -> Text(
+                            "${ortung.gepuffert.value} Positionen sind noch nicht gesendet (kein Netz). Beim Wechsel gehen sie verloren.",
+                            fontWeight = FontWeight.Bold,
+                        )
+                        else -> {
+                            if (kannWechseln) {
+                                Button(onClick = { wechseln(false) }, Modifier.fillMaxWidth()) { Text("Team wechseln") }
+                                Text("Zeigt die Teams desselben Einsatzes, ohne neuen Code.", style = MaterialTheme.typography.bodySmall)
+                            }
+                            TextButton(onClick = { rueckfrage = "abmelden" }) {
+                                Text("Vom Einsatz abmelden", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
                 }
             },
             confirmButton = {
-                TextButton(onClick = {
-                    if (abmeldenFragen) {
-                        info = false
-                        abmelden()
-                    } else abmeldenFragen = true
-                }) { Text(if (abmeldenFragen) "Ja, abmelden" else "Abmelden") }
+                when (rueckfrage) {
+                    "abmelden" -> TextButton(onClick = { info = false; vomEinsatzAbmelden() }) { Text("Abmelden") }
+                    "puffer" -> TextButton(onClick = { wechseln(true) }) { Text("Trotzdem wechseln") }
+                    else -> Unit
+                }
             },
-            dismissButton = { TextButton(onClick = { info = false }) { Text("Schließen") } },
+            dismissButton = {
+                TextButton(onClick = { if (rueckfrage != null) rueckfrage = null else info = false }) {
+                    Text(if (rueckfrage != null) "Abbrechen" else "Schließen")
+                }
+            },
         )
     }
 }
