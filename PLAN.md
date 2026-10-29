@@ -34,7 +34,7 @@ Jede Antwort des Servers enthält, was die App als Nächstes tun soll:
 | Antwort `mode` | App |
 |---|---|
 | `track` | GPS an, Positionen puffern, gesammelt hochladen |
-| `pause` | GPS **aus**. Wecken über **stille Push-Mitteilung**, sobald der Server wieder `track` meldet; dazu `/status` beim App-Start (siehe unten) |
+| `pause` | GPS **aus**. Grob-Ortung ohne GPS hält die App wach, sie fragt jede Minute den Status ab und startet bei `track` selbst (siehe unten) |
 | `stop` | GPS aus, Token löschen, Rolle beenden |
 
 Zuordnung auf dem Server:
@@ -48,7 +48,13 @@ Zuordnung auf dem Server:
 
 Sicherheitsnetz in der App: Läuft `expiresAt` ab, stoppt die App auch ohne Netz.
 
-### Aufwecken im Modus `pause` (entschieden 28.10.2026: stille Push-Mitteilung)
+### Aufwecken im Modus `pause` (entschieden 29.10.2026: Grob-Ortung ohne GPS; stille Push ab Dezember prüfen)
+
+**Stand 29.10.2026:** Im iPhone-Test hat iOS die gesperrte App in der Pause schlafen gelegt, eine neue Suche kam nicht an.
+Entscheidung: In `pause` läuft eine Grob-Ortung (niedrigste Genauigkeit, Funkzellen/WLAN, kein GPS, keine Positionen senden).
+Sie hält die App wach, die App fragt jede Minute `/status` und startet bei `track` das GPS selbst. Das blaue Standort-Symbol
+bleibt in der Pause sichtbar. Bei `stop` ist alles aus. Akku-Messung nötig. Ab Dezember (bezahltes Apple-Konto) prüfen,
+ob stille Push zuverlässig genug ist, um die Grob-Ortung zu ersetzen. Der Abschnitt unten beschreibt diesen Push-Weg.
 
 iOS hält eine App ohne laufende Ortung im Hintergrund nach kurzer Zeit an, ein Takt „alle 2 min `/status`“ ist dort nicht möglich.
 Darum:
