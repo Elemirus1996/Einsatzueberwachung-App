@@ -24,6 +24,10 @@ final class ELAnsicht: ObservableObject {
 
     /// Ton bzw. Vibration bei Eskalation (in der Ansicht gesetzt).
     var beiWarnung: ((Int) -> Void)?
+    /// Neue Notiz bzw. neuer Funkspruch (Liste neu laden)
+    var beiNotiz: (() async -> Void)?
+    /// Nach jeder erfolgreich geladenen Lage (wartende Aktionen senden)
+    var nachLage: (() async -> Void)?
 
     init(schnittstelle: ELLageSchnittstelle, jetzt: @escaping () -> Date = Date.init,
          lageTakt: Duration = .seconds(60), beiSteuerung: @escaping (Modus) -> Void) {
@@ -95,8 +99,10 @@ final class ELAnsicht: ObservableObject {
             await neuLaden()
         case .verdraengt(let sekunden):
             verdraengtWarten = .seconds(min(max(sekunden, 5), 600))
-        case .position, .notiz, .funk, .vermisste:
-            break   // Karte, Notizen und Vermisste folgen in den nächsten Stufen
+        case .notiz, .funk:
+            await beiNotiz?()
+        case .position, .vermisste:
+            break   // Karte und Vermisste folgen in den nächsten Stufen
         }
     }
 
@@ -108,6 +114,7 @@ final class ELAnsicht: ObservableObject {
             lageAbgerufen = jetzt()
             verbindungsfehler = false
             if let mode = neu.mode { beiSteuerung(mode) }
+            await nachLage?()
         } catch SchnittstellenFehler.beendet {
             beiSteuerung(.stop)
         } catch {

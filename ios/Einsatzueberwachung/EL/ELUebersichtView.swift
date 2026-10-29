@@ -7,6 +7,8 @@ struct ELUebersichtView: View {
     @EnvironmentObject private var modell: AppModell
     @ObservedObject var ansicht: ELAnsicht
     @ObservedObject var ortung: TeamOrtung
+    @ObservedObject var betrieb: ELBetrieb
+    @State private var gewaehltesTeam: ELLage.Team?
     @Environment(\.scenePhase) private var phase
     @Environment(\.horizontalSizeClass) private var breite
     @State private var abmeldenFragen = false
@@ -15,6 +17,13 @@ struct ELUebersichtView: View {
         TimelineView(.periodic(from: .now, by: 1)) { kontext in
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
+                    if let offen = betrieb.offen.first {
+                        Label("„\(offen.beschreibung)“ wartet auf Netz", systemImage: "antenna.radiowaves.left.and.right.slash")
+                            .foregroundStyle(.orange)
+                    } else if let hinweis = betrieb.hinweis, kontext.date.timeIntervalSince(hinweis.zeit) < 6 {
+                        Label(hinweis.text, systemImage: hinweis.fehler ? "exclamationmark.circle" : "checkmark.circle")
+                            .foregroundStyle(hinweis.fehler ? .red : .green)
+                    }
                     if let warnung = ansicht.warnung, kontext.date.timeIntervalSince(warnung.zeit) < 30 {
                         Label(warnung.text, systemImage: "exclamationmark.triangle.fill")
                             .font(.headline)
@@ -30,7 +39,10 @@ struct ELUebersichtView: View {
                         }
                         LazyVGrid(columns: spalten, spacing: 12) {
                             ForEach(lage.teams) { team in
-                                ELTeamKarte(team: team, ansicht: ansicht, zeitpunkt: kontext.date)
+                                Button { gewaehltesTeam = team } label: {
+                                    ELTeamKarte(team: team, ansicht: ansicht, zeitpunkt: kontext.date)
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
                     }
@@ -41,6 +53,11 @@ struct ELUebersichtView: View {
         }
         .navigationTitle("Einsatzleitung")
         .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                NavigationLink {
+                    ELFunkView(betrieb: betrieb, teams: ansicht.lage?.teams ?? [])
+                } label: { Label("Funk & Notizen", systemImage: "text.bubble") }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button("Abmelden", role: .destructive) { abmeldenFragen = true }
@@ -59,6 +76,9 @@ struct ELUebersichtView: View {
         .onDisappear { ansicht.anhalten() }
         .onChange(of: phase) { _, neu in
             if neu == .active { ansicht.starten() } else if neu == .background { ansicht.anhalten() }
+        }
+        .sheet(item: $gewaehltesTeam) { team in
+            ELTeamAktionenView(team: team, betrieb: betrieb)
         }
         .confirmationDialog("Als Einsatzleitung abmelden?", isPresented: $abmeldenFragen, titleVisibility: .visible) {
             Button("Abmelden", role: .destructive) { Task { await modell.elAbmelden() } }
