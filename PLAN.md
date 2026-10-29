@@ -76,7 +76,7 @@ damit alles flüssig läuft. Die Daten kommen ausschließlich über die Schnitts
 | | iOS (`ios/`) | Android (`android/`) |
 |---|---|---|
 | Sprache / UI | Swift, SwiftUI | Kotlin, Jetpack Compose |
-| Oberflächen | SwiftUI, Karte mit MapKit (entschieden 28.10.2026) | Jetpack Compose, Karte offen (MapLibre oder osmdroid) |
+| Oberflächen | SwiftUI, Karte mit MapKit (entschieden 28.10.2026) | Jetpack Compose, Karte mit MapLibre Native (entschieden 29.10.2026) |
 | Live-Daten | Server-Sent Events mit `URLSession` (Bearer-Token im Header), Rückfall Abfrage per HTTP | Server-Sent Events (Bearer-Token im Header), Rückfall Abfrage per HTTP |
 | Push | APNs (sichtbar und still) | Firebase Cloud Messaging (nur Messaging) |
 | Ortung | `CLLocationManager`, `allowsBackgroundLocationUpdates`, `pausesLocationUpdatesAutomatically`, Berechtigung „Beim Verwenden“ (blaue Statusanzeige, „Immer“ wird nicht verlangt) | Foreground-Service Typ `location` mit Benachrichtigung, Fused Location Provider (ausgewogen, Batching) |
@@ -121,7 +121,7 @@ Nachgebaut wird, was `/el` heute kann (Stand Server 1.11.7):
 | Einsatz starten | Stichwort, Ort, Szenario, Einsatz/Übung (wie `/el/start`) |
 | Übersicht | Teams mit Suchzeit und Warnstufe, Starten (mit Halsband-Auswahl), Pause, Weiter, Stopp, Zurücksetzen; Warnton bei Eskalation; Wetter |
 | Vermisste | Profile anlegen/bearbeiten, Szenario, Checklisten |
-| Karte | Suchgebiete, Halsbänder und Team-Handys live, Tracks, Abdeckung in %, ELW; iOS mit MapKit, Android offen (keine Google-Schlüssel) |
+| Karte | Suchgebiete, Halsbänder und Team-Handys live, Tracks, Abdeckung in %, ELW; iOS mit MapKit, Android mit MapLibre und OSM/OpenTopoMap (keine Google-Schlüssel) |
 | Notizen und Funk | Liste, neue Einträge, Antworten; Funkloch-Puffer wie heute |
 | Einsatz beenden | Ergebnis, Prüfung der Ressourcen, PDF-Optionen (wie `/el/beenden`) |
 | Ortung | Standort der Einsatzleitung für die Karte im ELW (Server fertig, PR #113) |
@@ -211,7 +211,7 @@ Android:
 - [ ] Anmeldung mit Staffel-Passwort (nativer Dialog), Token in Keychain/Keystore
 - [ ] Übersicht mit Teams und Aktionen, Warnton/Haptik bei Eskalation
 - [ ] Vermisste, Notizen und Funk (mit Funkloch-Puffer), Einsatz starten und beenden
-- [ ] Karte (iOS: MapKit; Android: offen) mit Gebieten, Positionen, Tracks, Abdeckung
+- [ ] Karte (iOS: MapKit; Android: MapLibre) mit Gebieten, Positionen, Tracks, Abdeckung
 - [ ] EL-Ortung, Stop bei Einsatzende, Abmeldung oder Rollenwechsel
 
 ### Phase 3b – Push-Mitteilungen für die Einsatzleitung (entschieden 28.10.2026)
