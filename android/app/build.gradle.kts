@@ -65,6 +65,10 @@ dependencies {
     implementation("androidx.camera:camera-view:1.6.2")
     // Einzige Fremdbibliothek (Ausnahme in CLAUDE.md, 29.10.2026): QR-Auswertung, Apache 2.0, kein Netz
     implementation("com.google.zxing:core:3.5.4")
+    // Zweite Ausnahme (CLAUDE.md, 29.10.2026): Karte. BSD-2, Kacheln nur von OSM/OpenTopoMap, keine Telemetrie
+    implementation("org.maplibre.gl:android-sdk:13.7.1")
+    // Von MapLibre ohnehin genutzt; ausdrücklich eingebunden für den eigenen Client mit Host-Freigabeliste
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
