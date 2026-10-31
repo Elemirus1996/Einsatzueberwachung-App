@@ -8,5 +8,7 @@ Diese Datei gehört nach `~/einsatzspur/CLAUDE.md` (außerhalb der Repos). Vorla
 - Schnittstelle ändern: erst `APP_API.md` beschreiben, dann Server mit Tests, dann iOS und Android. Jeder Server-PR nach Skill `pr-checkliste`.
 - Branch pro Aufgabe, PR nach `main`, mergen nach grünen Tests. Builds und Tests nur mit Skill `tests-kurz`.
 - Releases des Servers und alles in den Stores nur nach Pauls ausdrücklichem OK. Einspielen auf dem Staffel-Server macht Paul.
-- Stand und Aufgaben: `PLAN.md` und das Board https://claude.ai/artifact/EDiazzj2cArneXUVzCHb8K (Sammlung `aufgaben`, Werkzeug ArtifactData). Nach jeder abgeschlossenen Stufe den Stand ins Board schreiben und Paul einen Neustart der Sitzung vorschlagen.
+- Stand und Aufgaben: Board https://claude.ai/artifact/EDiazzj2cArneXUVzCHb8K (Sammlung `aufgaben`, Karte `mac-uebergabe`, Werkzeug ArtifactData) und `PLAN.md`. Nach jeder abgeschlossenen Stufe Skill `uebergabe`.
+- Tokens sparen: gezielt lesen (grep, Ausschnitte), lange Ausgaben in Dateien, Antworten knapp.
+- Skills liegen in `Einsatzueberwachung-App/docs/arbeitsplatz/skills/`, eingebunden per Symlink in `~/einsatzspur/.claude/skills/`; `pr-checkliste`, `impeccable` und `interface-design` per Symlink aus dem Server-Repo.
 - Sicherheitsrelevante PRs (Anmeldung, Token, Ortung, Datenschutz) vor dem Merge mit `/security-review` prüfen.
