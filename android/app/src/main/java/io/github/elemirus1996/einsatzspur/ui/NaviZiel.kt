@@ -31,7 +31,8 @@ import kotlinx.coroutines.launch
 
 /** Ziel der Einsatzleitung als `geo:`-Link (APP_API.md Abschnitt 13): Android bietet alle installierten Navi-Apps an. */
 fun naviStarten(context: Context, ziel: NavigationsZiel) {
-    val link = ziel.geo ?: return
+    // Nur `geo:` öffnen, nie beliebige Links aus der Antwort
+    val link = ziel.geo?.takeIf { it.startsWith("geo:") } ?: return
     val intent = Intent(Intent.ACTION_VIEW, Uri.parse(link))
     runCatching { context.startActivity(Intent.createChooser(intent, "Navigation zu „${ziel.name}“").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
 }

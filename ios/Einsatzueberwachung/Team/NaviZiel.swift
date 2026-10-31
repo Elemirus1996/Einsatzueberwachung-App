@@ -22,7 +22,17 @@ enum NaviApp: String, CaseIterable, Identifiable, Sendable {
         case .googleMaps: ziel.links.googleMaps
         case .waze: ziel.links.waze
         }
-        return text.flatMap(URL.init(string:))
+        // Nur die erwarteten Adressen öffnen, nie beliebige Links aus der Antwort
+        guard let text, text.hasPrefix(praefix) else { return nil }
+        return URL(string: text)
+    }
+
+    private var praefix: String {
+        switch self {
+        case .appleKarten: "https://maps.apple.com/"
+        case .googleMaps: "comgooglemaps://"
+        case .waze: "waze://"
+        }
     }
 
     /// Apps mit Link, die auf dem Gerät geöffnet werden können
