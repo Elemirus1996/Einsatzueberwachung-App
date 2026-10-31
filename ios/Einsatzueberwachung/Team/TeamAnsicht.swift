@@ -52,6 +52,8 @@ final class TeamAnsicht: ObservableObject {
 
     /// Lokale Mitteilungen bei Änderungen der Lage (Suche, Gebiet, Halsband, Mitteilungen der EL).
     var beiMeldungen: (([LageMeldung]) -> Void)?
+    /// Jede neue Lage (z. B. neue Version der Datenschutzerklärung, #148)
+    var beiLage: ((TeamLage) -> Void)?
     /// Wartezeit vor dem nächsten Verbindungsversuch nach einer Verdrängung (sonst `nil`).
     private var verdraengtWarten: Duration?
 
@@ -220,6 +222,7 @@ final class TeamAnsicht: ObservableObject {
         let alt = lage
         lage = neu
         lageAbgerufen = jetzt()
+        beiLage?(neu)
         guard let alt else { return }
         let meldungen = LageMeldung.vergleichen(alt: alt, neu: neu)
         if !meldungen.isEmpty { beiMeldungen?(meldungen) }

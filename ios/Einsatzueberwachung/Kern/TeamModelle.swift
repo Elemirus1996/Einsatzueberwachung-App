@@ -32,6 +32,8 @@ struct TeamConfig: Decodable, Equatable, Sendable {
     var uploadEverySec: Int
     var pauseCheckSec: Int
     var server: ServerInfo?
+    /// Nur `version` (#148)
+    var datenschutz: Datenschutz?
 
     var steuerung: SteuerAntwort {
         SteuerAntwort(mode: mode, intervalSec: intervalSec, uploadEverySec: uploadEverySec,

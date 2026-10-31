@@ -29,6 +29,10 @@ struct StartView: View {
         }
         // Nach An- oder Abmeldung neu aufbauen, damit keine Anmeldeseite auf dem Stapel liegen bleibt
         .id("\(modell.team == nil)-\(modell.teamWahl == nil)-\(modell.elSitzung == nil)")
+        // #148: zuerst Datenschutz, dann Heimatstaffel
+        .sheet(item: Binding(get: { modell.datenschutzFrage }, set: { _ in })) { frage in
+            DatenschutzAbfrageView(frage: frage)
+        }
         .alert("Ist „\(modell.heimatFrage?.name ?? "")“ deine eigene Staffel?",
                isPresented: Binding(get: { modell.heimatFrage != nil }, set: { _ in })) {
             Button("Ja, meine Staffel") { modell.heimatBeantworten(true) }

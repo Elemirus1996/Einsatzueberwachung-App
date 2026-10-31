@@ -17,8 +17,10 @@ struct TeamAnmeldungView: View {
 
     var body: some View {
         Form {
-            if let auswahl {
+            if let auswahl, modell.datenschutzFrage == nil {
                 teamListe(auswahl.qr, auswahl.teams)
+            } else if auswahl != nil {
+                Section { Text("Bitte zuerst die Datenschutzerklärung der Staffel lesen.").foregroundStyle(.secondary) }
             } else {
                 scanBereich
                 eingabeBereich
@@ -169,7 +171,12 @@ struct TeamAnmeldungView: View {
         laedt = true
         defer { laedt = false }
         do {
-            auswahl = (qr, try await TeamAnmeldung(qr: qr).teams())
+            let teams = try await TeamAnmeldung(qr: qr).teams()
+            auswahl = (qr, teams)
+            // #148: vor dem Token die Erklärung der Staffel; „Nicht anmelden“ führt zurück
+            modell.datenschutzFragen(kennung: teams.server?.kennung ?? qr.server.name, angabe: teams.datenschutz) {
+                auswahl = nil
+            }
         } catch AnmeldeFehler.codeUngueltig where qr == vorgabe {
             // Gespeicherter Code gilt nicht mehr: neu scannen
             modell.zugangUngueltig()

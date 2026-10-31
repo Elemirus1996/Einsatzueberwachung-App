@@ -37,7 +37,7 @@ struct ELAnmeldungTests {
     func anmelden(_ status: Int, _ text: String = "{}", fehler: URLError? = nil) async throws -> ELSitzung {
         StubProtokoll.antwort = (status, text)
         StubProtokoll.fehler = fehler
-        return try await ELAnmeldung(server: server, session: StubProtokoll.session).anmelden(passwort: "geheim", geraet: "iPad ELW").0
+        return try await ELAnmeldung(server: server, session: StubProtokoll.session).anmelden(passwort: "geheim", geraet: "iPad ELW").sitzung
     }
 
     @Test func erfolgreich() async throws {
