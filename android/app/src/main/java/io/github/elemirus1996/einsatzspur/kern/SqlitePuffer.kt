@@ -6,8 +6,8 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 
 /** Funkloch-Puffer in SQLite (App-eigener Speicher, nicht gesichert). */
-class SqlitePuffer(context: Context) :
-    SQLiteOpenHelper(context, "positionen.db", null, 1), PositionsSpeicher {
+class SqlitePuffer(context: Context, datei: String = "positionen.db") :
+    SQLiteOpenHelper(context, datei, null, 1), PositionsSpeicher {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(

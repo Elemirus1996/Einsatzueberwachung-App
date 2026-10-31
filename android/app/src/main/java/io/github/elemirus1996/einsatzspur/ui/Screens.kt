@@ -64,7 +64,12 @@ import java.util.Date
  * Läuft der Einsatz noch (Code gespeichert), führt „Team“ direkt zur Teamauswahl.
  */
 @Composable
-fun StartScreen(einsatzZugang: TeamQRCode?, anmelden: (TeamSitzung, TeamQRCode) -> Unit, zugangUngueltig: () -> Unit) {
+fun StartScreen(
+    einsatzZugang: TeamQRCode?,
+    anmelden: (TeamSitzung, TeamQRCode) -> Unit,
+    zugangUngueltig: () -> Unit,
+    einsatzleitung: () -> Unit,
+) {
     var anmeldungOffen by remember { mutableStateOf(false) }
     Surface(Modifier.fillMaxSize()) {
         if (anmeldungOffen) {
@@ -85,7 +90,7 @@ fun StartScreen(einsatzZugang: TeamQRCode?, anmelden: (TeamSitzung, TeamQRCode) 
             Text("EinsatzSpur", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(32.dp))
             Rollenknopf("Team", "QR-Code aus dem Einsatz scannen", aktiv = true) { anmeldungOffen = true }
-            Rollenknopf("Einsatzleitung", "Kommt in einer späteren Version", aktiv = false) {}
+            Rollenknopf("Einsatzleitung", "Nur im VPN der Staffel, mit Staffel-Passwort", aktiv = true, aktion = einsatzleitung)
             val context = androidx.compose.ui.platform.LocalContext.current
             var lizenzen by remember { mutableStateOf<String?>(null) }
             TextButton(onClick = { lizenzen = context.assets.open("lizenzen.txt").bufferedReader().use { it.readText() } }) {

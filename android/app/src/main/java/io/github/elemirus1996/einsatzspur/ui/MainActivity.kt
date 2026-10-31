@@ -14,6 +14,8 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import io.github.elemirus1996.einsatzspur.kern.GeraeteHinweis
 import io.github.elemirus1996.einsatzspur.kern.GeraeteHinweise
 import io.github.elemirus1996.einsatzspur.kern.TeamQRCode
@@ -48,10 +50,34 @@ class MainActivity : ComponentActivity() {
                 val ansicht by modell.ansicht.collectAsState()
                 val einsatzZugang by modell.einsatzZugang.collectAsState()
                 val teamWahl by modell.teamWahl.collectAsState()
+                val elOrtung by modell.elOrtung.collectAsState()
+                val elAnsicht by modell.elAnsicht.collectAsState()
+                val elVerlaengerung by modell.elVerlaengerung.collectAsState()
+                val elHinweis by modell.elHinweis.collectAsState()
+                var elAnmeldungOffen by remember { mutableStateOf(elHinweis != null) }
                 val ortung = team
                 val zugang = sitzung
                 val lage = ansicht
-                if (ortung != null && zugang != null && lage != null) {
+                val elO = elOrtung
+                val elA = elAnsicht
+                if (elO != null && elA != null) {
+                    ELUebersichtScreen(elA, elO, elVerlaengerung, abmelden = {
+                        modell.elAbmelden()
+                        elAnmeldungOffen = false
+                    })
+                } else if (elAnmeldungOffen || elHinweis != null) {
+                    ELAnmeldungScreen(
+                        modell.elServerAdresse, elHinweis,
+                        anmelden = { server, passwort, geraet ->
+                            berechtigungenAnfragen()
+                            modell.elAnmelden(server, passwort, geraet)
+                        },
+                        zurueck = {
+                            elAnmeldungOffen = false
+                            modell.elHinweisGelesen()
+                        },
+                    )
+                } else if (ortung != null && zugang != null && lage != null) {
                     TeamAnsichtScreen(
                         ortung, lage, zugang, hinweise.value,
                         einstellungOeffnen = { runCatching { startActivity(it) } },
@@ -71,7 +97,7 @@ class MainActivity : ComponentActivity() {
                             AnmeldungScreen(wahl, anmelden, zurueck = modell::teamWahlAbbrechen, zugangUngueltig = modell::zugangUngueltig)
                         }
                     } else {
-                        StartScreen(einsatzZugang, anmelden, zugangUngueltig = modell::zugangUngueltig)
+                        StartScreen(einsatzZugang, anmelden, zugangUngueltig = modell::zugangUngueltig, einsatzleitung = { elAnmeldungOffen = true })
                     }
                 }
             }
