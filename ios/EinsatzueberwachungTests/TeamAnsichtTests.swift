@@ -479,3 +479,13 @@ struct TeamsteuerungTests {
         #expect(ohne.darfSteuern == nil, "Älterer Server: keine Steuerung")
     }
 }
+
+@MainActor
+struct GenauigkeitTests {
+    @Test func gpsWlanUndUnbekannt() {
+        #expect(TeamAnsichtView.genauigkeit(8.4) == "± 8 m")
+        #expect(TeamAnsichtView.genauigkeit(150) == "± 150 m (ohne GPS)")
+        #expect(TeamAnsichtView.genauigkeit(1240) == "± 1,2 km (ohne GPS)")
+        #expect(TeamAnsichtView.genauigkeit(nil) == "(Genauigkeit unbekannt)")
+    }
+}

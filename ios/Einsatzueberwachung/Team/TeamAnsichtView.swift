@@ -302,7 +302,9 @@ struct TeamAnsichtView: View {
 
     private var ortungText: String {
         switch ortung.zustand {
-        case .ortet: "Handy ortet"
+        case .ortet:
+            // Ohne GPS (iPad nur mit WLAN) kommt eine ungenaue oder gar keine Position, die Anzeige sagt das
+            if let p = ortung.letztePosition { "Handy ortet \(Self.genauigkeit(p.accuracy))" } else { "Handy ortet, noch kein Standort" }
         case .pausiert: "wartet auf neue Suche"
         case .wartet: "verbinde …"
         case .beendet: "beendet"
@@ -329,6 +331,14 @@ struct TeamAnsichtView: View {
             Button("Zurück zum Start") { modell.teamSchliessen() }
                 .buttonStyle(.borderedProminent)
         }
+    }
+
+    /// „± 8 m“, „± 1,2 km (ohne GPS)“: Ab 100 m stammt die Position aus WLAN oder Funkzellen.
+    static func genauigkeit(_ meter: Double?) -> String {
+        guard let meter, meter >= 0 else { return "(Genauigkeit unbekannt)" }
+        let wert = meter < 1000 ? "± \(Int(meter.rounded())) m"
+                                : "± " + (meter / 1000).formatted(.number.precision(.fractionLength(1)).locale(Locale(identifier: "de_DE"))) + " km"
+        return meter >= 100 ? wert + " (ohne GPS)" : wert
     }
 
     static func dauer(_ sekunden: TimeInterval) -> String {
