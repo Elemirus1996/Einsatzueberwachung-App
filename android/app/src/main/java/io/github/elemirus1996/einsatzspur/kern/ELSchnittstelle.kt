@@ -286,7 +286,7 @@ class ELClient(
     val zugang: ELZugang,
     private val transport: Transport = ::http,
     private val sse: SseTransport = ::sseOeffnen,
-) : TeamSchnittstelle, ELLageSchnittstelle, ELVerlaengerSchnittstelle {
+) : TeamSchnittstelle, ELLageSchnittstelle, ELVerlaengerSchnittstelle, ELAktionsSchnittstelle {
 
     val sitzung: ELSitzung get() = zugang.sitzung
 
@@ -333,6 +333,24 @@ class ELClient(
             else -> throw SchnittstellenFehler.Server(status)
         }
     }
+
+    override suspend fun ausfuehren(aktion: ELAktion): String {
+        val (status, text) = roh(aktion.pfad, "POST", aktion.koerper())
+        return when (status) {
+            in 200..299 -> text
+            410 -> throw SchnittstellenFehler.Beendet
+            // 400 falsche Eingabe, 404 unbekanntes Team bzw. Notiz, 409 nicht erlaubt (auch: kein Einsatz läuft)
+            400, 404, 409 -> throw ELAktionAbgelehnt(
+                runCatching { JSONObject(text).textOderNull("error") }.getOrNull() ?: if (status == 404) "Nicht gefunden." else "Nicht möglich.",
+            )
+            else -> throw SchnittstellenFehler.Server(status)
+        }
+    }
+
+    override suspend fun notizen(vor: String?): ELNotizSeite =
+        ELNotizSeite.aus(anfrage(if (vor != null) "notizen?vor=${java.net.URLEncoder.encode(vor, "UTF-8")}&anzahl=50" else "notizen?anzahl=50", "GET", null))
+
+    override suspend fun halsbaender(): ELHalsbaender = ELHalsbaender.aus(anfrage("halsbaender", "GET", null))
 
     /** Token auf dem Server ungültig machen (best effort). */
     suspend fun abmelden() {

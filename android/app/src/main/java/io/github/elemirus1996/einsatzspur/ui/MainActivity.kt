@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity() {
                 val elOrtung by modell.elOrtung.collectAsState()
                 val elAnsicht by modell.elAnsicht.collectAsState()
                 val elVerlaengerung by modell.elVerlaengerung.collectAsState()
+                val elBetrieb by modell.elBetrieb.collectAsState()
                 val elHinweis by modell.elHinweis.collectAsState()
                 var elAnmeldungOffen by remember { mutableStateOf(elHinweis != null) }
                 var einstellungenOffen by remember { mutableStateOf(false) }
@@ -64,10 +65,11 @@ class MainActivity : ComponentActivity() {
                 val lage = ansicht
                 val elO = elOrtung
                 val elA = elAnsicht
+                val elB = elBetrieb
                 if (einstellungenOffen) {
                     EinstellungenScreen(modell.heimat, modell.datenschutz.alle(), version(), zurueck = { einstellungenOffen = false })
-                } else if (elO != null && elA != null) {
-                    ELUebersichtScreen(elA, elO, elVerlaengerung, abmelden = {
+                } else if (elO != null && elA != null && elB != null) {
+                    ELUebersichtScreen(elA, elO, elB, elVerlaengerung, abmelden = {
                         modell.elAbmelden()
                         elAnmeldungOffen = false
                     })

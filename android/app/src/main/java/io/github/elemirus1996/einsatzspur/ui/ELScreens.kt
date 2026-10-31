@@ -7,6 +7,7 @@ import android.os.VibrationEffect
 import android.os.Vibrator
 import android.provider.Settings
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -53,6 +54,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import io.github.elemirus1996.einsatzspur.kern.ELAnmeldeFehler
 import io.github.elemirus1996.einsatzspur.kern.ELAnsicht
+import io.github.elemirus1996.einsatzspur.kern.ELBetrieb
 import io.github.elemirus1996.einsatzspur.kern.ELLage
 import io.github.elemirus1996.einsatzspur.kern.ELVerlaengerung
 import io.github.elemirus1996.einsatzspur.kern.ServerAdresse
@@ -168,9 +170,18 @@ private fun elFehlerText(e: Exception): String = when (e) {
 fun ELUebersichtScreen(
     ansicht: ELAnsicht,
     ortung: TeamOrtung,
+    betrieb: ELBetrieb,
     verlaengerung: ELVerlaengerung?,
     abmelden: suspend () -> Unit,
 ) {
+    var funkOffen by remember { mutableStateOf(false) }
+    var gewaehltesTeam by remember { mutableStateOf<ELLage.Team?>(null) }
+    val offen by betrieb.offen.collectAsState()
+    val betriebHinweis by betrieb.hinweis.collectAsState()
+    if (funkOffen) {
+        ELFunkScreen(betrieb, ansicht.lage.collectAsState().value?.teams ?: emptyList(), zurueck = { funkOffen = false })
+        return
+    }
     val context = LocalContext.current
     val bereich = rememberCoroutineScope()
     val lage by ansicht.lage.collectAsState()
@@ -214,7 +225,17 @@ fun ELUebersichtScreen(
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Einsatzleitung", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { funkOffen = true }) { Text("Funk & Notizen") }
                     TextButton(onClick = { abmeldenFragen = true }) { Text("Abmelden") }
+                }
+            }
+            val wartet = offen.firstOrNull()
+            val h = betriebHinweis
+            if (wartet != null) {
+                item(span = { GridItemSpan(maxLineSpan) }) { Text("„${wartet.beschreibung}“ wartet auf Netz", color = ORANGE) }
+            } else if (h != null && jetzt - h.zeitMs < 6_000) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Text(h.text, color = if (h.fehler) Color.Red else Color(0xFF2E9D4F))
                 }
             }
             ablaufHinweis?.let { text -> item(span = { GridItemSpan(maxLineSpan) }) { Text(text, color = ORANGE) } }
@@ -236,7 +257,9 @@ fun ELUebersichtScreen(
                         Text("Noch keine Teams im Einsatz.", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
-                items(aktiv.teams, key = { it.teamId }) { team -> TeamKarte(team, ansicht, jetzt) }
+                items(aktiv.teams, key = { it.teamId }) { team ->
+                    Box(Modifier.clickable { gewaehltesTeam = team }) { TeamKarte(team, ansicht, jetzt) }
+                }
             }
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -254,6 +277,7 @@ fun ELUebersichtScreen(
             }
         }
     }
+    gewaehltesTeam?.let { team -> ELTeamAktionenDialog(team, betrieb, schliessen = { gewaehltesTeam = null }) }
     if (abmeldenFragen) {
         AlertDialog(
             onDismissRequest = { abmeldenFragen = false },
