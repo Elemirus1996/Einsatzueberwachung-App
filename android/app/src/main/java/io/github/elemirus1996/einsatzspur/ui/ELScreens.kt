@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import io.github.elemirus1996.einsatzspur.kern.ELAnmeldeFehler
 import io.github.elemirus1996.einsatzspur.kern.ELAnsicht
 import io.github.elemirus1996.einsatzspur.kern.ELBetrieb
+import io.github.elemirus1996.einsatzspur.kern.ELKartenAnsicht
 import io.github.elemirus1996.einsatzspur.kern.ELLage
 import io.github.elemirus1996.einsatzspur.kern.ELVerlaengerung
 import io.github.elemirus1996.einsatzspur.kern.ServerAdresse
@@ -171,15 +172,21 @@ fun ELUebersichtScreen(
     ansicht: ELAnsicht,
     ortung: TeamOrtung,
     betrieb: ELBetrieb,
+    karte: ELKartenAnsicht?,
     verlaengerung: ELVerlaengerung?,
     abmelden: suspend () -> Unit,
 ) {
     var funkOffen by remember { mutableStateOf(false) }
+    var karteOffen by remember { mutableStateOf(false) }
     var gewaehltesTeam by remember { mutableStateOf<ELLage.Team?>(null) }
     val offen by betrieb.offen.collectAsState()
     val betriebHinweis by betrieb.hinweis.collectAsState()
     if (funkOffen) {
         ELFunkScreen(betrieb, ansicht.lage.collectAsState().value?.teams ?: emptyList(), zurueck = { funkOffen = false })
+        return
+    }
+    if (karteOffen && karte != null) {
+        ELLagekarteScreen(karte, ansicht.lage.collectAsState().value?.teams ?: emptyList(), zurueck = { karteOffen = false })
         return
     }
     val context = LocalContext.current
@@ -225,6 +232,7 @@ fun ELUebersichtScreen(
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Einsatzleitung", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    if (karte != null) TextButton(onClick = { karteOffen = true }) { Text("Karte") }
                     TextButton(onClick = { funkOffen = true }) { Text("Funk & Notizen") }
                     TextButton(onClick = { abmeldenFragen = true }) { Text("Abmelden") }
                 }

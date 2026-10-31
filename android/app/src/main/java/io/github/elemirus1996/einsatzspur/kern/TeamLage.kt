@@ -119,22 +119,21 @@ data class TeamTracks(val hund: List<Punkt>, val mensch: List<Punkt>, val abgesc
                 hund = punkte(laufend.getJSONArray("hund")),
                 mensch = punkte(laufend.getJSONArray("mensch")),
                 abgeschlossen = json.optJSONArray("abgeschlossen")?.let { a ->
-                    (0 until a.length()).flatMap { i ->
-                        val tracks = a.getJSONObject(i).getJSONArray("tracks")
-                        (0 until tracks.length()).map { j ->
-                            val t = tracks.getJSONObject(j)
-                            Track(t.getString("art"), t.textOderNull("farbe"), punkte(t.getJSONArray("punkte")))
-                        }
-                    }
+                    (0 until a.length()).flatMap { i -> tracks(a.getJSONObject(i).getJSONArray("tracks")) }
                 } ?: emptyList(),
             )
         } catch (e: JSONException) {
             throw SchnittstellenFehler.AntwortUngueltig
         }
 
-        private fun punkte(a: JSONArray) = (0 until a.length()).map {
+        internal fun punkte(a: JSONArray) = (0 until a.length()).map {
             val p = a.getJSONObject(it)
             Punkt(p.getDouble("lat"), p.getDouble("lng"), if (p.has("t")) p.getLong("t") else null)
+        }
+
+        internal fun tracks(a: JSONArray) = (0 until a.length()).map {
+            val t = a.getJSONObject(it)
+            Track(t.getString("art"), t.textOderNull("farbe"), punkte(t.getJSONArray("punkte")))
         }
     }
 }

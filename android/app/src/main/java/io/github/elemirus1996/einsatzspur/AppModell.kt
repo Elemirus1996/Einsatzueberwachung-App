@@ -19,6 +19,7 @@ import io.github.elemirus1996.einsatzspur.kern.ELAnmeldung
 import io.github.elemirus1996.einsatzspur.kern.ELAnsicht
 import io.github.elemirus1996.einsatzspur.kern.ELBetrieb
 import io.github.elemirus1996.einsatzspur.kern.ELClient
+import io.github.elemirus1996.einsatzspur.kern.ELKartenAnsicht
 import io.github.elemirus1996.einsatzspur.kern.ELSitzung
 import io.github.elemirus1996.einsatzspur.kern.ELVerlaengerung
 import io.github.elemirus1996.einsatzspur.kern.ELZugang
@@ -96,6 +97,8 @@ class AppModell(private val context: Context) {
     val elAnsicht: StateFlow<ELAnsicht?> = _elAnsicht
     private val _elBetrieb = MutableStateFlow<ELBetrieb?>(null)
     val elBetrieb: StateFlow<ELBetrieb?> = _elBetrieb
+    private val _elKarte = MutableStateFlow<ELKartenAnsicht?>(null)
+    val elKarte: StateFlow<ELKartenAnsicht?> = _elKarte
     private val _elVerlaengerung = MutableStateFlow<ELVerlaengerung?>(null)
     val elVerlaengerung: StateFlow<ELVerlaengerung?> = _elVerlaengerung
     /** Hinweis nach Ende der EL-Sitzung durch den Server (Token abgelaufen, Passwort geändert). */
@@ -324,9 +327,13 @@ class AppModell(private val context: Context) {
         val betrieb = ELBetrieb(client, ablage) { _elOrtung.value?.anwenden(SteuerAntwort.STOP) }
         betrieb.nachAktion = { ansicht.neuLaden() }
         ansicht.beiNotiz = { betrieb.notizenLaden() }
+        val karte = ELKartenAnsicht(client, bereich)
+        ansicht.beiPosition = karte::position
+        _elKarte.value = karte
         _elBetrieb.value = betrieb
         ansicht.nachLage = { lage ->
             betrieb.senden()
+            karte.lageGeaendert()
             verlaengerung.pruefen(lage.einsatz.aktiv)
             datenschutzVersionPruefen(lage.datenschutzVersion, zugang.sitzung.kennung) { client.datenschutz() }
         }
@@ -353,6 +360,8 @@ class AppModell(private val context: Context) {
 
     private fun elBeendet() {
         _elAnsicht.value?.anhalten()
+        _elKarte.value?.anhalten()
+        _elKarte.value = null
         _elBetrieb.value?.vergessen()
         _elBetrieb.value = null
         schluesselbund.elSitzungLoeschen()

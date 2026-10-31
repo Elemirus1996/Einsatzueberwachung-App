@@ -62,40 +62,10 @@ enum class Kartenart(val titel: String, val kacheln: List<String>, val quelle: S
 /** MapLibre-Karte mit Suchgebiet, Laufwegen, Hund und eigener Position. */
 @Composable
 fun Karte(lage: TeamLage?, tracks: TeamTracks?, ich: Koordinate?, modifier: Modifier) {
-    val context = LocalContext.current
-    val lebenszyklus = LocalLifecycleOwner.current
     var art by remember { mutableStateOf(Kartenart.TOPO) }
-    var karte by remember { mutableStateOf<MapLibreMap?>(null) }
     var stil by remember { mutableStateOf<Style?>(null) }
     var eingepasst by remember { mutableStateOf(false) }
-    val ansicht = remember {
-        MapView(context).apply {
-            onCreate(null)
-            getMapAsync { m ->
-                m.uiSettings.isAttributionEnabled = false   // eigene, immer sichtbare Quellenangabe
-                m.uiSettings.isLogoEnabled = false
-                m.uiSettings.isRotateGesturesEnabled = false
-                karte = m
-            }
-        }
-    }
-
-    DisposableEffect(lebenszyklus) {
-        val beobachter = LifecycleEventObserver { _, ereignis ->
-            when (ereignis) {
-                Lifecycle.Event.ON_START -> ansicht.onStart()
-                Lifecycle.Event.ON_RESUME -> ansicht.onResume()
-                Lifecycle.Event.ON_PAUSE -> ansicht.onPause()
-                Lifecycle.Event.ON_STOP -> ansicht.onStop()
-                else -> Unit
-            }
-        }
-        lebenszyklus.lifecycle.addObserver(beobachter)
-        onDispose {
-            lebenszyklus.lifecycle.removeObserver(beobachter)
-            ansicht.onDestroy()
-        }
-    }
+    val (ansicht, karte) = rememberMapView()
 
     // Stil bei Wechsel der Kartenart neu setzen; Ebenen für die Lage darüber
     LaunchedEffect(karte, art) {
@@ -168,7 +138,44 @@ fun Karte(lage: TeamLage?, tracks: TeamTracks?, ich: Koordinate?, modifier: Modi
     }
 }
 
-private fun stilJson(art: Kartenart): String = JSONObject()
+/** MapView mit Lebenszyklus der Activity; die Karte ist da, sobald MapLibre sie geladen hat. */
+@Composable
+internal fun rememberMapView(): Pair<MapView, MapLibreMap?> {
+    val context = LocalContext.current
+    val lebenszyklus = LocalLifecycleOwner.current
+    var karte by remember { mutableStateOf<MapLibreMap?>(null) }
+    val ansicht = remember {
+        MapView(context).apply {
+            onCreate(null)
+            getMapAsync { m ->
+                m.uiSettings.isAttributionEnabled = false   // eigene, immer sichtbare Quellenangabe
+                m.uiSettings.isLogoEnabled = false
+                m.uiSettings.isRotateGesturesEnabled = false
+                karte = m
+            }
+        }
+    }
+
+    DisposableEffect(lebenszyklus) {
+        val beobachter = LifecycleEventObserver { _, ereignis ->
+            when (ereignis) {
+                Lifecycle.Event.ON_START -> ansicht.onStart()
+                Lifecycle.Event.ON_RESUME -> ansicht.onResume()
+                Lifecycle.Event.ON_PAUSE -> ansicht.onPause()
+                Lifecycle.Event.ON_STOP -> ansicht.onStop()
+                else -> Unit
+            }
+        }
+        lebenszyklus.lifecycle.addObserver(beobachter)
+        onDispose {
+            lebenszyklus.lifecycle.removeObserver(beobachter)
+            ansicht.onDestroy()
+        }
+    }
+    return ansicht to karte
+}
+
+internal fun stilJson(art: Kartenart): String = JSONObject()
     .put("version", 8)
     .put("sources", JSONObject().put("hintergrund", JSONObject()
         .put("type", "raster")
@@ -179,17 +186,17 @@ private fun stilJson(art: Kartenart): String = JSONObject()
     .put("layers", JSONArray().put(JSONObject().put("id", "hintergrund").put("type", "raster").put("source", "hintergrund")))
     .toString()
 
-private fun quelle(stil: Style, id: String, merkmale: List<JSONObject>?) {
+internal fun quelle(stil: Style, id: String, merkmale: List<JSONObject>?) {
     val sammlung = JSONObject().put("type", "FeatureCollection").put("features", JSONArray(merkmale.orEmpty()))
     stil.getSourceAs<GeoJsonSource>(id)?.setGeoJson(sammlung.toString())
 }
 
-private fun merkmal(geometrie: JSONObject, farbe: String? = null) = JSONObject()
+internal fun merkmal(geometrie: JSONObject, farbe: String? = null) = JSONObject()
     .put("type", "Feature").put("geometry", geometrie)
     .put("properties", JSONObject().apply { farbe?.let { put("farbe", it) } })
 
-private fun koordinaten(punkte: List<Koordinate>) = JSONArray(punkte.map { JSONArray(listOf(it.lng, it.lat)) })
+internal fun koordinaten(punkte: List<Koordinate>) = JSONArray(punkte.map { JSONArray(listOf(it.lng, it.lat)) })
 
-private fun punkt(k: Koordinate) = JSONObject().put("type", "Point").put("coordinates", JSONArray(listOf(k.lng, k.lat)))
-private fun linie(p: List<Koordinate>) = JSONObject().put("type", "LineString").put("coordinates", koordinaten(p))
-private fun polygon(p: List<Koordinate>) = JSONObject().put("type", "Polygon").put("coordinates", JSONArray().put(koordinaten(p + p.first())))
+internal fun punkt(k: Koordinate) = JSONObject().put("type", "Point").put("coordinates", JSONArray(listOf(k.lng, k.lat)))
+internal fun linie(p: List<Koordinate>) = JSONObject().put("type", "LineString").put("coordinates", koordinaten(p))
+internal fun polygon(p: List<Koordinate>) = JSONObject().put("type", "Polygon").put("coordinates", JSONArray().put(koordinaten(p + p.first())))
