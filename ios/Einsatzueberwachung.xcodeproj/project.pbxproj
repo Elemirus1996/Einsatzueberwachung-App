@@ -31,6 +31,7 @@
 		803B4AE407AAFC1F22809B0B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 01EEA4C26487F0027FEABEF9 /* Assets.xcassets */; };
 		80FFF55887CED67964C53D62 /* ELAktionen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C14AEB1CFCD5BFB520E66C48 /* ELAktionen.swift */; };
 		8D7BC3821334E2D60C7A796D /* Schluesselbund.swift in Sources */ = {isa = PBXBuildFile; fileRef = 179F8BB87D6F40D69F2E2A8D /* Schluesselbund.swift */; };
+		8E2266F5BED14D0B86E1087C /* ELVerlaengerungTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2AC73FC5048EC687F22B01D /* ELVerlaengerungTests.swift */; };
 		9624F08F2E148F47A2EE4D15 /* ELSchnittstelle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 119EF115046BB0FA7AF52B80 /* ELSchnittstelle.swift */; };
 		9C16D7091D48A562D60679C2 /* TeamAnsicht.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42542B191DD57AAC94CE0EC0 /* TeamAnsicht.swift */; };
 		A0AF23349A115130EE14C9AD /* StartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 133295A3FD86DD2CC9E0275C /* StartView.swift */; };
@@ -44,6 +45,7 @@
 		D71352AEE8F6BE7307B7CB12 /* ELBetrieb.swift in Sources */ = {isa = PBXBuildFile; fileRef = BEB08B86E4BDD277798024C9 /* ELBetrieb.swift */; };
 		D9316212B2329978232AA34B /* TeamOrtung.swift in Sources */ = {isa = PBXBuildFile; fileRef = F92EA3A1472DD75C912F9D1D /* TeamOrtung.swift */; };
 		DEA130868989542425090850 /* KernTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90922EA3579F26D42494A74A /* KernTests.swift */; };
+		F050670B2BC1CA2A79C712F1 /* ELVerlaengerung.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1AF389F95017BA7F54F2DDF /* ELVerlaengerung.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -87,10 +89,12 @@
 		BFBE4E8B3659C84DE022CA21 /* TeamAnsichtView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamAnsichtView.swift; sourceTree = "<group>"; };
 		C127025FCE3C8F3145640AA1 /* Signierung.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signierung.xcconfig; sourceTree = "<group>"; };
 		C14AEB1CFCD5BFB520E66C48 /* ELAktionen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELAktionen.swift; sourceTree = "<group>"; };
+		C1AF389F95017BA7F54F2DDF /* ELVerlaengerung.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELVerlaengerung.swift; sourceTree = "<group>"; };
 		C59E8CF5D165989F439B72BD /* TeamAnmeldungView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamAnmeldungView.swift; sourceTree = "<group>"; };
 		C5AB257A4D6CC10859BDCE63 /* PositionsPuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionsPuffer.swift; sourceTree = "<group>"; };
 		C68F35498C530D450622E54F /* ELEinsatzView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELEinsatzView.swift; sourceTree = "<group>"; };
 		D0A1C0F7850179783614D223 /* AppModell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModell.swift; sourceTree = "<group>"; };
+		D2AC73FC5048EC687F22B01D /* ELVerlaengerungTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELVerlaengerungTests.swift; sourceTree = "<group>"; };
 		DC1B71859AD992E6E951AFDE /* ELUebersichtView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELUebersichtView.swift; sourceTree = "<group>"; };
 		EBA23EF762B87148EB23B089 /* EinsatzueberwachungTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = EinsatzueberwachungTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F0208DBE8A1D6C6A176561A4 /* ELKarte.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELKarte.swift; sourceTree = "<group>"; };
@@ -143,6 +147,7 @@
 			isa = PBXGroup;
 			children = (
 				1B59E2709C134ABFF739D386 /* ELTests.swift */,
+				D2AC73FC5048EC687F22B01D /* ELVerlaengerungTests.swift */,
 				4C49A3C66952DBE5E6E35822 /* HeimatStaffelTests.swift */,
 				90922EA3579F26D42494A74A /* KernTests.swift */,
 				7A917F3FBFB4256F935A563E /* TeamAnsichtTests.swift */,
@@ -179,6 +184,7 @@
 				C14AEB1CFCD5BFB520E66C48 /* ELAktionen.swift */,
 				F0208DBE8A1D6C6A176561A4 /* ELKarte.swift */,
 				119EF115046BB0FA7AF52B80 /* ELSchnittstelle.swift */,
+				C1AF389F95017BA7F54F2DDF /* ELVerlaengerung.swift */,
 				4001B68B182590449211F7D6 /* ELVermisste.swift */,
 				40C766A51FD148218A0B29EE /* HeimatStaffel.swift */,
 				F8C0A9707EAB2B06820D5174 /* LageMeldungen.swift */,
@@ -317,6 +323,7 @@
 				9624F08F2E148F47A2EE4D15 /* ELSchnittstelle.swift in Sources */,
 				0195198E4DE054DEE6B9DE77 /* ELTeamAktionenView.swift in Sources */,
 				64BCD752C2E9C4B01BE8C481 /* ELUebersichtView.swift in Sources */,
+				F050670B2BC1CA2A79C712F1 /* ELVerlaengerung.swift in Sources */,
 				7BA6D9BA34CD555221A6CE44 /* ELVermisste.swift in Sources */,
 				C89B47CBDA4CCCA923E56062 /* ELVermissteView.swift in Sources */,
 				5A6F46FC11967E1EDF36B4A3 /* EinsatzApp.swift in Sources */,
@@ -344,6 +351,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				5C4AFAE82FC962ADD873325B /* ELTests.swift in Sources */,
+				8E2266F5BED14D0B86E1087C /* ELVerlaengerungTests.swift in Sources */,
 				AC8F19C87FD06F962F9B94B2 /* HeimatStaffelTests.swift in Sources */,
 				DEA130868989542425090850 /* KernTests.swift in Sources */,
 				6C7B4127674E4722256EA536 /* TeamAnsichtTests.swift in Sources */,

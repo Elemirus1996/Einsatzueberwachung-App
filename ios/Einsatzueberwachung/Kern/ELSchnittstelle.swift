@@ -5,6 +5,49 @@ struct ELSitzung: Codable, Equatable, Sendable {
     var server: ServerAdresse
     var token: String
     var expiresAt: Date
+    /// Gerätename aus der Anmeldung, geht beim Verlängern wieder mit (nur Anzeige im Audit-Log)
+    var geraet: String?
+    /// Bis wann `/verlaengern` höchstens geht (72 h ab Anmeldung mit Passwort), sobald bekannt
+    var verlaengerbarBis: Date?
+}
+
+/// Hält das aktuelle Token der Einsatzleitung für alle Teile (Lage, Live, Aktionen, Ortung).
+/// Nach `/verlaengern` (#141) gilt nur noch das neue Token; Anfragen mit dem alten bekommen 410 bzw. `stop`.
+/// Das ist dann keine Abmeldung: Der Client wiederholt mit dem neuen Token.
+final class ELZugang: @unchecked Sendable {
+    private let sperre = NSLock()
+    private var _sitzung: ELSitzung
+    private var _verlaengerungLaeuft = false
+
+    init(_ sitzung: ELSitzung) { _sitzung = sitzung }
+
+    var sitzung: ELSitzung { sperre.withLock { _sitzung } }
+    var verlaengerungLaeuft: Bool { sperre.withLock { _verlaengerungLaeuft } }
+
+    func ersetzen(_ neu: ELSitzung) { sperre.withLock { _sitzung = neu } }
+    func verlaengerungBeginnt() { sperre.withLock { _verlaengerungLaeuft = true } }
+    func verlaengerungEndet() { sperre.withLock { _verlaengerungLaeuft = false } }
+
+    /// Gibt es schon ein anderes Token als `token`? Läuft gerade eine Verlängerung, wird kurz auf ihr Ende gewartet,
+    /// weil der Server das alte Token sperrt, bevor die Antwort mit dem neuen ankommt.
+    func neueresToken(als token: String, warten: Duration = .seconds(20)) async -> Bool {
+        var rest = warten
+        while verlaengerungLaeuft && rest > .zero {
+            try? await Task.sleep(for: .milliseconds(100))
+            rest -= .milliseconds(100)
+        }
+        return sitzung.token != token
+    }
+}
+
+enum ELVerlaengerFehler: Error, Equatable {
+    /// 409: kein Einsatz läuft oder 72 h erreicht – nicht wiederholen, nach Ablauf neu anmelden
+    case nichtMoeglich(String)
+}
+
+/// Was die Verlängerung braucht (testbar ohne Netz).
+protocol ELVerlaengerSchnittstelle: Sendable {
+    func verlaengern(geraet: String?) async throws -> ELSitzung
 }
 
 /// Antwort von `GET /lage` der Einsatzleitung (APP_API.md „Rolle Einsatzleitung – native App“, Abschnitt 5).
@@ -142,7 +185,8 @@ struct ELAnmeldung: Sendable {
         switch http.statusCode {
         case 200..<300:
             guard let ergebnis = try? JSONDecoder.server.decode(Ergebnis.self, from: daten) else { throw ELAnmeldeFehler.antwortUngueltig }
-            return (ELSitzung(server: server, token: ergebnis.token, expiresAt: ergebnis.expiresAt), ergebnis.server)
+            let name = geraet.flatMap { $0.isEmpty ? nil : String($0.prefix(40)) }
+            return (ELSitzung(server: server, token: ergebnis.token, expiresAt: ergebnis.expiresAt, geraet: name), ergebnis.server)
         case 401: throw ELAnmeldeFehler.passwortFalsch
         case 429:
             let sekunden = ((try? JSONSerialization.jsonObject(with: daten)) as? [String: Any])?["wiederholenNachSec"] as? Int
@@ -167,9 +211,23 @@ protocol ELLageSchnittstelle: Sendable {
     func ereignisse() async throws -> AsyncThrowingStream<ELEreignis, Error>
 }
 
-struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle, ELKartenSchnittstelle, ELVermissteSchnittstelle {
-    let sitzung: ELSitzung
+struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle, ELKartenSchnittstelle, ELVermissteSchnittstelle,
+                ELVerlaengerSchnittstelle {
+    let zugang: ELZugang
     var session: URLSession = .einsatz
+    var ereignisSession: URLSession = .ereignisse
+
+    init(zugang: ELZugang, session: URLSession = .einsatz, ereignisSession: URLSession = .ereignisse) {
+        self.zugang = zugang
+        self.session = session
+        self.ereignisSession = ereignisSession
+    }
+
+    init(sitzung: ELSitzung, session: URLSession = .einsatz) {
+        self.init(zugang: ELZugang(sitzung), session: session)
+    }
+
+    var sitzung: ELSitzung { zugang.sitzung }
 
     func config() async throws -> TeamConfig { throw SchnittstellenFehler.server(status: 404) }
 
@@ -246,19 +304,42 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle,
 
     func halsbaender() async throws -> ELHalsbaender { try await anfrage("halsbaender", methode: "GET", inhalt: nil) }
 
+    /// Neues Token ohne Passwort (#141). Das alte ist danach gesperrt; die Antwort ersetzt die Sitzung nicht selbst.
+    func verlaengern(geraet: String?) async throws -> ELSitzung {
+        struct Antwort: Decodable { var token: String; var expiresAt: Date; var verlaengerbarBis: Date? }
+        let alt = sitzung
+        let inhalt = try JSONEncoder().encode(geraet.map { ["geraet": String($0.prefix(40))] } ?? [:])
+        let (daten, http) = try await rohEinmal("verlaengern", methode: "POST", inhalt: inhalt, token: alt.token)
+        switch http.statusCode {
+        case 200..<300:
+            guard let a = try? JSONDecoder.server.decode(Antwort.self, from: daten) else { throw SchnittstellenFehler.antwortUngueltig }
+            return ELSitzung(server: alt.server, token: a.token, expiresAt: a.expiresAt, geraet: alt.geraet,
+                             verlaengerbarBis: a.verlaengerbarBis)
+        case 409:
+            let text = ((try? JSONSerialization.jsonObject(with: daten)) as? [String: Any])?["error"] as? String
+            throw ELVerlaengerFehler.nichtMoeglich(text ?? "Verlängern nicht möglich.")
+        case 410: throw SchnittstellenFehler.beendet
+        default: throw SchnittstellenFehler.server(status: http.statusCode)
+        }
+    }
+
     /// Token auf dem Server ungültig machen (best effort).
     func abmelden() async {
         _ = try? await roh("logout", methode: "POST", inhalt: nil)
     }
 
     /// Server-Sent Events wie in der Team-Rolle; 410 beim Verbinden → `beendet`.
+    /// Gibt es inzwischen ein neueres Token (#141), ist 410 bzw. `stop` keine Abmeldung: Neu verbinden mit dem neuen Token.
     func ereignisse() async throws -> AsyncThrowingStream<ELEreignis, Error> {
-        var request = request("ereignisse", methode: "GET")
-        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-        let (bytes, antwort) = try await URLSession.ereignisse.bytes(for: request)
-        guard let http = antwort as? HTTPURLResponse else { throw SchnittstellenFehler.antwortUngueltig }
+        let erstesToken = sitzung.token
+        let erster = try await verbinden(erstesToken)
+        let neuVerbinden = erster.1.statusCode == 410 ? await zugang.neueresToken(als: erstesToken) : false
+        let token = neuVerbinden ? sitzung.token : erstesToken
+        let (bytes, http) = neuVerbinden ? try await verbinden(token) : erster
         if http.statusCode == 410 { throw SchnittstellenFehler.beendet }
         guard http.statusCode == 200 else { throw SchnittstellenFehler.server(status: http.statusCode) }
+        let zugang = self.zugang
+        let verbindungsToken = token
         return AsyncThrowingStream { fortsetzung in
             let aufgabe = Task {
                 var leser = SSELeser()
@@ -271,6 +352,10 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle,
                         }
                         if zeile.last == UInt8(ascii: "\r") { zeile.removeLast() }
                         if let ereignis = leser.zeile(String(decoding: zeile, as: UTF8.self)).flatMap(ELEreignis.init) {
+                            if ereignis == .stop, await zugang.neueresToken(als: verbindungsToken) {
+                                // Altes Token nach /verlaengern: Verbindung endet, die Ansicht verbindet sich neu
+                                break
+                            }
                             fortsetzung.yield(ereignis)
                         }
                         zeile.removeAll(keepingCapacity: true)
@@ -284,7 +369,15 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle,
         }
     }
 
-    private func request(_ endpunkt: String, methode: String) -> URLRequest {
+    private func verbinden(_ token: String) async throws -> (URLSession.AsyncBytes, HTTPURLResponse) {
+        var request = request("ereignisse", methode: "GET", token: token)
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        let (bytes, antwort) = try await ereignisSession.bytes(for: request)
+        guard let http = antwort as? HTTPURLResponse else { throw SchnittstellenFehler.antwortUngueltig }
+        return (bytes, http)
+    }
+
+    private func request(_ endpunkt: String, methode: String, token: String) -> URLRequest {
         // Abfrageteil getrennt anhängen, sonst kodiert appending(path:) das „?“ mit
         let teile = endpunkt.split(separator: "?", maxSplits: 1).map(String.init)
         var url = sitzung.server.pfad("api/el/app/v1/\(teile[0])")
@@ -296,13 +389,21 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle,
         }
         var request = URLRequest(url: url)
         request.httpMethod = methode
-        request.setValue("Bearer \(sitzung.token)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         return request
     }
 
+    /// Wie `rohEinmal`, aber 410 mit einem inzwischen ersetzten Token (#141) wird einmal mit dem neuen wiederholt.
     private func roh(_ endpunkt: String, methode: String, inhalt: Data?) async throws -> (Data, HTTPURLResponse) {
-        var request = request(endpunkt, methode: methode)
+        let token = sitzung.token
+        let ergebnis = try await rohEinmal(endpunkt, methode: methode, inhalt: inhalt, token: token)
+        guard ergebnis.1.statusCode == 410, await zugang.neueresToken(als: token) else { return ergebnis }
+        return try await rohEinmal(endpunkt, methode: methode, inhalt: inhalt, token: sitzung.token)
+    }
+
+    private func rohEinmal(_ endpunkt: String, methode: String, inhalt: Data?, token: String) async throws -> (Data, HTTPURLResponse) {
+        var request = request(endpunkt, methode: methode, token: token)
         if let inhalt {
             request.httpBody = inhalt
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
