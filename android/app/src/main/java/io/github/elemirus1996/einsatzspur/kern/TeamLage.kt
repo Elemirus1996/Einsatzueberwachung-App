@@ -250,8 +250,8 @@ data class LageMeldung(val titel: String, val text: String? = null) {
     }
 }
 
-private fun JSONObject.textOderNull(name: String): String? =
+internal fun JSONObject.textOderNull(name: String): String? =
     if (has(name) && !isNull(name)) optString(name).ifEmpty { null } else null
 
-private fun JSONObject.objektOderNull(name: String): JSONObject? =
+internal fun JSONObject.objektOderNull(name: String): JSONObject? =
     if (has(name) && !isNull(name)) optJSONObject(name) else null

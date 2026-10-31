@@ -79,7 +79,13 @@ class Schluesselbund(context: Context) {
     fun zugangLesen(): TeamQRCode? = lesen(KONTO_ZUGANG)?.let(TeamQRCode::ausText)
     fun zugangLoeschen() = loeschen(KONTO_ZUGANG)
 
+    /** Token der Einsatzleitung */
+    fun elSitzungSpeichern(sitzung: ELSitzung) = speichern(KONTO_EL, sitzung.alsText())
+    fun elSitzungLesen(): ELSitzung? = lesen(KONTO_EL)?.let(ELSitzung::ausText)
+    fun elSitzungLoeschen() = loeschen(KONTO_EL)
+
     companion object {
+        const val KONTO_EL = "el"
         const val KONTO_ZUGANG = "einsatz-zugang"
         const val KONTO_TEAM = "team"
         private const val ALIAS = "einsatzspur-zugang"

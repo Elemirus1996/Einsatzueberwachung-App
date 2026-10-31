@@ -24,6 +24,7 @@ import kotlinx.coroutines.launch
 /**
  * Vordergrunddienst Typ `location` mit dauerhafter Benachrichtigung. Hält die Ortung im Hintergrund am Leben,
  * solange ein Team angemeldet ist (auch in der Pause, dann nur Grob-Ortung). Endet bei `stop`.
+ * Einsatzleitung: nur während eines Einsatzes (Modus `track`).
  */
 class OrtungsDienst : Service() {
     private val bereich = MainScope()
@@ -44,13 +45,16 @@ class OrtungsDienst : Service() {
         if (beobachtung == null) {
             val modell = (application as EinsatzSpurApp).modell
             beobachtung = bereich.launch {
-                modell.team.collectLatest { team ->
+                modell.aktiveOrtung.collectLatest { team ->
                     if (team == null) {
                         beenden()
                         return@collectLatest
                     }
+                    val einsatzleitung = team === modell.elOrtung.value
                     team.zustand.collect { zustand ->
                         if (zustand == TeamOrtung.Zustand.BEENDET) beenden()
+                        // Einsatzleitung ohne Einsatz: Ortung ganz aus, also auch kein Dienst (entschieden 29.10.2026)
+                        else if (einsatzleitung && zustand == TeamOrtung.Zustand.PAUSIERT) beenden()
                         else getSystemService(NotificationManager::class.java).notify(NUMMER, benachrichtigung(zustand))
                     }
                 }

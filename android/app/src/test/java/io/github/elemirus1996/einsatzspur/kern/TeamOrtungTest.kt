@@ -69,7 +69,7 @@ class TeamOrtungTest {
     private val start = 1_800_000_000_000L
 
     private fun TestScope.ortung(ablaufMs: Long = 3_600_000, beimBeenden: () -> Unit = {}) =
-        TeamOrtung(server, quelle, puffer, start + ablaufMs, backgroundScope, { start + testScheduler.currentTime }, beimBeenden)
+        TeamOrtung(server, quelle, puffer, start + ablaufMs, backgroundScope, { start + testScheduler.currentTime }, beimBeenden = beimBeenden)
 
     private fun position(ms: Long) = Position(49.31, 8.43, 5.0, ms, 70)
 

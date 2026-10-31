@@ -47,6 +47,11 @@ class TeamOrtung(
     ablaufMs: Long,
     private val bereich: CoroutineScope,
     private val jetzt: () -> Long = System::currentTimeMillis,
+    /**
+     * Einsatzleitung (entschieden 29.10.2026): in der Pause (kein Einsatz) Ortung ganz aus, kein Takt.
+     * Geprüft wird nur beim Öffnen der App und bei Live-Ereignissen im Vordergrund. Teams: Grob-Ortung.
+     */
+    private val pauseOhneOrtung: Boolean = false,
     private val beimBeenden: () -> Unit,
 ) {
     enum class Zustand { WARTET, ORTET, PAUSIERT, BEENDET }
@@ -104,7 +109,12 @@ class TeamOrtung(
                 _zustand.value = Zustand.ORTET
                 taktStarten()
             }
-            Modus.PAUSE -> {
+            Modus.PAUSE -> if (pauseOhneOrtung) {
+                quelle.beenden()
+                takt?.cancel()
+                takt = null
+                _zustand.value = Zustand.PAUSIERT
+            } else {
                 // Kein GPS, aber Grob-Ortung hält die App wach, damit der Takt eine neue Suche bemerkt
                 quelle.starten(OrtungsStufe.GROB)
                 _zustand.value = Zustand.PAUSIERT
@@ -112,6 +122,11 @@ class TeamOrtung(
             }
             Modus.STOP -> beenden()
         }
+    }
+
+    /** Neues Token mit späterem Ablauf (Einsatzleitung, `/verlaengern`) */
+    fun ablaufSetzen(ablaufMs: Long) {
+        steuerung = steuerung.copy(expiresAtMs = ablaufMs)
     }
 
     /** Sicherheitsnetz: Ist `expiresAt` erreicht, endet die Ortung auch ohne Netz. */
