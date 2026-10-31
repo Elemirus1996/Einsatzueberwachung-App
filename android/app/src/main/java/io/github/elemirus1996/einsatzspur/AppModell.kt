@@ -350,7 +350,7 @@ class AppModell(private val context: Context) {
             _elSitzung.value = neu
             _elOrtung.value?.ablaufSetzen(neu.expiresAtMs)
         }
-        val betrieb = ELBetrieb(client, ablage) { _elOrtung.value?.anwenden(SteuerAntwort.STOP) }
+        val betrieb = ELBetrieb(client, ablage, einsatz = client) { _elOrtung.value?.anwenden(SteuerAntwort.STOP) }
         betrieb.nachAktion = { ansicht.neuLaden() }
         ansicht.beiNotiz = { betrieb.notizenLaden() }
         val karte = ELKartenAnsicht(client, bereich)

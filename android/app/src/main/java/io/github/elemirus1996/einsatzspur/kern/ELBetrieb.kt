@@ -132,6 +132,8 @@ class ELBetrieb(
     private val schnittstelle: ELAktionsSchnittstelle,
     private val ablage: Ablage,
     private val jetzt: () -> Long = System::currentTimeMillis,
+    /** Auswahllisten für Einsatz starten und beenden */
+    private val einsatz: ELEinsatzSchnittstelle? = null,
     private val beiStop: () -> Unit,
 ) {
     data class Hinweis(val text: String, val fehler: Boolean, val zeitMs: Long)
@@ -145,6 +147,9 @@ class ELBetrieb(
     val hinweis: StateFlow<Hinweis?> = _hinweis
     private val _weitereNotizen = MutableStateFlow(true)
     val weitereNotizen: StateFlow<Boolean> = _weitereNotizen
+    /** Ergebnis von „Einsatz beenden“ (Nummer, PDF erstellt oder Fehler), bis die Einsatzleitung es bestätigt */
+    private val _einsatzEnde = MutableStateFlow<ELEinsatzEnde?>(null)
+    val einsatzEnde: StateFlow<ELEinsatzEnde?> = _einsatzEnde
     private var laeuft = false
 
     /** Nach jeder ausgeführten Aktion (Lage neu laden) */
@@ -176,6 +181,7 @@ class ELBetrieb(
                 try {
                     val antwort = schnittstelle.ausfuehren(aktion)
                     _hinweis.value = Hinweis("${aktion.beschreibung} ✓", false, jetzt())
+                    if (aktion.pfad == "einsatz/beenden") _einsatzEnde.value = ELEinsatzEnde.aus(antwort)
                     beiAntwort?.invoke(aktion, antwort)
                     etwasGetan = true
                 } catch (e: SchnittstellenFehler.Beendet) {
@@ -225,6 +231,15 @@ class ELBetrieb(
     }
 
     suspend fun halsbaender(): ELHalsbaender? = runCatching { schnittstelle.halsbaender() }.getOrNull()
+
+    /** `null`, wenn die Liste nicht geladen werden konnte (Eingabe dann von Hand) */
+    suspend fun vorlage(): ELVorlage? = einsatz?.let { e -> runCatching { e.vorlage() }.getOrNull() }
+
+    suspend fun ergebnisse(): List<ELErgebnis> = einsatz?.let { e -> runCatching { e.ergebnisse() }.getOrNull() } ?: emptyList()
+
+    fun einsatzEndeGelesen() {
+        _einsatzEnde.value = null
+    }
 
     private fun laden(): List<ELAktion> = ablage.lesen(SCHLUESSEL)?.let { text ->
         runCatching { JSONArray(text).let { a -> (0 until a.length()).map { ELAktion.aus(a.getJSONObject(it)) } } }.getOrNull()

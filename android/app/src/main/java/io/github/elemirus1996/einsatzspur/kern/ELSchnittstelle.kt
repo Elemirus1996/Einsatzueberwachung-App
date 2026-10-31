@@ -306,7 +306,7 @@ class ELClient(
     val zugang: ELZugang,
     private val transport: Transport = ::http,
     private val sse: SseTransport = ::sseOeffnen,
-) : TeamSchnittstelle, ELLageSchnittstelle, ELVerlaengerSchnittstelle, ELAktionsSchnittstelle, ELKartenSchnittstelle, ELVermissteSchnittstelle {
+) : TeamSchnittstelle, ELLageSchnittstelle, ELVerlaengerSchnittstelle, ELAktionsSchnittstelle, ELKartenSchnittstelle, ELVermissteSchnittstelle, ELEinsatzSchnittstelle {
 
     val sitzung: ELSitzung get() = zugang.sitzung
 
@@ -393,6 +393,18 @@ class ELClient(
         ELNotizSeite.aus(anfrage(if (vor != null) "notizen?vor=${java.net.URLEncoder.encode(vor, "UTF-8")}&anzahl=50" else "notizen?anzahl=50", "GET", null))
 
     override suspend fun halsbaender(): ELHalsbaender = ELHalsbaender.aus(anfrage("halsbaender", "GET", null))
+    override suspend fun vorlage(): ELVorlage = ELVorlage.aus(anfrage("einsatz/vorlage", "GET", null))
+
+    override suspend fun ergebnisse(): List<ELErgebnis> {
+        val (status, text) = roh("einsatz/ergebnisse", "GET", null)
+        if (status == 410) throw SchnittstellenFehler.Beendet
+        if (status !in 200..299) throw SchnittstellenFehler.Server(status)
+        return try {
+            ELErgebnis.liste(JSONArray(text))
+        } catch (e: JSONException) {
+            throw SchnittstellenFehler.AntwortUngueltig
+        }
+    }
 
     /** Token auf dem Server ungültig machen (best effort). */
     suspend fun abmelden() {
