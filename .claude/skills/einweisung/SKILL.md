@@ -15,7 +15,8 @@ Du baust die App **EinsatzSpur**: iOS in `ios/` (Swift, SwiftUI, Xcode) und Andr
 3. Board lesen: https://claude.ai/artifact/EDiazzj2cArneXUVzCHb8K, Sammlung `aufgaben`. Zuerst die Karten `mac-uebergabe` und `leitung-uebergabe`, dann alle Karten mit `zustaendig` = Mac, die nicht `fertig` sind.
 4. Offene PRs und Branches: `gh pr list`, `git branch -r`.
 5. Schnittstellenstand prüfen: Skill `api-abgleich`.
-6. Kurzmeldung an die Leitung mit Skill `meldung`: „Einweisung fertig, Stand, nächster Schritt“.
+6. Für Builds und Tests immer Skill `tests-kurz` nutzen.
+7. Kurzmeldung an die Leitung mit Skill `meldung`: „Einweisung fertig, Stand, nächster Schritt“.
 
 ## Arbeitsweise
 
