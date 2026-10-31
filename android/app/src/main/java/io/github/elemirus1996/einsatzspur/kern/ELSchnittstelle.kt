@@ -301,7 +301,7 @@ class ELClient(
     val zugang: ELZugang,
     private val transport: Transport = ::http,
     private val sse: SseTransport = ::sseOeffnen,
-) : TeamSchnittstelle, ELLageSchnittstelle, ELVerlaengerSchnittstelle, ELAktionsSchnittstelle, ELKartenSchnittstelle {
+) : TeamSchnittstelle, ELLageSchnittstelle, ELVerlaengerSchnittstelle, ELAktionsSchnittstelle, ELKartenSchnittstelle, ELVermissteSchnittstelle {
 
     val sitzung: ELSitzung get() = zugang.sitzung
 
@@ -324,6 +324,25 @@ class ELClient(
     override suspend fun status(): SteuerAntwort = TeamClient.steuerAntwort(anfrage("status", "GET", null))
 
     override suspend fun lage(): ELLage = ELLage.aus(anfrage("lage", "GET", null))
+    override suspend fun vermisste(): ELVermisste = ELVermisste.aus(anfrage("vermisste", "GET", null))
+
+    override suspend fun vermissteSpeichern(id: String, profilId: String?, version: String?, felder: JSONObject): Pair<String, String> {
+        val inhalt = JSONObject(felder.toString()).put("id", id)
+        profilId?.let { inhalt.put("profilId", it) }
+        version?.let { inhalt.put("version", it) }
+        val (status, text) = roh("vermisste", "POST", inhalt)
+        val antwort = runCatching { JSONObject(text) }.getOrNull()
+        return when (status) {
+            in 200..299 -> runCatching { antwort!!.getString("profilId") to antwort.getString("version") }
+                .getOrElse { throw SchnittstellenFehler.AntwortUngueltig }
+            409 -> antwort?.optJSONObject("profil")?.let { throw ELVermissteGeaendert(ELVermisstenprofil.aus(it)) }
+                ?: throw ELAktionAbgelehnt(antwort?.textOderNull("error") ?: "Nicht möglich.")
+            400 -> throw ELAktionAbgelehnt(antwort?.textOderNull("error") ?: "Eingabe ungültig.")
+            410 -> throw SchnittstellenFehler.Beendet
+            else -> throw SchnittstellenFehler.Server(status)
+        }
+    }
+
     override suspend fun karte(): ELKarte = ELKarte.aus(anfrage("karte", "GET", null))
     override suspend fun tracks(seit: Long?): ELTracks =
         ELTracks.aus(anfrage(if (seit != null) "tracks?seit=$seit" else "tracks", "GET", null))

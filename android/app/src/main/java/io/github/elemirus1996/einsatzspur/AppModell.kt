@@ -22,6 +22,7 @@ import io.github.elemirus1996.einsatzspur.kern.ELClient
 import io.github.elemirus1996.einsatzspur.kern.ELKartenAnsicht
 import io.github.elemirus1996.einsatzspur.kern.ELSitzung
 import io.github.elemirus1996.einsatzspur.kern.ELVerlaengerung
+import io.github.elemirus1996.einsatzspur.kern.ELVermissteAnsicht
 import io.github.elemirus1996.einsatzspur.kern.ELZugang
 import io.github.elemirus1996.einsatzspur.kern.ServerAdresse
 import io.github.elemirus1996.einsatzspur.kern.LageMeldung
@@ -99,6 +100,8 @@ class AppModell(private val context: Context) {
     val elBetrieb: StateFlow<ELBetrieb?> = _elBetrieb
     private val _elKarte = MutableStateFlow<ELKartenAnsicht?>(null)
     val elKarte: StateFlow<ELKartenAnsicht?> = _elKarte
+    private val _elVermisste = MutableStateFlow<ELVermissteAnsicht?>(null)
+    val elVermisste: StateFlow<ELVermissteAnsicht?> = _elVermisste
     private val _elVerlaengerung = MutableStateFlow<ELVerlaengerung?>(null)
     val elVerlaengerung: StateFlow<ELVerlaengerung?> = _elVerlaengerung
     /** Hinweis nach Ende der EL-Sitzung durch den Server (Token abgelaufen, Passwort geändert). */
@@ -330,6 +333,9 @@ class AppModell(private val context: Context) {
         val karte = ELKartenAnsicht(client, bereich)
         ansicht.beiPosition = karte::position
         _elKarte.value = karte
+        val vermisste = ELVermissteAnsicht(client)
+        ansicht.beiVermisste = { vermisste.laden() }
+        _elVermisste.value = vermisste
         _elBetrieb.value = betrieb
         ansicht.nachLage = { lage ->
             betrieb.senden()
@@ -362,6 +368,7 @@ class AppModell(private val context: Context) {
         _elAnsicht.value?.anhalten()
         _elKarte.value?.anhalten()
         _elKarte.value = null
+        _elVermisste.value = null
         _elBetrieb.value?.vergessen()
         _elBetrieb.value = null
         schluesselbund.elSitzungLoeschen()
