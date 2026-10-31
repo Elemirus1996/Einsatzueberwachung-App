@@ -183,11 +183,22 @@ fun ELUebersichtScreen(
     var funkOffen by remember { mutableStateOf(false) }
     var karteOffen by remember { mutableStateOf(false) }
     var vermissteOffen by remember { mutableStateOf(false) }
+    var startOffen by remember { mutableStateOf(false) }
+    var beendenOffen by remember { mutableStateOf(false) }
     var gewaehltesTeam by remember { mutableStateOf<ELLage.Team?>(null) }
     val offen by betrieb.offen.collectAsState()
     val betriebHinweis by betrieb.hinweis.collectAsState()
     if (funkOffen) {
         ELFunkScreen(betrieb, ansicht.lage.collectAsState().value?.teams ?: emptyList(), zurueck = { funkOffen = false })
+        return
+    }
+    if (startOffen) {
+        ELEinsatzStartScreen(betrieb, ortung.letztePosition.collectAsState().value, schliessen = { startOffen = false })
+        return
+    }
+    val beendenLage = ansicht.lage.collectAsState().value
+    if (beendenOffen && beendenLage != null) {
+        ELEinsatzBeendenScreen(betrieb, beendenLage, schliessen = { beendenOffen = false })
         return
     }
     if (vermissteOffen && vermisste != null) {
@@ -275,6 +286,15 @@ fun ELUebersichtScreen(
                 }
             }
             item(span = { GridItemSpan(maxLineSpan) }) { EinsatzKopf(lage, verbindungsfehler) }
+            lage?.let { l ->
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    if (l.einsatz.aktiv) {
+                        OutlinedButton(onClick = { beendenOffen = true }) { Text("Einsatz beenden") }
+                    } else {
+                        Button(onClick = { startOffen = true }) { Text("Einsatz starten") }
+                    }
+                }
+            }
             val aktiv = lage?.takeIf { it.einsatz.aktiv }
             if (aktiv != null) {
                 if (aktiv.teams.isEmpty()) {
@@ -301,6 +321,14 @@ fun ELUebersichtScreen(
                 }
             }
         }
+    }
+    betrieb.einsatzEnde.collectAsState().value?.let { ende ->
+        AlertDialog(
+            onDismissRequest = betrieb::einsatzEndeGelesen,
+            title = { Text(if (ende.pdfErstellt == false) "Einsatz beendet, Bericht fehlt" else "Einsatz beendet") },
+            text = { Text(ende.meldung) },
+            confirmButton = { TextButton(onClick = betrieb::einsatzEndeGelesen) { Text("OK") } },
+        )
     }
     gewaehltesTeam?.let { team -> ELTeamAktionenDialog(team, betrieb, schliessen = { gewaehltesTeam = null }) }
     if (abmeldenFragen) {
