@@ -174,7 +174,25 @@ data class ELLage(
 }
 
 /** Live-Position für die Karte (`position` auf `/ereignisse`). */
-data class ELPosition(val art: String, val id: String?, val teamId: String?, val lat: Double, val lng: Double, val zeitMs: Long?, val akku: Int?)
+data class ELPosition(
+    val art: String,
+    val id: String?,
+    val teamId: String?,
+    val lat: Double,
+    val lng: Double,
+    val zeitMs: Long?,
+    val akku: Int?,
+    val name: String? = null,
+) {
+    /** Eindeutig über Art und Kennung (ein Halsband und ein Team können dieselbe Kennung tragen) */
+    val schluessel: String get() = "$art|$id"
+
+    companion object {
+        fun aus(json: JSONObject) = ELPosition(json.getString("art"), json.textOderNull("id"), json.textOderNull("teamId"),
+            json.getDouble("lat"), json.getDouble("lng"), isoZuMs(json.textOderNull("zeit")), json.ganzOderNull("akku"),
+            json.textOderNull("name"))
+    }
+}
 
 /** Live-Ereignisse der Einsatzleitung (Abschnitt 8). */
 sealed class ELEreignis {
@@ -193,10 +211,7 @@ sealed class ELEreignis {
             val json = runCatching { JSONObject(roh.daten) }.getOrElse { JSONObject() }
             return when (roh.name) {
                 "team" -> Team(json.textOderNull("teamId"))
-                "position" -> runCatching {
-                    Position(ELPosition(json.getString("art"), json.textOderNull("id"), json.textOderNull("teamId"),
-                        json.getDouble("lat"), json.getDouble("lng"), isoZuMs(json.textOderNull("zeit")), json.ganzOderNull("akku")))
-                }.getOrNull()
+                "position" -> runCatching { Position(ELPosition.aus(json)) }.getOrNull()
                 "notiz" -> Notiz
                 "funk" -> Funk
                 "vermisste" -> Vermisste
@@ -286,7 +301,7 @@ class ELClient(
     val zugang: ELZugang,
     private val transport: Transport = ::http,
     private val sse: SseTransport = ::sseOeffnen,
-) : TeamSchnittstelle, ELLageSchnittstelle, ELVerlaengerSchnittstelle, ELAktionsSchnittstelle {
+) : TeamSchnittstelle, ELLageSchnittstelle, ELVerlaengerSchnittstelle, ELAktionsSchnittstelle, ELKartenSchnittstelle {
 
     val sitzung: ELSitzung get() = zugang.sitzung
 
@@ -309,6 +324,9 @@ class ELClient(
     override suspend fun status(): SteuerAntwort = TeamClient.steuerAntwort(anfrage("status", "GET", null))
 
     override suspend fun lage(): ELLage = ELLage.aus(anfrage("lage", "GET", null))
+    override suspend fun karte(): ELKarte = ELKarte.aus(anfrage("karte", "GET", null))
+    override suspend fun tracks(seit: Long?): ELTracks =
+        ELTracks.aus(anfrage(if (seit != null) "tracks?seit=$seit" else "tracks", "GET", null))
 
     /** Ganze Erklärung zum Nachlesen bzw. bei neuer Version; 404 = keine hinterlegt (#148) */
     suspend fun datenschutz(): Datenschutz? = datenschutzAbrufen(url("datenschutz"), sitzung.token, transport)
