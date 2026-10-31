@@ -26,8 +26,11 @@ data class ELSitzung(
     val geraet: String? = null,
     /** Bis wann `/verlaengern` höchstens geht (72 h ab Anmeldung mit Passwort), sobald bekannt */
     val verlaengerbarBisMs: Long? = null,
+    /** Feste Server-Kennung aus der Anmeldung (Bestätigung der Datenschutzerklärung, Heimatstaffel) */
+    val kennung: String? = null,
 ) {
     fun alsText(): String = JSONObject().apply {
+        kennung?.let { put("kennung", it) }
         put("server", server.basis)
         put("token", token)
         put("expiresAtMs", expiresAtMs)
@@ -44,6 +47,7 @@ data class ELSitzung(
                 expiresAtMs = json.getLong("expiresAtMs"),
                 geraet = json.textOderNull("geraet"),
                 verlaengerbarBisMs = if (json.has("verlaengerbarBisMs")) json.getLong("verlaengerbarBisMs") else null,
+                kennung = json.textOderNull("kennung"),
             )
         }.getOrNull()
     }
@@ -86,6 +90,8 @@ data class ELLage(
     val einsatz: Einsatz,
     val teams: List<Team>,
     val wetter: Wetter?,
+    /** Nur die Version der Datenschutzerklärung (#148) */
+    val datenschutzVersion: String? = null,
 ) {
     data class Einsatz(
         val aktiv: Boolean,
@@ -141,6 +147,7 @@ data class ELLage(
                 wetter = json.objektOderNull("wetter")?.let { w ->
                     Wetter(w.zahlOderNull("temperatur"), w.zahlOderNull("wind"), w.textOderNull("beschreibung"), isoZuMs(w.textOderNull("zeit")))
                 },
+                datenschutzVersion = Datenschutz.version(json),
             )
         } catch (e: JSONException) {
             throw SchnittstellenFehler.AntwortUngueltig
@@ -228,9 +235,12 @@ class SseVerbindung(val status: Int, val zeilen: BufferedReader?, val schliessen
 /** Öffnet `/ereignisse` (blockierend, auf IO aufrufen), im Test ersetzbar. */
 typealias SseTransport = (String, String) -> SseVerbindung
 
+/** Ergebnis der Anmeldung: Sitzung, Server-Info und Datenschutzerklärung der Staffel (#148). */
+data class ELAngemeldet(val sitzung: ELSitzung, val server: ServerInfo?, val datenschutz: DatenschutzAngabe)
+
 /** Anmeldung der Einsatzleitung (`POST /login`), nur an der internen Adresse im VPN. */
 class ELAnmeldung(private val server: ServerAdresse, private val transport: Transport = ::http) {
-    suspend fun anmelden(passwort: String, geraet: String?): Pair<ELSitzung, JSONObject?> {
+    suspend fun anmelden(passwort: String, geraet: String?): ELAngemeldet {
         val name = geraet?.trim()?.take(40)?.ifEmpty { null }
         val inhalt = JSONObject().put("passwort", passwort).apply { name?.let { put("geraet", it) } }
         val (status, text) = try {
@@ -243,7 +253,8 @@ class ELAnmeldung(private val server: ServerAdresse, private val transport: Tran
             in 200..299 -> {
                 val token = json?.textOderNull("token") ?: throw ELAnmeldeFehler.AntwortUngueltig
                 val ablauf = isoZuMs(json.textOderNull("expiresAt")) ?: throw ELAnmeldeFehler.AntwortUngueltig
-                ELSitzung(server, token, ablauf, geraet = name) to json.objektOderNull("server")
+                val info = ServerInfo.aus(json.objektOderNull("server"))
+                ELAngemeldet(ELSitzung(server, token, ablauf, geraet = name, kennung = info?.kennung), info, DatenschutzAngabe.aus(json))
             }
             401 -> throw ELAnmeldeFehler.PasswortFalsch
             429 -> throw ELAnmeldeFehler.Gesperrt(json?.optInt("wiederholenNachSec", 300) ?: 300)
@@ -298,6 +309,12 @@ class ELClient(
     override suspend fun status(): SteuerAntwort = TeamClient.steuerAntwort(anfrage("status", "GET", null))
 
     override suspend fun lage(): ELLage = ELLage.aus(anfrage("lage", "GET", null))
+
+    /** Ganze Erklärung zum Nachlesen bzw. bei neuer Version; 404 = keine hinterlegt (#148) */
+    suspend fun datenschutz(): Datenschutz? = datenschutzAbrufen(url("datenschutz"), sitzung.token, transport)
+
+    /** Logo der Staffel als PNG; 404 = keins */
+    suspend fun logo(): ByteArray? = logoAbrufen(url("logo"), sitzung.token)
 
     /** Neues Token ohne Passwort (#141). Das alte ist danach gesperrt; ersetzt wird erst in [ELVerlaengerung]. */
     override suspend fun verlaengern(geraet: String?): ELSitzung {
