@@ -10,6 +10,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <!-- Nur für den QR-Scan bei der Anmeldung; Bilder werden auf dem Gerät ausgewertet, nicht gespeichert -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Vibration bei Warnstufe in der Übersicht der Einsatzleitung (normale Berechtigung, keine Abfrage) -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <application
