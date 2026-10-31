@@ -103,6 +103,12 @@ struct ELUebersichtView: View {
         .sheet(item: $gewaehltesTeam) { team in
             ELTeamAktionenView(team: team, betrieb: betrieb)
         }
+        .alert(betrieb.einsatzEnde?.pdf?.erstellt == false ? "Einsatz beendet, Bericht fehlt" : "Einsatz beendet",
+               isPresented: Binding(get: { betrieb.einsatzEnde != nil }, set: { if !$0 { betrieb.einsatzEnde = nil } })) {
+            Button("OK") { betrieb.einsatzEnde = nil }
+        } message: {
+            Text(betrieb.einsatzEnde?.meldung ?? "")
+        }
         .confirmationDialog("Als Einsatzleitung abmelden?", isPresented: $abmeldenFragen, titleVisibility: .visible) {
             Button("Abmelden", role: .destructive) { Task { await modell.elAbmelden() } }
         } message: {

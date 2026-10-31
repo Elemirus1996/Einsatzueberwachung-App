@@ -192,12 +192,12 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle,
         }
     }
 
-    func ausfuehren(_ aktion: ELAktion) async throws {
+    func ausfuehren(_ aktion: ELAktion) async throws -> Data {
         var inhalt = aktion.inhalt
         inhalt["id"] = .text(aktion.id)
         let (daten, http) = try await roh(aktion.pfad, methode: "POST", inhalt: try JSONEncoder().encode(inhalt))
         switch http.statusCode {
-        case 200..<300: return
+        case 200..<300: return daten
         case 410: throw SchnittstellenFehler.beendet
         // 400 falsche Eingabe, 404 unbekanntes Team bzw. Notiz, 409 nicht erlaubt (auch: kein Einsatz läuft)
         case 400, 404, 409:
@@ -243,6 +243,8 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle,
     }
 
     func ergebnisse() async throws -> [ELErgebnis] { try await anfrage("einsatz/ergebnisse", methode: "GET", inhalt: nil) }
+
+    func vorlage() async throws -> ELVorlage { try await anfrage("einsatz/vorlage", methode: "GET", inhalt: nil) }
 
     func halsbaender() async throws -> ELHalsbaender { try await anfrage("halsbaender", methode: "GET", inhalt: nil) }
 
