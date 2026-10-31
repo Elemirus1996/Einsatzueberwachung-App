@@ -23,7 +23,9 @@ struct ELKarte: Decodable, Equatable, Sendable {
         var farbe: String?
         var punkte: [Koordinate]
         var teamId: String?
+        /// `null`, solange der Server nichts berechnet hat
         var abdeckungProzent: Double?
+        var abgeschlossen: Bool?
     }
 
     var suchgebiete: [Suchgebiet]

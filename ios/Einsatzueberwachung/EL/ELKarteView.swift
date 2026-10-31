@@ -13,14 +13,20 @@ struct ELKarteView: View {
         Map(position: $kamera) {
             ForEach(karte.karte?.suchgebiete ?? []) { gebiet in
                 if gebiet.punkte.count > 2 {
+                    let fertig = gebiet.abgeschlossen == true
                     let farbe = Color(hex: gebiet.farbe) ?? .blue
+                    // Abgeschlossene Gebiete blasser, gestrichelt
                     MapPolygon(coordinates: gebiet.punkte.map(\.koordinate))
-                        .foregroundStyle(farbe.opacity(0.15))
-                        .stroke(farbe, lineWidth: 2)
+                        .foregroundStyle(farbe.opacity(fertig ? 0.06 : 0.15))
+                        .stroke(farbe.opacity(fertig ? 0.6 : 1), style: StrokeStyle(lineWidth: 2, dash: fertig ? [6, 4] : []))
                     if let mitte = mitte(gebiet.punkte) {
                         Annotation("", coordinate: mitte) {
                             VStack(spacing: 0) {
-                                Text(gebiet.name ?? "").font(.caption.bold())
+                                HStack(spacing: 3) {
+                                    if fertig { Image(systemName: "checkmark.circle.fill").foregroundStyle(.green) }
+                                    Text(gebiet.name ?? "")
+                                }
+                                .font(.caption.bold())
                                 if let abdeckung = gebiet.abdeckungProzent {
                                     Text("\(Int(abdeckung.rounded())) %").font(.caption2)
                                 }
@@ -109,3 +115,4 @@ struct ELKarteView: View {
                                       longitude: punkte.map(\.lng).reduce(0, +) / Double(punkte.count))
     }
 }
+

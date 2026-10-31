@@ -293,6 +293,19 @@ struct ELKarteTests {
         #expect(t.abgeschlossen?.first?.teamId == "t1")
     }
 
+    @Test func karteNachServer142() throws {
+        // abdeckungProzent null, abgeschlossenes Gebiet, ELW ohne zeit und akku
+        let k = try JSONDecoder.server.decode(ELKarte.self, from: Data(#"""
+            { "suchgebiete": [ { "id": "g2", "name": "Gebiet B", "farbe": "#2f6fd6", "teamId": null, "abgeschlossen": true, "abdeckungProzent": null,
+                                 "punkte": [ { "lat": 49.31, "lng": 8.43 }, { "lat": 49.32, "lng": 8.44 }, { "lat": 49.31, "lng": 8.45 } ] } ],
+              "positionen": [ { "art": "elw", "id": "elw", "name": "ELW", "teamId": null, "lat": 49.30, "lng": 8.40, "zeit": null, "akku": null } ] }
+            """#.utf8))
+        #expect(k.suchgebiete.first?.abdeckungProzent == nil)
+        #expect(k.suchgebiete.first?.abgeschlossen == true)
+        #expect(k.positionen.first?.art == "elw")
+        #expect(k.positionen.first?.zeit == nil && k.positionen.first?.akku == nil)
+    }
+
     @Test func livePositionBewegtMarker() async throws {
         let a = ELKartenAnsicht(schnittstelle: TestELKarte(karte: try Self.karte(), tracks: try Self.tracks()))
         await a.laden(voll: true)
