@@ -156,6 +156,14 @@ Auth: `Authorization: Bearer <token>`. Ungültiges Team-Token → `410 Gone` + `
 
 Anzeige auf dem Server: Marker „EL“ (mit Gerätename, z. B. „Tablet EL“) auf Einsatzkarte und Monitor, Alter der Position wie bei Team-Handys.
 
+## Umzug auf den Mac (entschieden 31.10.2026)
+
+Nach Abschluss der laufenden Aufträge (Löschfristen #151, Release v1.12.0, Android-Karte) wird die Arbeit auf dem Mac zusammengeführt, um Tokens zu sparen:
+- Ordner `~/einsatzspur/` mit beiden Repos, darüber `CLAUDE.md` aus `docs/arbeitsplatz/CLAUDE.md`.
+- Eine lokale Sitzung in der Claude-Desktop-App in `~/einsatzspur/`, bei Bedarf eine zweite für parallele Arbeit. Kein Projekt (Cloud-Teilsitzungen haben kein Xcode/Android Studio).
+- Paul arbeitet direkt mit dieser Sitzung. Die Cloud-Leitung und die Windows-Sitzung werden beendet.
+- Mitnehmen: `.claude/settings.local.json` (Merge-Erlaubnis), `ios/Lokal.xcconfig` (Team-ID), Testschlüssel `~/.einsatzspur/` bleibt, wo er ist. Auf dem Mac das .NET-9-SDK installieren.
+
 ## Phasen
 
 ### Phase 0 – Vorbereitung (Nutzer)
