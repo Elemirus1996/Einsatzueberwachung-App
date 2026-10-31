@@ -26,6 +26,11 @@
 	<string>1</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>comgooglemaps</string>
+		<string>waze</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Zum Scannen des QR-Codes aus dem Einsatz.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>

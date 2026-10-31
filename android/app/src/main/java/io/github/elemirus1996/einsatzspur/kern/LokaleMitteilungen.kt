@@ -16,7 +16,8 @@ import io.github.elemirus1996.einsatzspur.ui.MainActivity
 class LokaleMitteilungen(private val context: Context, private val imVordergrund: () -> Boolean) {
     private var nummer = 100
 
-    fun senden(meldung: LageMeldung) {
+    /** `stumm`: Ton dieser Art ist in den Einstellungen aus */
+    fun senden(meldung: LageMeldung, stumm: Boolean = false) {
         if (imVordergrund()) return
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED &&
             android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) return
@@ -30,6 +31,7 @@ class LokaleMitteilungen(private val context: Context, private val imVordergrund
             .setContentTitle(meldung.titel)
             .apply { meldung.text?.let { setContentText(it).setStyle(NotificationCompat.BigTextStyle().bigText(it)) } }
             .setAutoCancel(true)
+            .setSilent(stumm)
             .setContentIntent(oeffnen)
             .build())
     }

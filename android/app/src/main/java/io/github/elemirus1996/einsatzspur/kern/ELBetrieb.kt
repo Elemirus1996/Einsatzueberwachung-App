@@ -43,6 +43,9 @@ data class ELAktion(
         fun teamZuruecksetzen(teamId: String, name: String) = neu("teams/$teamId/zuruecksetzen", "$name: Zurücksetzen")
         fun mitteilung(teamId: String, name: String, text: String) =
             neu("teams/$teamId/mitteilung", "Mitteilung an $name", JSONObject().put("text", text))
+        /** Kartenpunkt als Navigationsziel an das Team (Abschnitt 7, Variante C) */
+        fun ziel(teamId: String, name: String, punktId: String, punktName: String) =
+            neu("teams/$teamId/ziel", "Ziel „$punktName“ an $name", JSONObject().put("punktId", punktId))
         fun notiz(text: String, teamId: String?) = neu("notizen", "Notiz", JSONObject().put("text", text).put("teamId", oderNull(teamId)))
         fun notizLoeschen(notizId: String) = neu("notizen/$notizId/loeschen", "Notiz löschen")
         fun funk(text: String, teamId: String?, antwortAuf: String?) = neu(

@@ -30,6 +30,13 @@ class ELAnsicht(
     /** Letzte Warnung (Warnstufe 1 oder 2) für Hinweis, Ton und Vibration. */
     private val _warnung = MutableStateFlow<Warnung?>(null)
     val warnung: StateFlow<Warnung?> = _warnung
+    private val _teamPunkt = MutableStateFlow<Pair<String, Long>?>(null)
+    /** Letzter Punkt, den ein Team per App gesetzt hat (Hinweis): Text, Zeit */
+    val teamPunkt: StateFlow<Pair<String, Long>?> = _teamPunkt
+    /** Kartenpunkt geändert (Karte neu laden) */
+    var beiPunkt: (suspend () -> Unit)? = null
+    /** Ton je Art (Punkt vom Team, Funk); Warnungen über `beiWarnung` */
+    var beiTon: ((Tonart) -> Unit)? = null
 
     var lageAbgerufenMs: Long? = null
         private set
@@ -100,7 +107,18 @@ class ELAnsicht(
             // Nur bei ungültigem Token; /lage bestätigt (410 → stop)
             ELEreignis.Stop -> neuLaden()
             is ELEreignis.Verdraengt -> verdraengtWartenMs = ereignis.wiederholenNachSec.coerceIn(5, 600) * 1000L
-            ELEreignis.Notiz, ELEreignis.Funk -> beiNotiz?.invoke()
+            ELEreignis.Notiz -> beiNotiz?.invoke()
+            ELEreignis.Funk -> {
+                beiTon?.invoke(Tonart.FUNK)
+                beiNotiz?.invoke()
+            }
+            is ELEreignis.Punkt -> {
+                if (ereignis.aenderung == "neu" && ereignis.teamId != null) {
+                    _teamPunkt.value = (ereignis.text ?: "Neuer Punkt von einem Team") to jetzt()
+                    beiTon?.invoke(Tonart.PUNKT_VOM_TEAM)
+                }
+                beiPunkt?.invoke()
+            }
             is ELEreignis.Position -> beiPosition?.invoke(ereignis.position)
             ELEreignis.Vermisste -> beiVermisste?.invoke()
         }

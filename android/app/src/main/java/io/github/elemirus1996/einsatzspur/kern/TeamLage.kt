@@ -15,7 +15,34 @@ data class Halsband(
     val akku: Int? = null,
 )
 
-data class Mitteilung(val id: String, val text: String, val zeitMs: Long)
+data class Mitteilung(val id: String, val text: String, val zeitMs: Long, val ziel: NavigationsZiel? = null)
+
+/** Kartenpunkt als Navigationsziel (APP_API.md Abschnitt 13) mit fertigen Links des Servers; die App baut keine eigenen. */
+data class NavigationsZiel(
+    val punktId: String,
+    val name: String,
+    val lat: Double,
+    val lng: Double,
+    val geo: String?,
+    val appleKarten: String?,
+    val googleMaps: String?,
+    val waze: String?,
+)
+
+/** Punkt am eigenen Standort (`POST /punkt`, Abschnitt 13); wartet im Funkloch auf dem Gerät. */
+data class TeamPunkt(val id: String, val text: String, val lat: Double, val lng: Double, val genauigkeit: Double?, val zeitMs: Long) {
+    /** Körper für den Server, Zeit als UTC mit `Z` */
+    fun json(): JSONObject = JSONObject().put("id", id).put("text", text).put("lat", lat).put("lng", lng)
+        .put("genauigkeit", genauigkeit ?: JSONObject.NULL)
+        .put("zeit", java.time.Instant.ofEpochMilli(zeitMs).truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString())
+
+    companion object {
+        const val MAX_TEXT = 200
+    }
+}
+
+/** Vom Server abgelehnter Punkt (400/409, z. B. 50 Punkte erreicht); nicht wiederholen. */
+class PunktAbgelehnt(val text: String?) : Exception("abgelehnt")
 
 /** Antwort von `GET /lage` (APP_API.md, Abschnitt 6). */
 data class TeamLage(
@@ -98,6 +125,14 @@ data class TeamLage(
             id = m.getString("id"),
             text = m.getString("text"),
             zeitMs = isoZuMs(m.getString("zeit")) ?: throw SchnittstellenFehler.AntwortUngueltig,
+            ziel = m.objektOderNull("ziel")?.let { z ->
+                val links = z.objektOderNull("links")
+                NavigationsZiel(
+                    punktId = z.getString("punktId"), name = z.getString("name"), lat = z.getDouble("lat"), lng = z.getDouble("lng"),
+                    geo = links?.textOderNull("geo"), appleKarten = links?.textOderNull("appleKarten"),
+                    googleMaps = links?.textOderNull("googleMaps"), waze = links?.textOderNull("waze"),
+                )
+            },
         )
 
         private fun punkte(a: JSONArray) = (0 until a.length()).map { a.getJSONObject(it).let { p -> Koordinate(p.getDouble("lat"), p.getDouble("lng")) } }
@@ -228,7 +263,7 @@ class SseLeser {
 }
 
 /** Eine lokale Mitteilung über eine Änderung der Lage. Texte kurz, ohne Namen von Vermissten und ohne Orte. */
-data class LageMeldung(val titel: String, val text: String? = null) {
+data class LageMeldung(val titel: String, val text: String? = null, val tonart: Tonart? = null) {
     companion object {
         val EINSATZ_BEENDET = LageMeldung("Einsatz beendet – Ortung aus")
 
@@ -247,7 +282,11 @@ data class LageMeldung(val titel: String, val text: String? = null) {
                 if (it.id != null && it.id != alt.halsband?.id) add(LageMeldung("Halsband zugewiesen: ${it.name ?: it.id}"))
             }
             val bekannt = alt.mitteilungen.map { it.id }.toSet()
-            neu.mitteilungen.filter { it.id !in bekannt }.forEach { add(LageMeldung("Mitteilung der Einsatzleitung", it.text)) }
+            neu.mitteilungen.filter { it.id !in bekannt }.forEach {
+                val ziel = it.ziel
+                if (ziel != null) add(LageMeldung("Neues Ziel: ${ziel.name}", "Zum Navigieren die App öffnen", Tonart.NAVIGATIONSZIEL))
+                else add(LageMeldung("Mitteilung der Einsatzleitung", it.text, Tonart.MITTEILUNG))
+            }
         }
     }
 }

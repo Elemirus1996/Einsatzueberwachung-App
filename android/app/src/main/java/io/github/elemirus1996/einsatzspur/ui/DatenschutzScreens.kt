@@ -1,5 +1,7 @@
 package io.github.elemirus1996.einsatzspur.ui
 
+import io.github.elemirus1996.einsatzspur.kern.Tonart
+import io.github.elemirus1996.einsatzspur.kern.Toene
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -133,6 +135,7 @@ fun EinstellungenScreen(
     heimat: HeimatStaffel,
     erklaerungen: Map<String, Datenschutz>,
     version: String,
+    toene: Toene,
     zurueck: () -> Unit,
 ) {
     val eintrag by heimat.eintrag.collectAsState()
@@ -172,6 +175,9 @@ fun EinstellungenScreen(
             }
             HorizontalDivider()
 
+            TonEinstellungen(toene)
+            HorizontalDivider()
+
             Text("Datenschutzerklärungen der Staffeln", style = MaterialTheme.typography.titleMedium)
             if (erklaerungen.isEmpty()) {
                 Text("Noch keine. Die Erklärung der Staffel erscheint bei der Anmeldung.",
@@ -194,6 +200,47 @@ fun EinstellungenScreen(
             text = { Text("Bei der nächsten Anmeldung fragt die App erneut.") },
             confirmButton = { TextButton(onClick = { heimat.entfernen(); entfernenFragen = false }) { Text("Entfernen") } },
             dismissButton = { TextButton(onClick = { entfernenFragen = false }) { Text("Abbrechen") } },
+        )
+    }
+}
+
+/** Ton je Art von Meldung (APP_API.md „Töne in den Apps“), wie iOS `TonEinstellungenView`. Stufe 2 nie „Aus“. */
+@Composable
+private fun TonEinstellungen(toene: Toene) {
+    val wahl by toene.wahl.collectAsState()
+    var offen by remember { mutableStateOf<Tonart?>(null) }
+    Text("Töne", style = MaterialTheme.typography.titleMedium)
+    listOf("Team" to true, "Einsatzleitung" to false).forEach { (gruppe, team) ->
+        Text(gruppe, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Tonart.entries.filter { it.fuerTeam == team }.forEach { art ->
+            Row(Modifier.fillMaxWidth().clickable { offen = art }.padding(vertical = 8.dp)) {
+                Text(art.titel, Modifier.weight(1f))
+                Text((wahl[art] ?: art.standard).name, color = MaterialTheme.colorScheme.primary)
+            }
+        }
+    }
+    Text("Warnung Stufe 2 lässt sich nicht ausschalten. Die Einstellung gilt für dieses Gerät.",
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    offen?.let { art ->
+        AlertDialog(
+            onDismissRequest = { offen = null },
+            title = { Text(art.titel) },
+            text = {
+                Column {
+                    toene.moeglich(art).forEach { moeglich ->
+                        Row(
+                            Modifier.fillMaxWidth().clickable {
+                                toene.setzen(moeglich, art)
+                                toene.probe(moeglich) // Probehören beim Auswählen
+                            }.padding(vertical = 8.dp),
+                        ) {
+                            Text(if ((wahl[art] ?: art.standard) == moeglich) "● " else "○ ")
+                            Text(moeglich.name)
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { offen = null }) { Text("Fertig") } },
         )
     }
 }

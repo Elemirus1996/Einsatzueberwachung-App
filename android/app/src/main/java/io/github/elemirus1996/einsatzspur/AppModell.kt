@@ -46,6 +46,12 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import android.media.AudioManager
+import android.media.ToneGenerator
+import android.os.VibrationEffect
+import android.os.Vibrator
+import io.github.elemirus1996.einsatzspur.kern.TonWahl
+import io.github.elemirus1996.einsatzspur.kern.Toene
 
 /** Hält die angemeldete Rolle und verbindet Schlüsselbund, Schnittstelle, Ortung und Vordergrunddienst. */
 class AppModell(private val context: Context) {
@@ -127,6 +133,23 @@ class AppModell(private val context: Context) {
     }
     val datenschutz = DatenschutzSpeicher(einstellungsAblage)
     val heimat = HeimatStaffel(einstellungsAblage, File(context.filesDir, "heimatstaffel-logo.png"))
+    /** Ton je Art von Meldung, Einstellung dieses Geräts (APP_API.md „Töne in den Apps“) */
+    val toene = Toene(einstellungsAblage, ::tonAbspielen)
+
+    private fun tonAbspielen(wahl: TonWahl) {
+        if (wahl is TonWahl.Ton) {
+            runCatching {
+                val generator = ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100)
+                generator.startTone(wahl.id, 800)
+                bereich.launch { delay(1000); generator.release() }
+            }
+        }
+        if (wahl != TonWahl.Aus) {
+            runCatching {
+                context.getSystemService(Vibrator::class.java)?.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 300), -1))
+            }
+        }
+    }
     private val _datenschutzFrage = MutableStateFlow<DatenschutzFrage?>(null)
     val datenschutzFrage: StateFlow<DatenschutzFrage?> = _datenschutzFrage
     private var datenschutzAbbruch: (() -> Unit)? = null
@@ -332,6 +355,8 @@ class AppModell(private val context: Context) {
         ansicht.beiNotiz = { betrieb.notizenLaden() }
         val karte = ELKartenAnsicht(client, bereich)
         ansicht.beiPosition = karte::position
+        ansicht.beiPunkt = { karte.karteNeuLaden() }
+        ansicht.beiTon = toene::spielen
         _elKarte.value = karte
         val vermisste = ELVermissteAnsicht(client)
         ansicht.beiVermisste = { vermisste.laden() }
@@ -471,7 +496,7 @@ class AppModell(private val context: Context) {
             _team.value?.anwenden(SteuerAntwort(modus), melden = false)
         }
         team.beiModuswechsel = { ansicht.modusGeaendert() }
-        ansicht.beiMeldungen = { liste -> liste.forEach(mitteilungen::senden) }
+        ansicht.beiMeldungen = { liste -> liste.forEach { mitteilungen.senden(it, stumm = it.tonart?.let { art -> !toene.mitTon(art) } ?: false) } }
         ansicht.beiLage = { lage -> datenschutzVersionPruefen(lage.datenschutzVersion, teamKennung) { client.datenschutz() } }
         _team.value = team
         _ansicht.value = ansicht

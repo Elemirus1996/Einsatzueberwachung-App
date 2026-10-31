@@ -69,9 +69,9 @@ class MainActivity : ComponentActivity() {
                 val elA = elAnsicht
                 val elB = elBetrieb
                 if (einstellungenOffen) {
-                    EinstellungenScreen(modell.heimat, modell.datenschutz.alle(), version(), zurueck = { einstellungenOffen = false })
+                    EinstellungenScreen(modell.heimat, modell.datenschutz.alle(), version(), modell.toene, zurueck = { einstellungenOffen = false })
                 } else if (elO != null && elA != null && elB != null) {
-                    ELUebersichtScreen(elA, elO, elB, elKarte, elVermisste, elVerlaengerung, abmelden = {
+                    ELUebersichtScreen(elA, elO, elB, elKarte, elVermisste, elVerlaengerung, modell.toene, abmelden = {
                         modell.elAbmelden()
                         elAnmeldungOffen = false
                     })
@@ -95,6 +95,7 @@ class MainActivity : ComponentActivity() {
                         teamWechseln = modell::teamWechseln,
                         vomEinsatzAbmelden = modell::vomEinsatzAbmelden,
                         schliessen = modell::schliessen,
+                        toene = modell.toene,
                     )
                 } else {
                     val anmelden = { sitzung: TeamSitzung, zugang: TeamQRCode, auswahl: TeamAuswahl ->

@@ -134,6 +134,7 @@ struct ELEinsatzBeendenView: View {
     @State private var ergebnis: ELErgebnis?
     @State private var geprueft = false
     @State private var mitTracks = true
+    @State private var mitPunkten = false
     @State private var kartenart = ELKartenart.streets.rawValue
     @State private var alleTeams = true
     @State private var teamIds: Set<String> = []
@@ -185,6 +186,7 @@ struct ELEinsatzBeendenView: View {
                 }
                 Section("Bericht (PDF)") {
                     Toggle("Tracks in den Bericht", isOn: $mitTracks)
+                    Toggle("Kartenpunkte in den Bericht", isOn: $mitPunkten)
                     Picker("Karte", selection: $kartenart) {
                         ForEach(kartenarten) { Text($0.anzeige).tag($0.wert) }
                     }
@@ -219,7 +221,8 @@ struct ELEinsatzBeendenView: View {
                     Task {
                         await betrieb.ausfuehren(.einsatzBeenden(
                             ergebnis: ergebnis.wert, mitTracks: mitTracks, kartenart: kartenart, teamIds: auswahl,
-                            endzeit: endzeitAngeben ? min(endzeit, Date()) : nil, bemerkungen: bemerkungen))
+                            endzeit: endzeitAngeben ? min(endzeit, Date()) : nil, bemerkungen: bemerkungen,
+                            mitPunkten: mitPunkten))
                     }
                     schliessen()
                 }

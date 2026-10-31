@@ -40,6 +40,13 @@ struct EinstellungenView: View {
                     }
                 }
                 Section {
+                    NavigationLink("Töne") { TonEinstellungenView(toene: Toene.geraet) }
+                } header: {
+                    Text("Töne")
+                } footer: {
+                    Text("Für jede Art von Meldung einen eigenen Ton wählen.")
+                }
+                Section {
                     NavigationLink("Datenschutzerklärungen der Staffeln") {
                         DatenschutzListeView(erklaerungen: modell.datenschutz.alle())
                     }
@@ -68,6 +75,38 @@ struct EinstellungenView: View {
             } message: {
                 Text("Bei der nächsten Anmeldung fragt die App erneut.")
             }
+        }
+    }
+}
+
+/// Ton je Art von Meldung (APP_API.md „Töne in den Apps“). „Aus“ gibt es für Warnung Stufe 2 nicht.
+struct TonEinstellungenView: View {
+    @ObservedObject var toene: Toene
+
+    var body: some View {
+        List {
+            Section("Team") { zeilen(Tonart.allCases.filter(\.fuerTeam)) }
+            Section {
+                zeilen(Tonart.allCases.filter { !$0.fuerTeam })
+            } header: {
+                Text("Einsatzleitung")
+            } footer: {
+                Text("Warnung Stufe 2 lässt sich nicht ausschalten. Die Einstellung gilt für dieses Gerät.")
+            }
+        }
+        .navigationTitle("Töne")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func zeilen(_ arten: [Tonart]) -> some View {
+        ForEach(arten) { art in
+            Picker(art.titel, selection: Binding(get: { toene.wahl(fuer: art) }, set: { neu in
+                toene.setzen(neu, fuer: art)
+                toene.probe(neu) // Probehören beim Auswählen
+            })) {
+                ForEach(toene.moeglich(fuer: art), id: \.self) { Text($0.name).tag($0) }
+            }
+            .pickerStyle(.navigationLink)
         }
     }
 }

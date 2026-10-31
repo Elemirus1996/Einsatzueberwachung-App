@@ -110,6 +110,14 @@ final class TestAnsichtSchnittstelle: TeamAnsichtSchnittstelle, @unchecked Senda
         if let meldungFehler { throw meldungFehler }
     }
 
+    var punktFehler: Error?
+    private(set) var punkte: [TeamPunkt] = []
+
+    func punkt(_ punkt: TeamPunkt) async throws {
+        punkte.append(punkt)
+        if let punktFehler { throw punktFehler }
+    }
+
     /// `true`: Live-Verbindung bleibt offen, liefert aber nichts (verpasstes `lage`-Ereignis)
     var offenerStrom = false
     private var offen: AsyncThrowingStream<TeamEreignis, Error>.Continuation?
@@ -317,7 +325,7 @@ struct LageMeldungTests {
             LageMeldung(titel: "Suche gestartet – Ortung läuft"),
             LageMeldung(titel: "Neues Suchgebiet: Gebiet B"),
             LageMeldung(titel: "Halsband zugewiesen: Halsband 9"),
-            LageMeldung(titel: "Mitteilung der Einsatzleitung", text: "Bitte Funkkontakt"),
+            LageMeldung(titel: "Mitteilung der Einsatzleitung", text: "Bitte Funkkontakt", tonart: .mitteilung),
         ])
     }
 
@@ -368,7 +376,7 @@ struct TeamAnsichtMeldungTests {
         lage.mitteilungen.append(neu)
         server.lageAntwort = .success(lage)
         await a.neuLaden()
-        #expect(alle == [LageMeldung(titel: "Mitteilung der Einsatzleitung", text: "Bitte Funkkontakt")])
+        #expect(alle == [LageMeldung(titel: "Mitteilung der Einsatzleitung", text: "Bitte Funkkontakt", tonart: .mitteilung)])
     }
 
     /// Das Halsband-Ereignis hat keine Kennung; danach darf /lage kein „Halsband zugewiesen“ melden.

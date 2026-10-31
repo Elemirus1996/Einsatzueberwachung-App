@@ -29,6 +29,8 @@ targets:
       path: Einsatzueberwachung/Info.plist
       properties:
         CFBundleDisplayName: EinsatzSpur
+        # Navigationsziele (APP_API.md Abschnitt 13): installierte Navi-Apps zur Auswahl anbieten
+        LSApplicationQueriesSchemes: [comgooglemaps, waze]
         CFBundleDevelopmentRegion: de
         UILaunchScreen: {}
         # iPhone nur Hochformat, iPad alle Ausrichtungen (Einsatzleitung am Tablet)

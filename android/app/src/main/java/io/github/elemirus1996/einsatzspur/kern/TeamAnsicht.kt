@@ -58,6 +58,13 @@ class TeamAnsicht(
     /** Kurzer Hinweis nach 409/403 */
     val suchHinweis: StateFlow<Pair<String, Long>?> = _suchHinweis
     private var aktionenLaufen = false
+    private val _offenePunkte = MutableStateFlow(ladePunkte())
+    /** Punkte, die noch auf die Bestätigung des Servers warten (Funkloch) */
+    val offenePunkte: StateFlow<List<TeamPunkt>> = _offenePunkte
+    private val _punktHinweis = MutableStateFlow<Triple<String, Boolean, Long>?>(null)
+    /** Ergebnis des letzten Punkts: Text, ok, Zeit */
+    val punktHinweis: StateFlow<Triple<String, Boolean, Long>?> = _punktHinweis
+    private var punkteLaufen = false
 
     /** Lokale Mitteilungen bei Änderungen der Lage. */
     var beiMeldungen: ((List<LageMeldung>) -> Unit)? = null
@@ -105,9 +112,11 @@ class TeamAnsicht(
         ablage.schreiben("$schluessel.gelesen", null)
         ablage.schreiben("$schluessel.meldungen", null)
         ablage.schreiben("$schluessel.aktionen", null)
+        ablage.schreiben("$schluessel.punkte", null)
         _gelesen.value = emptySet()
         _offen.value = emptyList()
         _offeneAktionen.value = emptyList()
+        _offenePunkte.value = emptyList()
     }
 
     /** Die Ortung hat von /positions oder /status einen neuen Modus erfahren: Anzeige nachziehen. */
@@ -199,6 +208,7 @@ class TeamAnsicht(
         }
         meldungenSenden()
         aktionenSenden()
+        punkteSenden()
         if (mitTracks) tracksLaden(voll = tracksVoll)
     }
 
@@ -329,6 +339,63 @@ class TeamAnsicht(
             aktionenLaufen = false
         }
     }
+
+    // MARK: Punkte (Abschnitt 13)
+
+    /** Punkt am eigenen Standort setzen; im Funkloch wartet er, dieselbe `id` erzeugt nur einen Punkt. */
+    suspend fun punktSetzen(text: String, lat: Double, lng: Double, genauigkeit: Double?, zeitMs: Long) {
+        val inhalt = text.trim().take(TeamPunkt.MAX_TEXT)
+        if (inhalt.isEmpty()) return
+        _offenePunkte.value = _offenePunkte.value + TeamPunkt(UUID.randomUUID().toString(), inhalt, lat, lng, genauigkeit, zeitMs)
+        speicherePunkte()
+        punkteSenden()
+        if (_offenePunkte.value.isNotEmpty()) _punktHinweis.value = Triple("Kein Netz – der Punkt wird gesendet, sobald es wieder geht.", true, jetzt())
+    }
+
+    suspend fun punkteSenden() {
+        if (punkteLaufen) return
+        punkteLaufen = true
+        try {
+            while (true) {
+                val punkt = _offenePunkte.value.firstOrNull() ?: break
+                try {
+                    schnittstelle.punkt(punkt)
+                    _punktHinweis.value = Triple("Punkt gesendet: ${punkt.text}", true, jetzt())
+                } catch (e: SchnittstellenFehler.Beendet) {
+                    beiSteuerung(Modus.STOP)
+                    return
+                } catch (e: PunktAbgelehnt) {
+                    _punktHinweis.value = Triple(e.text ?: "Der Server hat den Punkt abgelehnt.", false, jetzt())
+                } catch (e: SchnittstellenFehler.Server) {
+                    if (e.status !in 400..499 || e.status == 429) return
+                    _punktHinweis.value = Triple("Der Server hat den Punkt abgelehnt.", false, jetzt())
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    return
+                }
+                _offenePunkte.value = _offenePunkte.value.filterNot { it.id == punkt.id }
+                speicherePunkte()
+            }
+        } finally {
+            punkteLaufen = false
+        }
+    }
+
+    private fun speicherePunkte() {
+        val liste = JSONArray()
+        _offenePunkte.value.forEach { liste.put(it.json().put("zeitMs", it.zeitMs)) }
+        ablage.schreiben("$schluessel.punkte", liste.toString())
+    }
+
+    private fun ladePunkte(): List<TeamPunkt> = runCatching {
+        val liste = JSONArray(ablage.lesen("$schluessel.punkte") ?: return emptyList())
+        (0 until liste.length()).map { i ->
+            val o = liste.getJSONObject(i)
+            TeamPunkt(o.getString("id"), o.getString("text"), o.getDouble("lat"), o.getDouble("lng"),
+                if (o.isNull("genauigkeit")) null else o.getDouble("genauigkeit"), o.getLong("zeitMs"))
+        }
+    }.getOrDefault(emptyList())
 
     private fun sucheUebernehmen(suche: TeamLage.Suche?) {
         val alt = _lage.value ?: return

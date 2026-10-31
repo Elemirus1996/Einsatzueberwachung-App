@@ -36,6 +36,13 @@ struct ELUebersichtView: View {
                             .background(warnung.stufe >= 2 ? Color.red.opacity(0.2) : Color.orange.opacity(0.2),
                                         in: RoundedRectangle(cornerRadius: 12))
                     }
+                    if let punkt = ansicht.teamPunkt, kontext.date.timeIntervalSince(punkt.zeit) < 30 {
+                        Label(punkt.text, systemImage: "mappin.and.ellipse")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding()
+                            .background(Color.orange.opacity(0.2), in: RoundedRectangle(cornerRadius: 12))
+                    }
                     if let verlaengerung = modell.elVerlaengerung { ELAblaufHinweis(verlaengerung: verlaengerung) }
                     einsatzKopf
                     if let lage = ansicht.lage, lage.einsatz.aktiv {
@@ -65,7 +72,7 @@ struct ELUebersichtView: View {
             }
             ToolbarItem(placement: .topBarTrailing) {
                 NavigationLink {
-                    ELKarteView(karte: karte, teams: ansicht.lage?.teams ?? [])
+                    ELKarteView(karte: karte, teams: ansicht.lage?.teams ?? [], betrieb: betrieb)
                 } label: { Label("Lagekarte", systemImage: "map") }
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -85,8 +92,8 @@ struct ELUebersichtView: View {
         .refreshable { await ansicht.neuLaden() }
         .onAppear {
             ansicht.beiWarnung = { stufe in
-                // Warnton und Vibration bei Eskalation
-                AudioServicesPlaySystemSound(stufe >= 2 ? 1005 : 1007)
+                // Warnton je Einstellung; Stufe 2 lässt sich nicht abschalten
+                Toene.geraet.spielen(stufe >= 2 ? .warnung2 : .warnung1)
                 UINotificationFeedbackGenerator().notificationOccurred(stufe >= 2 ? .error : .warning)
             }
             ansicht.starten()

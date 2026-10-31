@@ -60,6 +60,14 @@ class TestAnsichtSchnittstelle(var lageAntwort: Result<TeamLage> = Result.succes
         meldungFehler?.let { throw it }
     }
 
+    var punktFehler: Exception? = null
+    val punkte = mutableListOf<TeamPunkt>()
+
+    override suspend fun punkt(punkt: TeamPunkt) {
+        punkte += punkt
+        punktFehler?.let { throw it }
+    }
+
     override fun ereignisse(): Flow<TeamEreignis> = if (offenerStrom) flow { awaitCancellation() } else emptyFlow()
 }
 
@@ -130,7 +138,7 @@ class TeamAnsichtTest {
         a.verarbeiten(TeamEreignis.NeueMitteilung(neu))
         server.lageAntwort = Result.success(BASIS_LAGE.copy(mitteilungen = BASIS_LAGE.mitteilungen + neu))
         a.neuLaden()
-        assertEquals(listOf(LageMeldung("Mitteilung der Einsatzleitung", "Bitte Funkkontakt")), gemeldet)
+        assertEquals(listOf(LageMeldung("Mitteilung der Einsatzleitung", "Bitte Funkkontakt", Tonart.MITTEILUNG)), gemeldet)
         a.alsGelesen(neu)
         assertEquals(listOf("m1"), a.ungelesen.map { it.id })
         a.vergessen()

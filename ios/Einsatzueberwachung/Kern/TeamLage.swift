@@ -64,6 +64,37 @@ struct Mitteilung: Decodable, Equatable, Identifiable, Sendable {
     var id: String
     var text: String
     var zeit: Date
+    /// Kartenpunkt als Navigationsziel (APP_API.md Abschnitt 13); `nil` bei einer normalen Mitteilung
+    var ziel: NavigationsZiel? = nil
+}
+
+/// Punkt, den das Team an seinem Standort setzt (`POST /punkt`, Abschnitt 13). Wartet im Funkloch auf dem Gerät.
+struct TeamPunkt: Codable, Equatable, Identifiable, Sendable {
+    var id: String
+    var text: String
+    var lat: Double
+    var lng: Double
+    var genauigkeit: Double?
+    /// Zeitpunkt der Ortung (UTC)
+    var zeit: Date
+
+    static let maxText = 200
+}
+
+/// Ziel der Einsatzleitung samt fertigen Links des Servers (die App baut keine eigenen).
+struct NavigationsZiel: Decodable, Equatable, Sendable {
+    struct Links: Decodable, Equatable, Sendable {
+        var geo: String?
+        var appleKarten: String?
+        var googleMaps: String?
+        var waze: String?
+    }
+
+    var punktId: String
+    var name: String
+    var lat: Double
+    var lng: Double
+    var links: Links
 }
 
 /// Antwort von `GET /tracks` (Abschnitt 7). `t` in Unix-Millisekunden.
