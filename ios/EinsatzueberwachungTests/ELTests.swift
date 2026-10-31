@@ -157,10 +157,13 @@ final class TestELAktionen: ELAktionsSchnittstelle, @unchecked Sendable {
     var fehler: Error?
     private(set) var ausgefuehrt: [ELAktion] = []
     var notizListe: [ELNotiz] = []
-    func ausfuehren(_ aktion: ELAktion) async throws {
+    var antwort = Data(#"{"doppelt":false}"#.utf8)
+    func ausfuehren(_ aktion: ELAktion) async throws -> Data {
         ausgefuehrt.append(aktion)
         if let fehler { throw fehler }
+        return antwort
     }
+    func vorlage() async throws -> ELVorlage { try JSONDecoder.server.decode(ELVorlage.self, from: Data(ELEinsatzTests.vorlageJSON.utf8)) }
     func notizen(vor: String?) async throws -> ELNotizSeite { ELNotizSeite(notizen: notizListe, weitere: false) }
     func halsbaender() async throws -> ELHalsbaender {
         try JSONDecoder.server.decode(ELHalsbaender.self, from: Data(#"[ { "id": "HB-1", "name": "Halsband 1", "akku": 80 } ]"#.utf8))
@@ -341,6 +344,14 @@ struct ELKarteTests {
 
 
 struct ELEinsatzTests {
+    static let vorlageJSON = #"""
+    { "aktiv": false, "szenarien": ["Mantrailer", "Flaeche", "Truemmer", "Sonstige"],
+      "divera": [ { "id": 4711, "titel": "VU Person", "ort": "Testwald 1", "lat": 49.3, "lng": 8.4, "zeit": "2026-10-31T06:00:00Z" } ],
+      "einsatzleiter": ["Anna Berg"], "fuehrungsassistenten": ["Ben Kurz"],
+      "ergebnisse": [ { "wert": "Uebung abgeschlossen", "anzeige": "Übung abgeschlossen" } ],
+      "kartenarten": [ { "wert": "Streets", "anzeige": "Straßenkarte" }, { "wert": "Topographic", "anzeige": "Topografisch" } ] }
+    """#
+
     @Test func startKoerperMitKoordinate() throws {
         var d = ELEinsatzStart()
         d.stichwort = "VP"; d.ort = "Testwald"; d.szenario = .flaeche; d.uebung = true
@@ -351,24 +362,115 @@ struct ELEinsatzTests {
         #expect(json?["szenario"] as? String == "Flaeche")
         #expect(json?["uebung"] as? Bool == true)
         #expect(json?["lat"] as? Double == 49.3)
-        #expect(!ELEinsatzStart().vollstaendig, "Ort ist Pflicht")
+        #expect(json?["diveraAlarmId"] == nil)
+        #expect(!ELEinsatzStart().vollstaendig, "Ort und Szenario sind Pflicht")
+    }
+
+    @Test func startPflichtfelder() {
+        var d = ELEinsatzStart()
+        d.ort = "Testwald"
+        #expect(!d.vollstaendig, "Szenario Unbestimmt reicht nicht")
+        d.szenario = .mantrailer
+        #expect(d.vollstaendig)
+        d.ort = "  "
+        #expect(!d.vollstaendig, "ohne Ort und ohne Alarm")
+        d.diveraAlarmId = 4711
+        #expect(d.vollstaendig, "Ort kommt aus dem Divera-Alarm")
+        d.szenario = .unbestimmt
+        #expect(!d.vollstaendig, "Szenario auch mit Alarm Pflicht (Server prüft es immer)")
+    }
+
+    @Test func startMitDiveraLaesstLeereFelderWeg() throws {
+        var d = ELEinsatzStart()
+        d.szenario = .mantrailer
+        d.diveraAlarmId = 4711
+        d.einsatzleiter = "Anna Berg"
+        let roh = try JSONEncoder().encode(ELAktion.einsatzStart(d).inhalt)
+        let json = try JSONSerialization.jsonObject(with: roh) as? [String: Any]
+        #expect(json?["ort"] == nil && json?["stichwort"] == nil && json?["fuehrungsassistent"] == nil,
+                "leere Angaben überschreiben den Alarm nicht")
+        #expect(json?["einsatzleiter"] as? String == "Anna Berg")
+        #expect(String(decoding: roh, as: UTF8.self).contains(#""diveraAlarmId":4711"#), "Ganzzahl für int? im Server")
+    }
+
+    @Test func vorlageDekodieren() throws {
+        let v = try JSONDecoder.server.decode(ELVorlage.self, from: Data(Self.vorlageJSON.utf8))
+        #expect(v.divera.first?.id == 4711 && v.divera.first?.ort == "Testwald 1")
+        #expect(v.szenarioWahl == [.mantrailer, .flaeche, .truemmer, .sonstige])
+        #expect(v.einsatzleiter == ["Anna Berg"] && v.fuehrungsassistenten == ["Ben Kurz"])
+        #expect(v.ergebnisse.first?.wert == "Uebung abgeschlossen")
+        #expect(v.kartenWahl.map(\.wert) == ["Streets", "Topographic"])
+        // Ohne Divera und ohne Listen: Rückfall
+        let leer = try JSONDecoder.server.decode(ELVorlage.self, from: Data(#"{ "aktiv": true, "divera": [] }"#.utf8))
+        #expect(leer.aktiv && leer.divera.isEmpty)
+        #expect(!leer.szenarioWahl.contains(.unbestimmt) && leer.szenarioWahl.count == 4)
+        #expect(leer.kartenWahl.count == 3)
     }
 
     @Test func beendenKoerperMitPdf() throws {
         let a = ELAktion.einsatzBeenden(ergebnis: "Uebung abgeschlossen", mitTracks: false)
         let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(a.inhalt)) as? [String: Any]
         #expect(json?["ressourcenGeprueft"] as? Bool == true)
+        #expect(json?["endzeit"] == nil && json?["bemerkungen"] == nil, "ohne Angabe = jetzt")
         let pdf = json?["pdf"] as? [String: Any]
         #expect(pdf?["tracks"] as? Bool == false)
         #expect(pdf?["kartenart"] as? String == "Streets", "Standard")
         let topo = try JSONSerialization.jsonObject(with: JSONEncoder().encode(
-            ELAktion.einsatzBeenden(ergebnis: "x", mitTracks: true, kartenart: .topographic).inhalt)) as? [String: Any]
+            ELAktion.einsatzBeenden(ergebnis: "x", mitTracks: true, kartenart: "Topographic").inhalt)) as? [String: Any]
         #expect((topo?["pdf"] as? [String: Any])?["kartenart"] as? String == "Topographic")
         #expect(ELKartenart.allCases.map(\.rawValue) == ["Streets", "Topographic", "Satellite"])
         #expect(pdf?["teamIds"] is NSNull)
         // Warteschlange speichert und liest verschachtelte Werte
         let wieder = try JSONDecoder().decode(ELAktion.self, from: JSONEncoder().encode(a))
         #expect(wieder == a)
+    }
+
+    @Test func beendenMitEndzeitTeamsUndBemerkung() throws {
+        let ende = Date(timeIntervalSince1970: 1_793_468_700.4)   // 2026-10-31T17:45:00Z
+        let a = ELAktion.einsatzBeenden(ergebnis: "x", mitTracks: true, teamIds: ["t1", "t2"], endzeit: ende, bemerkungen: " Hund gefunden ")
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(a.inhalt)) as? [String: Any]
+        #expect(json?["endzeit"] as? String == "2026-10-31T17:45:00Z", "UTC mit Z, ohne Bruchteile")
+        #expect(json?["bemerkungen"] as? String == "Hund gefunden")
+        #expect((json?["pdf"] as? [String: Any])?["teamIds"] as? [String] == ["t1", "t2"])
+        let wieder = try JSONDecoder().decode(ELAktion.self, from: JSONEncoder().encode(a))
+        #expect(wieder == a, "Liste übersteht die Warteschlange")
+    }
+
+    @Test func beendenAntwortDekodieren() throws {
+        let ok = try JSONDecoder.server.decode(ELEinsatzEnde.self, from: Data(
+            #"{ "doppelt": false, "archivId": "a1", "einsatzNummer": "2026-017", "pdf": { "erstellt": true, "fehler": null } }"#.utf8))
+        #expect(ok.archivId == "a1" && ok.einsatzNummer == "2026-017" && ok.pdf?.erstellt == true)
+        #expect(ok.meldung.contains("2026-017") && ok.meldung.contains("Archiv"))
+        let fehler = try JSONDecoder.server.decode(ELEinsatzEnde.self, from: Data(
+            #"{ "archivId": 12, "einsatzNummer": "2026-018", "pdf": { "erstellt": false, "fehler": "Karte nicht erreichbar" } }"#.utf8))
+        #expect(fehler.archivId == "12")
+        #expect(fehler.meldung.contains("Karte nicht erreichbar"))
+        // Wiederholung mit derselben id: nur { doppelt: true }
+        let doppelt = try JSONDecoder.server.decode(ELEinsatzEnde.self, from: Data(#"{ "doppelt": true }"#.utf8))
+        #expect(doppelt.pdf == nil && doppelt.meldung == "Einsatz beendet und archiviert.")
+    }
+}
+
+@MainActor
+struct ELEinsatzBetriebTests {
+    @Test func beendenZeigtPdfFehler() async {
+        let server = TestELAktionen()
+        server.antwort = Data(#"{ "doppelt": false, "archivId": "a1", "einsatzNummer": "7", "pdf": { "erstellt": false, "fehler": "Zeitüberschreitung" } }"#.utf8)
+        let b = ELBetrieb(schnittstelle: server, speicher: UserDefaults(suiteName: "ende-\(UUID().uuidString)")!, beiStop: {})
+        await b.ausfuehren(.einsatzBeenden(ergebnis: "x", mitTracks: true))
+        #expect(b.einsatzEnde?.pdf?.fehler == "Zeitüberschreitung")
+        #expect(b.offen.isEmpty)
+    }
+
+    @Test func startAbgelehntZeigtServertext() async {
+        let server = TestELAktionen()
+        server.fehler = ELAktionsFehler.abgelehnt("Divera-Alarm nicht gefunden.")
+        let b = ELBetrieb(schnittstelle: server, speicher: UserDefaults(suiteName: "start-\(UUID().uuidString)")!, beiStop: {})
+        var d = ELEinsatzStart(); d.szenario = .flaeche; d.diveraAlarmId = 1
+        await b.ausfuehren(.einsatzStart(d))
+        #expect(b.hinweis?.text == "Divera-Alarm nicht gefunden." && b.hinweis?.fehler == true)
+        #expect(b.offen.isEmpty, "abgelehnt: nicht erneut senden")
+        #expect(b.einsatzEnde == nil)
     }
 }
 

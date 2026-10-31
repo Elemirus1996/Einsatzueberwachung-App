@@ -8,6 +8,8 @@ final class ELBetrieb: ObservableObject {
     /// Ablehnung des Servers („Team läuft schon“, „Halsband vergeben“) oder Bestätigung, kurz anzeigen
     @Published private(set) var hinweis: (text: String, fehler: Bool, zeit: Date)?
     @Published private(set) var weitereNotizen = true
+    /// Ergebnis von „Einsatz beenden“ (Nummer, PDF erstellt oder Fehler), bis die Einsatzleitung es bestätigt
+    @Published var einsatzEnde: ELEinsatzEnde?
 
     private let schnittstelle: ELAktionsSchnittstelle
     private let speicher: UserDefaults
@@ -50,8 +52,11 @@ final class ELBetrieb: ObservableObject {
         var etwasGetan = false
         while let aktion = offen.first {
             do {
-                try await schnittstelle.ausfuehren(aktion)
+                let antwort = try await schnittstelle.ausfuehren(aktion)
                 hinweis = ("\(aktion.beschreibung) ✓", false, jetzt())
+                if aktion.pfad == "einsatz/beenden" {
+                    einsatzEnde = (try? JSONDecoder.server.decode(ELEinsatzEnde.self, from: antwort)) ?? ELEinsatzEnde()
+                }
                 etwasGetan = true
             } catch SchnittstellenFehler.beendet {
                 beiStop()
@@ -90,6 +95,11 @@ final class ELBetrieb: ObservableObject {
 
     func ergebnisse() async -> [ELErgebnis] {
         (try? await schnittstelle.ergebnisse()) ?? []
+    }
+
+    /// Auswahllisten für Start und Ende; ohne Netz bzw. alter Server nil (dann freie Eingabe)
+    func vorlage() async -> ELVorlage? {
+        try? await schnittstelle.vorlage()
     }
 
     func halsbaender() async -> ELHalsbaender? {
