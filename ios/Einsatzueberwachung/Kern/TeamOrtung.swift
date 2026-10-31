@@ -90,6 +90,11 @@ final class TeamOrtung: ObservableObject {
         }
     }
 
+    /// Neues Token mit späterem Ablauf (Einsatzleitung, `/verlaengern`)
+    func ablaufSetzen(_ ablauf: Date) {
+        steuerung.expiresAt = ablauf
+    }
+
     /// Sicherheitsnetz: Ist `expiresAt` erreicht, endet die Ortung auch ohne Netz.
     func ablaufPruefen() {
         if zustand != .beendet, abgelaufen { beenden() }

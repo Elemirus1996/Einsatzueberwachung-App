@@ -36,6 +36,7 @@ struct ELUebersichtView: View {
                             .background(warnung.stufe >= 2 ? Color.red.opacity(0.2) : Color.orange.opacity(0.2),
                                         in: RoundedRectangle(cornerRadius: 12))
                     }
+                    if let verlaengerung = modell.elVerlaengerung { ELAblaufHinweis(verlaengerung: verlaengerung) }
                     einsatzKopf
                     if let lage = ansicht.lage, lage.einsatz.aktiv {
                         if lage.teams.isEmpty {
@@ -245,5 +246,16 @@ struct ELTeamKarte: View {
         }
         if let akku = g.akku { teile.append("\(akku) %") }
         return teile.isEmpty ? (g.name ?? "–") : teile.joined(separator: " · ")
+    }
+}
+
+/// „Anmeldung läuft um HH:mm ab“, wenn der Server das Verlängern abgelehnt hat (#141)
+struct ELAblaufHinweis: View {
+    @ObservedObject var verlaengerung: ELVerlaengerung
+
+    var body: some View {
+        if let text = verlaengerung.hinweis {
+            Label(text, systemImage: "clock.badge.exclamationmark").foregroundStyle(.orange)
+        }
     }
 }

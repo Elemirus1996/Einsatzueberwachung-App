@@ -23,6 +23,8 @@ final class AppModell: ObservableObject {
     @Published private(set) var elBetrieb: ELBetrieb?
     @Published private(set) var elKarte: ELKartenAnsicht?
     @Published private(set) var elVermisste: ELVermissteAnsicht?
+    @Published private(set) var elVerlaengerung: ELVerlaengerung?
+    private var elVerlaengerTakt: Task<Void, Never>?
     /// Hinweis nach Ende der EL-Sitzung durch den Server (Token abgelaufen, Passwort geändert).
     @Published private(set) var elHinweis: String?
     private var elAbmeldungDurchNutzer = false
@@ -165,7 +167,8 @@ final class AppModell: ObservableObject {
 
     private func elStarten(_ sitzung: ELSitzung) {
         elSitzung = sitzung
-        let client = ELClient(sitzung: sitzung)
+        let zugang = ELZugang(sitzung)
+        let client = ELClient(zugang: zugang)
         let ortung = TeamOrtung(
             schnittstelle: client, quelle: quelle, puffer: elPuffer, ablauf: sitzung.expiresAt,
             pauseOhneOrtung: true,
@@ -176,17 +179,43 @@ final class AppModell: ObservableObject {
         let betrieb = ELBetrieb(schnittstelle: client) { [weak self] in self?.elOrtung?.anwenden(.stop) }
         betrieb.nachAktion = { [weak ansicht] in await ansicht?.neuLaden() }
         ansicht.beiNotiz = { [weak betrieb] in await betrieb?.notizenLaden() }
-        ansicht.nachLage = { [weak betrieb] in await betrieb?.senden() }
         let karte = ELKartenAnsicht(schnittstelle: client)
         ansicht.beiPosition = { [weak karte] in karte?.position($0) }
         elKarte = karte
         let vermisste = ELVermissteAnsicht(schnittstelle: client)
         ansicht.beiVermisste = { [weak vermisste] in await vermisste?.laden() }
         elVermisste = vermisste
+        // #141: neues Token in den Schlüsselbund, Ablauf an die Ortung; alle Teile lesen es aus `zugang`
+        let verlaengerung = ELVerlaengerung(schnittstelle: client, zugang: zugang) { [weak self] neu in
+            guard let self else { return }
+            self.schluesselbund.speichern(neu, konto: Schluesselbund.kontoEL)
+            self.elSitzung = neu
+            self.elOrtung?.ablaufSetzen(neu.expiresAt)
+        }
+        ansicht.nachLage = { [weak betrieb, weak ansicht, weak verlaengerung] in
+            await betrieb?.senden()
+            await verlaengerung?.pruefen(einsatzLaeuft: ansicht?.lage?.einsatz.aktiv == true)
+        }
+        elVerlaengerung = verlaengerung
         elOrtung = ortung
         elAnsicht = ansicht
         elBetrieb = betrieb
         ortung.ablaufPruefen()
+        // Auch ohne sichtbare Übersicht (Ortung im Hintergrund) regelmäßig prüfen
+        elVerlaengerTakt?.cancel()
+        elVerlaengerTakt = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(600))
+                guard !Task.isCancelled, let self else { return }
+                await self.elVerlaengernPruefen()
+            }
+        }
+    }
+
+    /// Einsatz läuft, wenn die Lage es sagt oder die Ortung der Einsatzleitung im Modus `track` ist.
+    private func elVerlaengernPruefen() async {
+        let einsatzLaeuft = elAnsicht?.lage?.einsatz.aktiv == true || elOrtung?.zustand == .ortet
+        await elVerlaengerung?.pruefen(einsatzLaeuft: einsatzLaeuft)
     }
 
     private func elBeendet() {
@@ -204,6 +233,9 @@ final class AppModell: ObservableObject {
         elKarte?.anhalten()
         elKarte = nil
         elVermisste = nil
+        elVerlaengerTakt?.cancel()
+        elVerlaengerTakt = nil
+        elVerlaengerung = nil
     }
 
     /// App kommt in den Vordergrund: Ablauf prüfen und Status holen.
@@ -211,6 +243,7 @@ final class AppModell: ObservableObject {
         if let elOrtung {
             elOrtung.ablaufPruefen()
             await elOrtung.statusPruefen()
+            await elVerlaengernPruefen()
         }
         guard let team else { return }
         team.ablaufPruefen()
