@@ -17,6 +17,7 @@ import io.github.elemirus1996.einsatzspur.kern.TeamAuswahl
 import java.io.File
 import io.github.elemirus1996.einsatzspur.kern.ELAnmeldung
 import io.github.elemirus1996.einsatzspur.kern.ELAnsicht
+import io.github.elemirus1996.einsatzspur.kern.ELBetrieb
 import io.github.elemirus1996.einsatzspur.kern.ELClient
 import io.github.elemirus1996.einsatzspur.kern.ELSitzung
 import io.github.elemirus1996.einsatzspur.kern.ELVerlaengerung
@@ -93,6 +94,8 @@ class AppModell(private val context: Context) {
     val elOrtung: StateFlow<TeamOrtung?> = _elOrtung
     private val _elAnsicht = MutableStateFlow<ELAnsicht?>(null)
     val elAnsicht: StateFlow<ELAnsicht?> = _elAnsicht
+    private val _elBetrieb = MutableStateFlow<ELBetrieb?>(null)
+    val elBetrieb: StateFlow<ELBetrieb?> = _elBetrieb
     private val _elVerlaengerung = MutableStateFlow<ELVerlaengerung?>(null)
     val elVerlaengerung: StateFlow<ELVerlaengerung?> = _elVerlaengerung
     /** Hinweis nach Ende der EL-Sitzung durch den Server (Token abgelaufen, Passwort geändert). */
@@ -318,7 +321,12 @@ class AppModell(private val context: Context) {
             _elSitzung.value = neu
             _elOrtung.value?.ablaufSetzen(neu.expiresAtMs)
         }
+        val betrieb = ELBetrieb(client, ablage) { _elOrtung.value?.anwenden(SteuerAntwort.STOP) }
+        betrieb.nachAktion = { ansicht.neuLaden() }
+        ansicht.beiNotiz = { betrieb.notizenLaden() }
+        _elBetrieb.value = betrieb
         ansicht.nachLage = { lage ->
+            betrieb.senden()
             verlaengerung.pruefen(lage.einsatz.aktiv)
             datenschutzVersionPruefen(lage.datenschutzVersion, zugang.sitzung.kennung) { client.datenschutz() }
         }
@@ -345,6 +353,8 @@ class AppModell(private val context: Context) {
 
     private fun elBeendet() {
         _elAnsicht.value?.anhalten()
+        _elBetrieb.value?.vergessen()
+        _elBetrieb.value = null
         schluesselbund.elSitzungLoeschen()
         if (!elAbmeldungDurchNutzer) {
             _elHinweis.value = "Die Anmeldung der Einsatzleitung ist abgelaufen oder das Staffel-Passwort wurde geändert. Bitte neu anmelden."
