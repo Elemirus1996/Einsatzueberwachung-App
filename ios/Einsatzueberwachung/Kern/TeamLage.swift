@@ -47,6 +47,8 @@ struct TeamLage: Decodable, Equatable, Sendable {
     var suchgebiet: Suchgebiet?
     var halsband: Halsband?
     var mitteilungen: [Mitteilung]
+    /// Nur `version` (#148)
+    var datenschutz: Datenschutz?
 }
 
 struct Halsband: Decodable, Equatable, Sendable {

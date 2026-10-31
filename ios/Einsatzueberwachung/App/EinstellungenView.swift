@@ -39,6 +39,15 @@ struct EinstellungenView: View {
                         Text("Beendet die Ortung und vergisst den Anmelde-Code. Für den nächsten Einsatz wieder den QR-Code scannen.")
                     }
                 }
+                Section {
+                    NavigationLink("Datenschutzerklärungen der Staffeln") {
+                        DatenschutzListeView(erklaerungen: modell.datenschutz.alle())
+                    }
+                } header: {
+                    Text("Datenschutz")
+                } footer: {
+                    Text("Verantwortlich ist die Staffel, die den Server betreibt. Hier steht die zuletzt gezeigte Fassung je Server.")
+                }
                 Section("App") {
                     LabeledContent("Version", value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "–")
                 }

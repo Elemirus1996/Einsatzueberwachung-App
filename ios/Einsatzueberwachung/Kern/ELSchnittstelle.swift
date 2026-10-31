@@ -9,6 +9,8 @@ struct ELSitzung: Codable, Equatable, Sendable {
     var geraet: String?
     /// Bis wann `/verlaengern` höchstens geht (72 h ab Anmeldung mit Passwort), sobald bekannt
     var verlaengerbarBis: Date?
+    /// Feste Server-Kennung aus der Anmeldung (für die Bestätigung der Datenschutzerklärung, #148)
+    var kennung: String?
 }
 
 /// Hält das aktuelle Token der Einsatzleitung für alle Teile (Lage, Live, Aktionen, Ortung).
@@ -109,6 +111,8 @@ struct ELLage: Decodable, Equatable, Sendable {
     var einsatz: Einsatz
     var teams: [Team]
     var wetter: Wetter?
+    /// Nur `version` (#148)
+    var datenschutz: Datenschutz?
 }
 
 /// Live-Ereignisse der Einsatzleitung (Abschnitt 8).
@@ -165,9 +169,26 @@ struct ELAnmeldung: Sendable {
         var token: String
         var expiresAt: Date
         var server: ServerInfo?
+        var datenschutz: DatenschutzAngabe
+
+        private enum Schluessel: String, CodingKey { case token, expiresAt, server, datenschutz }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: Schluessel.self)
+            token = try c.decode(String.self, forKey: .token)
+            expiresAt = try c.decode(Date.self, forKey: .expiresAt)
+            server = try c.decodeIfPresent(ServerInfo.self, forKey: .server)
+            datenschutz = DatenschutzAngabe(c, .datenschutz)
+        }
     }
 
-    func anmelden(passwort: String, geraet: String?) async throws -> (ELSitzung, ServerInfo?) {
+    struct Angemeldet: Sendable {
+        var sitzung: ELSitzung
+        var server: ServerInfo?
+        var datenschutz: DatenschutzAngabe
+    }
+
+    func anmelden(passwort: String, geraet: String?) async throws -> Angemeldet {
         var request = URLRequest(url: server.pfad("api/el/app/v1/login"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -186,7 +207,8 @@ struct ELAnmeldung: Sendable {
         case 200..<300:
             guard let ergebnis = try? JSONDecoder.server.decode(Ergebnis.self, from: daten) else { throw ELAnmeldeFehler.antwortUngueltig }
             let name = geraet.flatMap { $0.isEmpty ? nil : String($0.prefix(40)) }
-            return (ELSitzung(server: server, token: ergebnis.token, expiresAt: ergebnis.expiresAt, geraet: name), ergebnis.server)
+            return Angemeldet(sitzung: ELSitzung(server: server, token: ergebnis.token, expiresAt: ergebnis.expiresAt, geraet: name),
+                              server: ergebnis.server, datenschutz: ergebnis.datenschutz)
         case 401: throw ELAnmeldeFehler.passwortFalsch
         case 429:
             let sekunden = ((try? JSONSerialization.jsonObject(with: daten)) as? [String: Any])?["wiederholenNachSec"] as? Int
@@ -239,6 +261,15 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle,
     func status() async throws -> SteuerAntwort { try await anfrage("status", methode: "GET", inhalt: nil) }
 
     func lage() async throws -> ELLage { try await anfrage("lage", methode: "GET", inhalt: nil) }
+
+    /// Ganze Erklärung zum Nachlesen bzw. bei neuer Version; 404 = keine hinterlegt
+    func datenschutz() async throws -> Datenschutz? {
+        do {
+            return try await anfrage("datenschutz", methode: "GET", inhalt: nil) as Datenschutz
+        } catch SchnittstellenFehler.server(let status) where status == 404 {
+            return nil
+        }
+    }
 
     func logo() async throws -> Data? {
         let (daten, http) = try await roh("logo", methode: "GET", inhalt: nil)
@@ -316,7 +347,7 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle,
         case 200..<300:
             guard let a = try? JSONDecoder.server.decode(Antwort.self, from: daten) else { throw SchnittstellenFehler.antwortUngueltig }
             return ELSitzung(server: alt.server, token: a.token, expiresAt: a.expiresAt, geraet: alt.geraet,
-                             verlaengerbarBis: a.verlaengerbarBis)
+                             verlaengerbarBis: a.verlaengerbarBis, kennung: alt.kennung)
         case 409:
             let text = ((try? JSONSerialization.jsonObject(with: daten)) as? [String: Any])?["error"] as? String
             throw ELVerlaengerFehler.nichtMoeglich(text ?? "Verlängern nicht möglich.")

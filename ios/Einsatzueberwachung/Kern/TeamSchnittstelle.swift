@@ -80,6 +80,15 @@ extension TeamClient: TeamAnsichtSchnittstelle {
         try await anfrage("lage", methode: "GET", inhalt: nil)
     }
 
+    /// Ganze Erklärung zum Nachlesen bzw. bei neuer Version; 404 = keine hinterlegt
+    func datenschutz() async throws -> Datenschutz? {
+        do {
+            return try await anfrage("datenschutz", methode: "GET", inhalt: nil) as Datenschutz
+        } catch SchnittstellenFehler.server(let status) where status == 404 {
+            return nil
+        }
+    }
+
     func tracks(seit: Int64?) async throws -> TeamTracks {
         try await anfrage("tracks", methode: "GET", inhalt: nil,
                           query: seit.map { [URLQueryItem(name: "seit", value: String($0))] } ?? [])
@@ -191,6 +200,30 @@ struct TeamAuswahl: Decodable, Equatable, Sendable {
     var staffel: String?
     var server: ServerInfo?
     var teams: [Eintrag]
+    /// Vor dem Token: Erklärung der Staffel, `keine` bei `null`, `fehlt` bei älterem Server (#148)
+    var datenschutz: DatenschutzAngabe = .fehlt
+
+    private enum Schluessel: String, CodingKey { case einsatz, uebung, staffel, server, teams, datenschutz }
+
+    init(einsatz: String? = nil, uebung: Bool? = nil, staffel: String? = nil, server: ServerInfo? = nil,
+         teams: [Eintrag], datenschutz: DatenschutzAngabe = .fehlt) {
+        self.einsatz = einsatz
+        self.uebung = uebung
+        self.staffel = staffel
+        self.server = server
+        self.teams = teams
+        self.datenschutz = datenschutz
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: Schluessel.self)
+        einsatz = try c.decodeIfPresent(String.self, forKey: .einsatz)
+        uebung = try c.decodeIfPresent(Bool.self, forKey: .uebung)
+        staffel = try c.decodeIfPresent(String.self, forKey: .staffel)
+        server = try c.decodeIfPresent(ServerInfo.self, forKey: .server)
+        teams = try c.decode([Eintrag].self, forKey: .teams)
+        datenschutz = DatenschutzAngabe(c, .datenschutz)
+    }
 }
 
 /// Native Anmeldung mit dem Anmelde-Code aus dem QR-Code (`login/teams`, `login`), ohne Token.

@@ -28,6 +28,15 @@ final class AppModell: ObservableObject {
     /// Hinweis nach Ende der EL-Sitzung durch den Server (Token abgelaufen, Passwort geändert).
     @Published private(set) var elHinweis: String?
     private var elAbmeldungDurchNutzer = false
+
+    // Datenschutzerklärung der Staffel (#148): zuerst Datenschutz, dann Heimatstaffel
+    @Published private(set) var datenschutzFrage: DatenschutzFrage?
+    let datenschutz = DatenschutzSpeicher()
+    private var datenschutzAbbruch: (() -> Void)?
+    private var datenschutzLaedt = false
+    private var heimatWartet: (info: ServerInfo, name: String)?
+    /// Feste Kennung des Team-Servers (aus login/teams bzw. config); ohne sie keine Versionsprüfung
+    private var teamKennung: String?
     private lazy var elPuffer = PositionsPuffer(datei: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appending(path: "el-positionen.sqlite"))
 
@@ -74,10 +83,71 @@ final class AppModell: ObservableObject {
         mitteiler.erlaubnisErfragen()
         if schluesselbund.speichern(zugang, konto: Schluesselbund.kontoEinsatzZugang) { einsatzZugang = zugang }
         teamWahl = nil
+        teamKennung = server?.kennung
         if let server, heimat.sollFragen(server) {
-            heimatFrage = (server, server.staffel ?? staffel ?? sitzung.server.name)
+            heimatFragen(server, name: server.staffel ?? staffel ?? sitzung.server.name)
         }
         teamAnmelden(sitzung)
+    }
+
+    // MARK: Datenschutz (#148)
+
+    /// Vor der Anmeldung bzw. direkt danach: Erklärung zeigen, wenn diese Version hier noch nicht bestätigt ist,
+    /// oder Hinweis, wenn die Staffel keine hinterlegt hat. `true`, wenn eine Abfrage offen ist.
+    @discardableResult
+    func datenschutzFragen(kennung: String, angabe: DatenschutzAngabe, abbrechen: (() -> Void)? = nil) -> Bool {
+        switch angabe {
+        case .fehlt:
+            return false
+        case .keine:
+            datenschutzFrage = DatenschutzFrage(kennung: kennung, erklaerung: nil)
+        case .erklaerung(let d):
+            datenschutz.merken(d, kennung: kennung)
+            guard datenschutz.offen(kennung: kennung, version: d.version) else { return false }
+            datenschutzFrage = DatenschutzFrage(kennung: kennung, erklaerung: d)
+        }
+        datenschutzAbbruch = abbrechen
+        return true
+    }
+
+    /// „Zur Kenntnis genommen“ (bzw. „OK“ beim Hinweis); danach ggf. die Frage nach der Heimatstaffel
+    func datenschutzBestaetigen() {
+        if let frage = datenschutzFrage, let d = frage.erklaerung {
+            datenschutz.bestaetigen(kennung: frage.kennung, version: d.version)
+        }
+        datenschutzFrage = nil
+        datenschutzAbbruch = nil
+        if let wartet = heimatWartet {
+            heimatWartet = nil
+            heimatFrage = wartet
+        }
+    }
+
+    /// Anmeldung abbrechen statt bestätigen (nur vor bzw. direkt nach der Anmeldung angeboten)
+    func datenschutzAbbrechen() {
+        let abbruch = datenschutzAbbruch
+        datenschutzFrage = nil
+        datenschutzAbbruch = nil
+        heimatWartet = nil
+        abbruch?()
+    }
+
+    var datenschutzAbbrechenMoeglich: Bool { datenschutzAbbruch != nil }
+
+    /// `config`/`lage` melden eine Version: Ist sie neu, die ganze Erklärung holen und erneut fragen.
+    func datenschutzVersionPruefen(_ version: String?, kennung: String?, laden: @escaping () async throws -> Datenschutz?) {
+        guard let kennung, datenschutz.offen(kennung: kennung, version: version),
+              datenschutzFrage == nil, !datenschutzLaedt else { return }
+        datenschutzLaedt = true
+        Task {
+            defer { datenschutzLaedt = false }
+            guard let d = try? await laden(), datenschutzFrage == nil else { return }
+            datenschutzFragen(kennung: kennung, angabe: .erklaerung(d))
+        }
+    }
+
+    private func heimatFragen(_ info: ServerInfo, name: String) {
+        if datenschutzFrage != nil { heimatWartet = (info, name) } else { heimatFrage = (info, name) }
     }
 
     func heimatBeantworten(_ eigeneStaffel: Bool) {
@@ -144,13 +214,19 @@ final class AppModell: ObservableObject {
 
     /// Anmeldung mit dem Staffel-Passwort an der internen Adresse (nur im VPN erreichbar).
     func elAnmelden(server: ServerAdresse, passwort: String, geraet: String?) async throws {
-        let (sitzung, info) = try await ELAnmeldung(server: server).anmelden(passwort: passwort, geraet: geraet)
+        let angemeldet = try await ELAnmeldung(server: server).anmelden(passwort: passwort, geraet: geraet)
+        let info = angemeldet.server
+        var sitzung = angemeldet.sitzung
+        sitzung.kennung = info?.kennung
         guard schluesselbund.speichern(sitzung, konto: Schluesselbund.kontoEL) else { return }
         elServerAdresse = server.name
         elHinweis = nil
         mitteiler.erlaubnisErfragen()
+        datenschutzFragen(kennung: info?.kennung ?? server.name, angabe: angemeldet.datenschutz) { [weak self] in
+            Task { await self?.elAbmelden() }
+        }
         if let info, heimat.sollFragen(info) {
-            heimatFrage = (info, info.staffel ?? server.name)
+            heimatFragen(info, name: info.staffel ?? server.name)
         } else if let info {
             Task { await heimat.aktualisieren(info) { try await ELClient(sitzung: sitzung).logo() } }
         }
@@ -192,9 +268,12 @@ final class AppModell: ObservableObject {
             self.elSitzung = neu
             self.elOrtung?.ablaufSetzen(neu.expiresAt)
         }
-        ansicht.nachLage = { [weak betrieb, weak ansicht, weak verlaengerung] in
+        ansicht.nachLage = { [weak self, weak betrieb, weak ansicht, weak verlaengerung] in
             await betrieb?.senden()
             await verlaengerung?.pruefen(einsatzLaeuft: ansicht?.lage?.einsatz.aktiv == true)
+            self?.datenschutzVersionPruefen(ansicht?.lage?.datenschutz?.version, kennung: zugang.sitzung.kennung) {
+                try await client.datenschutz()
+            }
         }
         elVerlaengerung = verlaengerung
         elOrtung = ortung
@@ -269,6 +348,8 @@ final class AppModell: ObservableObject {
             let client = TeamClient(sitzung: sitzung)
             let config = try await client.config()
             team.anwenden(config.steuerung)
+            if let kennung = config.server?.kennung { teamKennung = kennung }
+            datenschutzVersionPruefen(config.datenschutz?.version, kennung: teamKennung) { try await client.datenschutz() }
             if let server = config.server {
                 await heimat.aktualisieren(server) { try await client.logo() }
             }
@@ -293,6 +374,9 @@ final class AppModell: ObservableObject {
         team?.beiModuswechsel = { [weak self] _ in self?.teamAnsicht?.modusGeaendert() }
         teamAnsicht?.beiMeldungen = { [weak self] meldungen in
             meldungen.forEach { self?.mitteiler.senden($0) }
+        }
+        teamAnsicht?.beiLage = { [weak self] lage in
+            self?.datenschutzVersionPruefen(lage.datenschutz?.version, kennung: self?.teamKennung) { try await client.datenschutz() }
         }
         team?.ablaufPruefen()
     }
