@@ -73,6 +73,7 @@ protocol TeamAnsichtSchnittstelle: Sendable {
     func statusmeldung(id: String, code: Statusmeldung.Code) async throws
     func suche(id: String, aktion: Suchaktion) async throws -> SuchAntwort
     func ereignisse() async throws -> AsyncThrowingStream<TeamEreignis, Error>
+    func punkt(_ punkt: TeamPunkt) async throws
 }
 
 extension TeamClient: TeamAnsichtSchnittstelle {
@@ -133,6 +134,22 @@ extension TeamClient: TeamAnsichtSchnittstelle {
         }
     }
 
+    /// `POST /punkt` (Abschnitt 13). 400/409 → `PunktFehler.abgelehnt` mit Text des Servers (nicht wiederholen).
+    func punkt(_ punkt: TeamPunkt) async throws {
+        var request = request("punkt", methode: "POST")
+        request.httpBody = try JSONEncoder.server.encode(punkt)
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let (daten, antwort) = try await session.data(for: request)
+        guard let http = antwort as? HTTPURLResponse else { throw SchnittstellenFehler.antwortUngueltig }
+        struct Fehler: Decodable { var error: String? }
+        switch http.statusCode {
+        case 200..<300: return
+        case 400, 409: throw PunktFehler.abgelehnt(text: (try? JSONDecoder().decode(Fehler.self, from: daten))?.error)
+        case 410: throw SchnittstellenFehler.beendet
+        default: throw SchnittstellenFehler.server(status: http.statusCode)
+        }
+    }
+
     /// Server-Sent Events. Endet, wenn die Verbindung abbricht; 410 beim Verbinden → `beendet`.
     func ereignisse() async throws -> AsyncThrowingStream<TeamEreignis, Error> {
         var request = request("ereignisse")
@@ -166,6 +183,11 @@ extension TeamClient: TeamAnsichtSchnittstelle {
             fortsetzung.onTermination = { _ in aufgabe.cancel() }
         }
     }
+}
+
+enum PunktFehler: Error, Equatable {
+    /// Vom Server abgelehnt (ungültig oder 50 Punkte erreicht); Text des Servers zum Anzeigen
+    case abgelehnt(text: String?)
 }
 
 enum SuchFehler: Error, Equatable {

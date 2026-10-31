@@ -11,7 +11,19 @@ import org.json.JSONException
 import org.json.JSONObject
 
 /** Antwort von `GET /karte` der Einsatzleitung (APP_API.md „native App“ Abschnitt 6), wie iOS `ELKarte`. */
-data class ELKarte(val suchgebiete: List<Suchgebiet>, val positionen: List<ELPosition>) {
+data class ELKarte(val suchgebiete: List<Suchgebiet>, val positionen: List<ELPosition>, val punkte: List<Punkt> = emptyList()) {
+    /** Kartenpunkt (Variante C); `teamId` bei Punkten, die ein Team per App gesetzt hat */
+    data class Punkt(
+        val id: String,
+        val name: String?,
+        val beschreibung: String?,
+        val farbe: String?,
+        val lat: Double,
+        val lng: Double,
+        val zeitMs: Long?,
+        val teamId: String?,
+    )
+
     /** `abdeckungProzent` ist `null`, solange der Server nichts berechnet hat. */
     data class Suchgebiet(
         val id: String,
@@ -45,6 +57,14 @@ data class ELKarte(val suchgebiete: List<Suchgebiet>, val positionen: List<ELPos
                     )
                 },
                 positionen = (0 until positionen.length()).map { ELPosition.aus(positionen.getJSONObject(it)) },
+                // Ältere Server ohne Kartenpunkte: leer
+                punkte = json.optJSONArray("punkte")?.let { a ->
+                    (0 until a.length()).map { i ->
+                        val p = a.getJSONObject(i)
+                        Punkt(p.getString("id"), p.textOderNull("name"), p.textOderNull("beschreibung"), p.textOderNull("farbe"),
+                            p.getDouble("lat"), p.getDouble("lng"), isoZuMs(p.textOderNull("zeit")), p.textOderNull("teamId"))
+                    }
+                } ?: emptyList(),
             )
         } catch (e: JSONException) {
             throw SchnittstellenFehler.AntwortUngueltig
@@ -135,6 +155,11 @@ class ELKartenAnsicht(
     fun anhalten() {
         aufgabe?.cancel()
         aufgabe = null
+    }
+
+    /** Live-Ereignis `punkt`: nur die Karte neu laden, nicht die Tracks */
+    suspend fun karteNeuLaden() {
+        versuchen { schnittstelle.karte() }?.let { _karte.value = it }
     }
 
     /** `voll`: Karte und Tracks ohne `seit`; sonst nur neue Punkte, außer die letzte volle Abfrage ist zu alt. */

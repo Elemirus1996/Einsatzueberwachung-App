@@ -20,7 +20,7 @@ private val SERVER = ServerAdresse.aus("https://einsatz.intern")!!
 private const val JETZT = 1_800_000_000_000L
 private const val STUNDE = 3_600_000L
 
-private const val LAGE_JSON = """
+internal const val LAGE_JSON = """
 { "mode": "track", "serverZeit": "2027-01-15T08:00:00Z",
   "einsatz": { "aktiv": true, "text": "Vermisste Person · Testwald", "szenario": "Flaeche", "uebung": true, "beginn": "2027-01-15T07:00:00Z", "einsatzleiter": "Anna" },
   "teams": [ { "teamId": "t1", "teamName": "Team Rex", "dogName": "Rex", "hundefuehrerName": "Anna", "helfer": ["Ben"],

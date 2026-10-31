@@ -203,6 +203,8 @@ sealed class ELEreignis {
     data object Vermisste : ELEreignis()
     data class Einsatz(val aktiv: Boolean) : ELEreignis()
     data class Warnung(val teamId: String?, val stufe: Int, val text: String) : ELEreignis()
+    /** Kartenpunkt neu, geändert oder gelöscht; `text` nur bei einem neuen Punkt eines Teams */
+    data class Punkt(val id: String, val teamId: String?, val aenderung: String, val text: String?) : ELEreignis()
     data object Stop : ELEreignis()
     data class Verdraengt(val wiederholenNachSec: Int) : ELEreignis()
 
@@ -217,6 +219,9 @@ sealed class ELEreignis {
                 "vermisste" -> Vermisste
                 "einsatz" -> Einsatz(json.optBoolean("aktiv", false))
                 "warnung" -> Warnung(json.textOderNull("teamId"), json.optInt("stufe", 1), json.textOderNull("text") ?: "Warnung")
+                "punkt" -> json.textOderNull("id")?.let {
+                    Punkt(it, json.textOderNull("teamId"), json.textOderNull("aenderung") ?: "geaendert", json.textOderNull("text"))
+                }
                 "stop" -> Stop
                 "verdraengt" -> Verdraengt(json.optInt("wiederholenNachSec", 60))
                 else -> null

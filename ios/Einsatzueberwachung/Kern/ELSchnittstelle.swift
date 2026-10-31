@@ -124,6 +124,8 @@ enum ELEreignis: Equatable, Sendable {
     case vermisste
     case einsatz(aktiv: Bool)
     case warnung(teamId: String?, stufe: Int, text: String)
+    /// Kartenpunkt neu, geändert oder gelöscht; `text` nur bei einem neuen Punkt eines Teams
+    case punkt(id: String, teamId: String?, aenderung: String, text: String?)
     case stop
     case verdraengt(wiederholenNachSec: Int)
 
@@ -140,6 +142,10 @@ enum ELEreignis: Equatable, Sendable {
         case "einsatz": self = .einsatz(aktiv: json["aktiv"] as? Bool ?? false)
         case "warnung":
             self = .warnung(teamId: json["teamId"] as? String, stufe: json["stufe"] as? Int ?? 1, text: json["text"] as? String ?? "Warnung")
+        case "punkt":
+            guard let id = json["id"] as? String else { return nil }
+            self = .punkt(id: id, teamId: json["teamId"] as? String, aenderung: json["aenderung"] as? String ?? "geaendert",
+                          text: json["text"] as? String)
         case "stop": self = .stop
         case "verdraengt": self = .verdraengt(wiederholenNachSec: json["wiederholenNachSec"] as? Int ?? 60)
         default: return nil

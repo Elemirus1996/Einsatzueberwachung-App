@@ -27,6 +27,10 @@ struct ELAktion: Codable, Equatable, Identifiable, Sendable {
     static func mitteilung(_ teamId: String, name: String, text: String) -> ELAktion {
         neu("teams/\(teamId)/mitteilung", "Mitteilung an \(name)", ["text": .text(text)])
     }
+    /// Kartenpunkt als Navigationsziel an das Team (Abschnitt 7, Variante C)
+    static func ziel(_ teamId: String, name: String, punktId: String, punktName: String) -> ELAktion {
+        neu("teams/\(teamId)/ziel", "Ziel „\(punktName)“ an \(name)", ["punktId": .text(punktId)])
+    }
     static func notiz(_ text: String, teamId: String?) -> ELAktion {
         neu("notizen", "Notiz", ["text": .text(text), "teamId": teamId.map(ELWert.text) ?? .null])
     }
@@ -49,13 +53,16 @@ struct ELAktion: Codable, Equatable, Identifiable, Sendable {
 
     /// Einsatz beenden wie `/el/beenden`; `ressourcenGeprueft` muss wahr sein.
     /// `teamIds` nil = alle Teams im Bericht; `endzeit` nil = jetzt (Server), sonst als UTC mit `Z`.
+    /// `mitPunkten`: Kartenpunkte ins Archiv und in den Bericht (sonst werden sie nicht archiviert)
     static func einsatzBeenden(ergebnis: String, mitTracks: Bool, kartenart: String = ELKartenart.streets.rawValue,
-                               teamIds: [String]? = nil, endzeit: Date? = nil, bemerkungen: String? = nil) -> ELAktion {
+                               teamIds: [String]? = nil, endzeit: Date? = nil, bemerkungen: String? = nil,
+                               mitPunkten: Bool = false) -> ELAktion {
         var inhalt: [String: ELWert] = [
             "ergebnis": .text(ergebnis),
             "ressourcenGeprueft": .wahr(true),
             "pdf": .objekt(["tracks": .wahr(mitTracks), "kartenart": .text(kartenart),
-                            "teamIds": teamIds.map { .liste($0.map(ELWert.text)) } ?? .null]),
+                            "teamIds": teamIds.map { .liste($0.map(ELWert.text)) } ?? .null,
+                            "punkte": .wahr(mitPunkten)]),
         ]
         if let endzeit { inhalt["endzeit"] = .text(ELEinsatzEnde.utc(endzeit)) }
         if let text = bemerkungen?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty { inhalt["bemerkungen"] = .text(text) }

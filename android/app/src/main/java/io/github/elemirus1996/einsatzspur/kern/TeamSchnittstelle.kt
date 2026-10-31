@@ -43,6 +43,7 @@ interface TeamAnsichtSchnittstelle {
     suspend fun tracks(seit: Long?): TeamTracks
     suspend fun statusmeldung(id: String, meldung: Statusmeldung)
     suspend fun suche(id: String, aktion: Suchaktion): SuchAntwort
+    suspend fun punkt(punkt: TeamPunkt)
 
     /** Server-Sent Events; endet, wenn die Verbindung abbricht. 410 beim Verbinden → [SchnittstellenFehler.Beendet]. */
     fun ereignisse(): Flow<TeamEreignis>
@@ -78,6 +79,17 @@ class TeamClient(private val sitzung: TeamSitzung) : TeamSchnittstelle, TeamAnsi
             in 200..299 -> SuchAntwort(Modus.aus(json?.optString("mode")), suche)
             409 -> throw SuchFehler.Abgelehnt(fehler, suche)
             403 -> throw SuchFehler.Verboten(fehler)
+            410 -> throw SchnittstellenFehler.Beendet
+            else -> throw SchnittstellenFehler.Server(status)
+        }
+    }
+
+    /** `POST /punkt` (Abschnitt 13). 400/409 → [PunktAbgelehnt] mit Text des Servers. */
+    override suspend fun punkt(punkt: TeamPunkt) {
+        val (status, text) = http(sitzung.server.pfad("api/team-mobile/app/v1/punkt"), "POST", punkt.json(), sitzung.token)
+        when (status) {
+            in 200..299 -> Unit
+            400, 409 -> throw PunktAbgelehnt(runCatching { JSONObject(text).optString("error") }.getOrNull()?.ifEmpty { null })
             410 -> throw SchnittstellenFehler.Beendet
             else -> throw SchnittstellenFehler.Server(status)
         }

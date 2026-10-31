@@ -257,6 +257,8 @@ final class AppModell: ObservableObject {
         ansicht.beiNotiz = { [weak betrieb] in await betrieb?.notizenLaden() }
         let karte = ELKartenAnsicht(schnittstelle: client)
         ansicht.beiPosition = { [weak karte] in karte?.position($0) }
+        ansicht.beiPunkt = { [weak karte] in await karte?.karteNeuLaden() }
+        ansicht.beiTon = { Toene.geraet.spielen($0) }
         elKarte = karte
         let vermisste = ELVermissteAnsicht(schnittstelle: client)
         ansicht.beiVermisste = { [weak vermisste] in await vermisste?.laden() }

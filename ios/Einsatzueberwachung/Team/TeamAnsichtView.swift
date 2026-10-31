@@ -13,6 +13,8 @@ struct TeamAnsichtView: View {
     @State private var satellit = false
     @State private var infoOffen = false
     @State private var beendenFragen = false
+    @State private var punktOffen = false
+    @ObservedObject private var toene = Toene.geraet
 
     var body: some View {
         Group {
@@ -44,7 +46,12 @@ struct TeamAnsichtView: View {
         .onChange(of: phase) { _, neu in
             if neu == .active { ansicht.starten() } else if neu == .background { ansicht.hintergrund() }
         }
-        .sensoryFeedback(.warning, trigger: ansicht.ungelesen.count) { alt, neu in neu > alt }
+        .sheet(isPresented: $punktOffen) { PunktSetzenView(ansicht: ansicht) }
+        // Ton je Art (Einstellungen): Navigationsziel oder Mitteilung
+        .onChange(of: ansicht.ungelesen.count) { alt, neu in
+            guard neu > alt, phase == .active else { return }
+            toene.spielen(ansicht.ungelesen.last?.ziel != nil ? .navigationsziel : .mitteilung)
+        }
     }
 
     // MARK: Kopf
@@ -175,10 +182,11 @@ struct TeamAnsichtView: View {
         VStack(spacing: 6) {
             ForEach(ansicht.ungelesen.suffix(3)) { mitteilung in
                 HStack(alignment: .top) {
-                    Image(systemName: "megaphone.fill").foregroundStyle(.orange)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(mitteilung.text).font(.subheadline.bold())
+                    Image(systemName: mitteilung.ziel == nil ? "megaphone.fill" : "flag.fill").foregroundStyle(.orange)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(mitteilung.ziel.map { "Neues Ziel: \($0.name)" } ?? mitteilung.text).font(.subheadline.bold())
                         Text(mitteilung.zeit, style: .time).font(.caption).foregroundStyle(.secondary)
+                        if let ziel = mitteilung.ziel { NavigationStartenKnopf(ziel: ziel) }
                     }
                     Spacer()
                     Button("OK") { ansicht.alsGelesen(mitteilung) }
@@ -233,11 +241,22 @@ struct TeamAnsichtView: View {
                     .tint(code.farbe)
                     .sensoryFeedback(.impact, trigger: ansicht.offeneMeldungen.count)
                 }
+                Button {
+                    punktOffen = true
+                } label: {
+                    VStack(spacing: 2) {
+                        Image(systemName: "mappin.and.ellipse").font(.title3)
+                        Text("Punkt setzen").font(.caption2)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .tint(.orange)
             }
             TimelineView(.periodic(from: .now, by: 1)) { kontext in
                 Text(meldungsHinweis(kontext.date))
                     .font(.caption)
-                    .foregroundStyle(ansicht.offeneMeldungen.isEmpty && ansicht.offeneAktionen.isEmpty ? Color.green : Color.orange)
+                    .foregroundStyle(meldungsHinweisFarbe(kontext.date))
                     .frame(height: 14)
             }
         }
@@ -251,9 +270,21 @@ struct TeamAnsichtView: View {
         }
     }
 
+    private func meldungsHinweisFarbe(_ jetzt: Date) -> Color {
+        if let hinweis = ansicht.punktHinweis, jetzt.timeIntervalSince(hinweis.zeit) < 6, !hinweis.ok { return .red }
+        return ansicht.offeneMeldungen.isEmpty && ansicht.offeneAktionen.isEmpty && ansicht.offenePunkte.isEmpty ? .green : .orange
+    }
+
     private func meldungsHinweis(_ jetzt: Date) -> String {
         if let offen = ansicht.offeneAktionen.first {
             return "„\(offen.aktion.titel)“ wartet auf Netz"
+        }
+        if let hinweis = ansicht.punktHinweis, jetzt.timeIntervalSince(hinweis.zeit) < 6 {
+            return hinweis.text
+        }
+        if !ansicht.offenePunkte.isEmpty {
+            let anzahl = ansicht.offenePunkte.count
+            return anzahl == 1 ? "1 Punkt wartet auf Netz" : "\(anzahl) Punkte warten auf Netz"
         }
         if let hinweis = ansicht.suchHinweis, jetzt.timeIntervalSince(hinweis.zeit) < 6 {
             return hinweis.text
@@ -407,9 +438,11 @@ private struct TeamInfoView: View {
                 if !(ansicht.lage?.mitteilungen.isEmpty ?? true) {
                     Section("Mitteilungen der Einsatzleitung") {
                         ForEach((ansicht.lage?.mitteilungen ?? []).reversed()) { mitteilung in
-                            VStack(alignment: .leading) {
+                            VStack(alignment: .leading, spacing: 4) {
                                 Text(mitteilung.text)
                                 Text(mitteilung.zeit, style: .time).font(.caption).foregroundStyle(.secondary)
+                                // Ziele bleiben hier erreichbar, auch nach „OK“
+                                if let ziel = mitteilung.ziel { NavigationStartenKnopf(ziel: ziel) }
                             }
                         }
                     }

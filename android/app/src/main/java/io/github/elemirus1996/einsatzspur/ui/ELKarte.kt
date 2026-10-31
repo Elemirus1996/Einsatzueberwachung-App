@@ -3,7 +3,11 @@ package io.github.elemirus1996.einsatzspur.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -67,7 +71,7 @@ import org.maplibre.android.style.sources.GeoJsonSource
  * gestrichelt, Laufwege je Team, Halsbänder, Team-Handys, Einsatzleitung und ELW. Positionen bewegen sich live.
  */
 @Composable
-fun ELLagekarteScreen(karte: ELKartenAnsicht, teams: List<ELLage.Team>, zurueck: () -> Unit) {
+fun ELLagekarteScreen(karte: ELKartenAnsicht, teams: List<ELLage.Team>, betrieb: io.github.elemirus1996.einsatzspur.kern.ELBetrieb, zurueck: () -> Unit) {
     val lebenszyklus = LocalLifecycleOwner.current
     val daten by karte.karte.collectAsState()
     val tracks by karte.tracks.collectAsState()
@@ -76,6 +80,7 @@ fun ELLagekarteScreen(karte: ELKartenAnsicht, teams: List<ELLage.Team>, zurueck:
     var eingepasst by remember { mutableStateOf(false) }
     // Zählt Kamerabewegungen, damit die Beschriftungen mitwandern
     var kamera by remember { mutableIntStateOf(0) }
+    var gewaehlterPunkt by remember { mutableStateOf<ELKarte.Punkt?>(null) }
     val (ansicht, m) = rememberMapView()
     BackHandler(onBack = zurueck)
 
@@ -101,11 +106,27 @@ fun ELLagekarteScreen(karte: ELKartenAnsicht, teams: List<ELLage.Team>, zurueck:
         onDispose { m?.removeOnCameraMoveListener(bewegt) }
     }
 
+    // Kartenpunkt antippen (Variante C): nächster Punkt im Umkreis von 40 px → an ein Team senden
+    DisposableEffect(m, daten) {
+        val k = m
+        val tippen = MapLibreMap.OnMapClickListener { ort ->
+            val tipp = k?.projection?.toScreenLocation(ort) ?: return@OnMapClickListener false
+            val treffer = daten?.punkte.orEmpty().map { p -> p to k.projection.toScreenLocation(LatLng(p.lat, p.lng)) }
+                .map { (p, s) -> p to kotlin.math.hypot((s.x - tipp.x).toDouble(), (s.y - tipp.y).toDouble()) }
+                .filter { it.second <= 40 * ansicht.resources.displayMetrics.density }
+                .minByOrNull { it.second }?.first
+            if (treffer != null) gewaehlterPunkt = treffer
+            treffer != null
+        }
+        k?.addOnMapClickListener(tippen)
+        onDispose { k?.removeOnMapClickListener(tippen) }
+    }
+
     LaunchedEffect(m, art) {
         val k = m ?: return@LaunchedEffect
         stil = null
         k.setStyle(Style.Builder().fromJson(stilJson(art))) { s ->
-            listOf("gebiete", "gebiete-fertig", "fruehere", "mensch", "hund", "positionen").forEach { s.addSource(GeoJsonSource(it)) }
+            listOf("gebiete", "gebiete-fertig", "fruehere", "mensch", "hund", "punkte", "positionen").forEach { s.addSource(GeoJsonSource(it)) }
             s.addLayer(FillLayer("gebiete-flaeche", "gebiete").withProperties(fillColor(get("farbe")), fillOpacity(0.15f)))
             s.addLayer(LineLayer("gebiete-rand", "gebiete").withProperties(lineColor(get("farbe")), lineWidth(2f)))
             // Abgeschlossene Gebiete blasser, gestrichelt
@@ -115,6 +136,9 @@ fun ELLagekarteScreen(karte: ELKartenAnsicht, teams: List<ELLage.Team>, zurueck:
             s.addLayer(LineLayer("fruehere", "fruehere").withProperties(lineColor(get("farbe")), lineWidth(2f), lineOpacity(0.4f)))
             s.addLayer(LineLayer("mensch", "mensch").withProperties(lineColor("#1F6FC4"), lineWidth(3f)))
             s.addLayer(LineLayer("hund", "hund").withProperties(lineColor("#C62828"), lineWidth(3f)))
+            // Kartenpunkte als Quadrat-ähnliche Kreise mit dunklem Rand, von Positionen unterscheidbar
+            s.addLayer(CircleLayer("punkte", "punkte").withProperties(
+                circleColor(get("farbe")), circleRadius(7f), circleStrokeColor("#333333"), circleStrokeWidth(2f)))
             s.addLayer(CircleLayer("positionen", "positionen").withProperties(
                 circleColor(get("farbe")), circleRadius(8f), circleStrokeColor("#FFFFFF"), circleStrokeWidth(2.5f)))
             stil = s
@@ -132,6 +156,7 @@ fun ELLagekarteScreen(karte: ELKartenAnsicht, teams: List<ELLage.Team>, zurueck:
         val laufend = tracks?.laufend.orEmpty()
         quelle(s, "mensch", laufend.filter { it.mensch.size > 1 }.map { l -> merkmal(linie(l.mensch.map { Koordinate(it.lat, it.lng) })) })
         quelle(s, "hund", laufend.filter { it.hund.size > 1 }.map { l -> merkmal(linie(l.hund.map { Koordinate(it.lat, it.lng) })) })
+        quelle(s, "punkte", daten?.punkte.orEmpty().map { merkmal(punkt(Koordinate(it.lat, it.lng)), it.farbe ?: "#2196F3") })
         quelle(s, "positionen", daten?.positionen.orEmpty().map { merkmal(punkt(Koordinate(it.lat, it.lng)), farbe(it.art)) })
 
         // Beim ersten Mal auf Gebiete und Positionen einpassen, danach nicht mehr bewegen
@@ -168,6 +193,9 @@ fun ELLagekarteScreen(karte: ELKartenAnsicht, teams: List<ELLage.Team>, zurueck:
                     daten?.positionen.orEmpty().forEach { p ->
                         beschriftung(p, teams).takeIf { it.isNotEmpty() }?.let { Beschriftung(k, Koordinate(p.lat, p.lng), it, ueber = true) }
                     }
+                    daten?.punkte.orEmpty().forEach { p ->
+                        p.name?.takeIf { it.isNotBlank() }?.let { Beschriftung(k, Koordinate(p.lat, p.lng), it, ueber = true) }
+                    }
                 }
                 if (daten?.let { it.suchgebiete.isEmpty() && it.positionen.isEmpty() } == true) {
                     Text(
@@ -181,6 +209,7 @@ fun ELLagekarteScreen(karte: ELKartenAnsicht, teams: List<ELLage.Team>, zurueck:
                     onClick = { art = if (art == Kartenart.TOPO) Kartenart.OSM else Kartenart.TOPO },
                     modifier = Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = 40.dp),
                 ) { Text(if (art == Kartenart.TOPO) Kartenart.OSM.titel else Kartenart.TOPO.titel) }
+                gewaehlterPunkt?.let { PunktSendenDialog(it, teams, betrieb) { gewaehlterPunkt = null } }
                 // Quellenangabe immer sichtbar (Nutzungsregeln OSM/OpenTopoMap)
                 Text(
                     art.quelle, Modifier.align(Alignment.BottomStart).background(Color(0xCCFFFFFF)).padding(horizontal = 4.dp),
@@ -189,6 +218,34 @@ fun ELLagekarteScreen(karte: ELKartenAnsicht, teams: List<ELLage.Team>, zurueck:
             }
         }
     }
+}
+
+/** Kartenpunkt ansehen und als Navigationsziel an ein Team senden (`/teams/{teamId}/ziel`), wie iOS `ELPunktView`. */
+@Composable
+private fun PunktSendenDialog(punkt: ELKarte.Punkt, teams: List<ELLage.Team>, betrieb: io.github.elemirus1996.einsatzspur.kern.ELBetrieb, schliessen: () -> Unit) {
+    val bereich = rememberCoroutineScope()
+    AlertDialog(
+        onDismissRequest = schliessen,
+        title = { Text(punkt.name ?: "Punkt") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                punkt.beschreibung?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                Text(String.format(java.util.Locale.ROOT, "%.6f, %.6f", punkt.lat, punkt.lng), style = MaterialTheme.typography.bodySmall)
+                Text("An Team senden", fontWeight = FontWeight.Bold)
+                if (teams.isEmpty()) Text("Noch keine Teams im Einsatz.")
+                teams.forEach { team ->
+                    TextButton(onClick = {
+                        bereich.launch {
+                            betrieb.ausfuehren(io.github.elemirus1996.einsatzspur.kern.ELAktion.ziel(team.teamId, team.teamName, punkt.id, punkt.name ?: "Punkt"))
+                        }
+                        schliessen()
+                    }) { Text(team.teamName) }
+                }
+                Text("Das Team bekommt den Punkt als Ziel und startet damit seine Navigation.", style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = { TextButton(onClick = schliessen) { Text("Schließen") } },
+    )
 }
 
 /** Beschriftung an einer Koordinate: über dem Marker bzw. mittig auf dem Gebiet. */

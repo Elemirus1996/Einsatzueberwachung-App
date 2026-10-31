@@ -13,6 +13,8 @@ final class ELAnsicht: ObservableObject {
     @Published private(set) var verbindungsfehler = false
     /// Letzte Warnung (Warnstufe 1 oder 2) für Hinweis, Ton und Vibration.
     @Published private(set) var warnung: (text: String, stufe: Int, zeit: Date)?
+    /// Letzter Punkt, den ein Team per App gesetzt hat (Hinweis)
+    @Published private(set) var teamPunkt: (text: String, zeit: Date)?
 
     private let schnittstelle: ELLageSchnittstelle
     private let jetzt: () -> Date
@@ -30,6 +32,10 @@ final class ELAnsicht: ObservableObject {
     var beiVermisste: (() async -> Void)?
     /// Live-Position für die Karte
     var beiPosition: ((ELPosition) -> Void)?
+    /// Kartenpunkt geändert (Karte neu laden)
+    var beiPunkt: (() async -> Void)?
+    /// Ton je Art (Punkt vom Team, Funk); Warnungen über `beiWarnung`
+    var beiTon: ((Tonart) -> Void)?
     /// Nach jeder erfolgreich geladenen Lage (wartende Aktionen senden)
     var nachLage: (() async -> Void)?
 
@@ -103,8 +109,17 @@ final class ELAnsicht: ObservableObject {
             await neuLaden()
         case .verdraengt(let sekunden):
             verdraengtWarten = .seconds(min(max(sekunden, 5), 600))
-        case .notiz, .funk:
+        case .notiz:
             await beiNotiz?()
+        case .funk:
+            beiTon?(.funk)
+            await beiNotiz?()
+        case .punkt(_, let teamId, let aenderung, let text):
+            if aenderung == "neu", teamId != nil {
+                teamPunkt = (text ?? "Neuer Punkt von einem Team", jetzt())
+                beiTon?(.punktVomTeam)
+            }
+            await beiPunkt?()
         case .position(let p):
             beiPosition?(p)
         case .vermisste:

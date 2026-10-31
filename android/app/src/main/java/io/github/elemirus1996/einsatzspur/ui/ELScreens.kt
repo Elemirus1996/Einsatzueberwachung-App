@@ -177,6 +177,7 @@ fun ELUebersichtScreen(
     karte: ELKartenAnsicht?,
     vermisste: ELVermissteAnsicht?,
     verlaengerung: ELVerlaengerung?,
+    toene: io.github.elemirus1996.einsatzspur.kern.Toene,
     abmelden: suspend () -> Unit,
 ) {
     var funkOffen by remember { mutableStateOf(false) }
@@ -194,7 +195,7 @@ fun ELUebersichtScreen(
         return
     }
     if (karteOffen && karte != null) {
-        ELLagekarteScreen(karte, ansicht.lage.collectAsState().value?.teams ?: emptyList(), zurueck = { karteOffen = false })
+        ELLagekarteScreen(karte, ansicht.lage.collectAsState().value?.teams ?: emptyList(), betrieb, zurueck = { karteOffen = false })
         return
     }
     val context = LocalContext.current
@@ -203,6 +204,7 @@ fun ELUebersichtScreen(
     val live by ansicht.live.collectAsState()
     val verbindungsfehler by ansicht.verbindungsfehler.collectAsState()
     val warnung by ansicht.warnung.collectAsState()
+    val teamPunkt by ansicht.teamPunkt.collectAsState()
     val zustand by ortung.zustand.collectAsState()
     val ablaufHinweis = verlaengerung?.hinweis?.collectAsState()?.value
     var jetzt by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -215,16 +217,9 @@ fun ELUebersichtScreen(
         }
     }
     DisposableEffect(ansicht) {
-        // Warnton und Vibration bei Eskalation
+        // Warnton je Einstellung; Stufe 2 lässt sich nicht abschalten
         ansicht.beiWarnung = { stufe ->
-            runCatching {
-                ToneGenerator(AudioManager.STREAM_NOTIFICATION, 100)
-                    .startTone(if (stufe >= 2) ToneGenerator.TONE_CDMA_EMERGENCY_RINGBACK else ToneGenerator.TONE_PROP_BEEP2, 800)
-            }
-            runCatching {
-                context.getSystemService(Vibrator::class.java)
-                    ?.vibrate(VibrationEffect.createWaveform(if (stufe >= 2) longArrayOf(0, 400, 200, 400) else longArrayOf(0, 300), -1))
-            }
+            toene.spielen(if (stufe >= 2) io.github.elemirus1996.einsatzspur.kern.Tonart.WARNUNG2 else io.github.elemirus1996.einsatzspur.kern.Tonart.WARNUNG1)
         }
         onDispose { ansicht.beiWarnung = null }
     }
@@ -268,6 +263,14 @@ fun ELUebersichtScreen(
                         modifier = Modifier.fillMaxWidth().background(
                             (if (w.stufe >= 2) Color.Red else ORANGE).copy(alpha = 0.2f), RoundedCornerShape(12.dp),
                         ).padding(16.dp),
+                    )
+                }
+            }
+            teamPunkt?.takeIf { jetzt - it.second < 30_000 }?.let { (text, _) ->
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        text, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.fillMaxWidth().background(ORANGE.copy(alpha = 0.2f), RoundedCornerShape(12.dp)).padding(16.dp),
                     )
                 }
             }

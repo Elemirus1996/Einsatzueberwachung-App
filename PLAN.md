@@ -223,6 +223,15 @@ Android:
 - [ ] EL-Ortung, Stop bei Einsatzende, Abmeldung oder Rollenwechsel
 - [ ] Tablet (iPad und Android-Tablets): eigenes Layout für die Einsatzleitung (Karte groß, Teamliste daneben); Team-Ansicht läuft mit. Tablets ohne Mobilfunk haben kein GPS, EL-Position dann ungenau oder ohne (entschieden 29.10.2026)
 
+### Phase 3a – Navigationsziele und Punkte, Variante C (Wunsch 31.10.2026, Server #159)
+- [x] Team: Ziel der EL als Mitteilung mit „Navigation starten“ (iOS: Apple Karten, Google Maps, Waze; Android: `geo:` mit Auswahl)
+- [x] Team: „Punkt setzen“ am eigenen Standort mit kurzem Text, im Funkloch gepuffert (`POST /punkt`)
+- [x] EL: Kartenpunkte auf der Lagekarte, antippen → an ein Team senden; Ereignis `punkt` mit Hinweis
+- [x] Töne je Art in den Einstellungen (Warnung Stufe 2 nicht abschaltbar)
+- [x] iOS: „Kartenpunkte in den Bericht“ beim Einsatzende
+- [ ] Android: „Kartenpunkte in den Bericht“, sobald Einsatz beenden in der Android-EL kommt
+- [ ] Test auf echten Geräten (Navi-Apps, Ortung in der Pause)
+
 ### Phase 3b – Push-Mitteilungen für die Einsatzleitung (entschieden 28.10.2026)
 - [ ] Jeder EL stellt **in der App selbst** ein, welche Mitteilungen er bekommt (z. B. Zeitwarnung Team, Funkstille Handy/Halsband, Hund außerhalb des Gebiets, neuer Funkspruch, Einsatzende) – alles einzeln abschaltbar, Standard: nur kritische Warnungen
 - [ ] Server: Geräte-Registrierung je EL-Gerät mit seinen Einstellungen, Versand bei Warnzentrum-Ereignissen und Funk; stille Push zum Aufwecken der EL-Ortung bei Einsatzbeginn

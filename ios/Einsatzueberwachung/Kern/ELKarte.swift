@@ -28,8 +28,22 @@ struct ELKarte: Decodable, Equatable, Sendable {
         var abgeschlossen: Bool?
     }
 
+    /// Kartenpunkt (APP_API.md Abschnitt 6, Variante C); `teamId` bei Punkten, die ein Team per App gesetzt hat
+    struct Punkt: Decodable, Equatable, Identifiable, Sendable {
+        var id: String
+        var name: String?
+        var beschreibung: String?
+        var farbe: String?
+        var lat: Double
+        var lng: Double
+        var zeit: Date?
+        var teamId: String?
+    }
+
     var suchgebiete: [Suchgebiet]
     var positionen: [ELPosition]
+    /// Ältere Server ohne Kartenpunkte: `nil`
+    var punkte: [Punkt]?
 }
 
 /// Antwort von `GET /tracks` der Einsatzleitung: laufende Suchen je Team, abgeschlossene mit `teamId`.
@@ -119,6 +133,11 @@ final class ELKartenAnsicht: ObservableObject {
             bisher.anhaengen(neu)
             tracks = bisher
         }
+    }
+
+    /// Live-Ereignis `punkt`: nur die Karte neu laden, nicht die Tracks
+    func karteNeuLaden() async {
+        if let neu = try? await schnittstelle.karte() { karte = neu }
     }
 
     /// Live-Ereignis `position`: Marker bewegen bzw. neu aufnehmen

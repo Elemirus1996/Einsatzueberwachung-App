@@ -7,6 +7,8 @@ import UserNotifications
 struct LageMeldung: Equatable, Sendable {
     var titel: String
     var text: String?
+    /// Tonart für den Ton der Mitteilung (Einstellung „Töne“); `nil` = Standardton
+    var tonart: Tonart? = nil
 
     static let einsatzBeendet = LageMeldung(titel: "Einsatz beendet – Ortung aus")
 
@@ -30,7 +32,11 @@ struct LageMeldung: Equatable, Sendable {
         }
         let bekannt = Set(alt.mitteilungen.map(\.id))
         for mitteilung in neu.mitteilungen where !bekannt.contains(mitteilung.id) {
-            meldungen.append(LageMeldung(titel: "Mitteilung der Einsatzleitung", text: mitteilung.text))
+            if let ziel = mitteilung.ziel {
+                meldungen.append(LageMeldung(titel: "Neues Ziel: \(ziel.name)", text: "Zum Navigieren die App öffnen", tonart: .navigationsziel))
+            } else {
+                meldungen.append(LageMeldung(titel: "Mitteilung der Einsatzleitung", text: mitteilung.text, tonart: .mitteilung))
+            }
         }
         return meldungen
     }
@@ -57,7 +63,8 @@ final class LokaleMitteilungen: Mitteiler {
         let inhalt = UNMutableNotificationContent()
         inhalt.title = meldung.titel
         if let text = meldung.text { inhalt.body = text }
-        inhalt.sound = .default
+        // „Aus“ in den Einstellungen: Mitteilung ohne Ton (eigene Töne gibt es im Hintergrund nicht)
+        inhalt.sound = meldung.tonart.map { Toene.geraet.mitTon($0) } == false ? nil : .default
         inhalt.threadIdentifier = "einsatz"
         // Tippen öffnet die App; angemeldet zeigt sie direkt die Team-Ansicht
         zentrale.add(UNNotificationRequest(identifier: UUID().uuidString, content: inhalt, trigger: nil))

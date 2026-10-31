@@ -47,6 +47,8 @@ import io.github.elemirus1996.einsatzspur.kern.TeamAnsicht
 import io.github.elemirus1996.einsatzspur.kern.TeamLage
 import io.github.elemirus1996.einsatzspur.kern.TeamOrtung
 import io.github.elemirus1996.einsatzspur.kern.TeamSitzung
+import io.github.elemirus1996.einsatzspur.kern.Tonart
+import io.github.elemirus1996.einsatzspur.kern.Toene
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.DateFormat
@@ -64,6 +66,7 @@ fun TeamAnsichtScreen(
     teamWechseln: suspend (trotzdem: Boolean) -> Boolean,
     vomEinsatzAbmelden: () -> Unit,
     schliessen: () -> Unit,
+    toene: Toene,
 ) {
     var ausgeblendet by remember { mutableStateOf(emptySet<String>()) }
     val zustand by ortung.zustand.collectAsState()
@@ -77,6 +80,16 @@ fun TeamAnsichtScreen(
     val ich by ortung.letztePosition.collectAsState()
     val bereich = rememberCoroutineScope()
     var info by remember { mutableStateOf(false) }
+    var punktOffen by remember { mutableStateOf(false) }
+    val offenePunkte by ansicht.offenePunkte.collectAsState()
+    val punktHinweis by ansicht.punktHinweis.collectAsState()
+    // Ton je Art (Einstellungen): Navigationsziel oder Mitteilung
+    val ungelesen = (lage?.mitteilungen ?: emptyList()).filter { it.id !in gelesen }
+    var bisherUngelesen by remember { mutableStateOf(ungelesen.size) }
+    LaunchedEffect(ungelesen.size) {
+        if (ungelesen.size > bisherUngelesen) toene.spielen(if (ungelesen.lastOrNull()?.ziel != null) Tonart.NAVIGATIONSZIEL else Tonart.MITTEILUNG)
+        bisherUngelesen = ungelesen.size
+    }
     var jetzt by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -138,9 +151,10 @@ fun TeamAnsichtScreen(
                     (lage?.mitteilungen ?: emptyList()).filter { it.id !in gelesen }.takeLast(3).forEach { m ->
                         Card(Modifier.fillMaxWidth()) {
                             Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text(m.text, fontWeight = FontWeight.Bold)
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(m.ziel?.let { "Neues Ziel: ${it.name}" } ?: m.text, fontWeight = FontWeight.Bold)
                                     Text(DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(m.zeitMs)), style = MaterialTheme.typography.bodySmall)
+                                    m.ziel?.let { NavigationStartenKnopf(it) }
                                 }
                                 Button(onClick = { ansicht.alsGelesen(m) }) { Text("OK") }
                             }
@@ -189,16 +203,29 @@ fun TeamAnsichtScreen(
                         contentPadding = ButtonDefaults.TextButtonContentPadding,
                     ) { Text(s.titel, maxLines = 1) }
                 }
+                OutlinedButton(
+                    onClick = { punktOffen = true },
+                    modifier = Modifier.weight(1f),
+                    contentPadding = ButtonDefaults.TextButtonContentPadding,
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFFD9530F)),
+                ) { Text("Punkt setzen", maxLines = 1) }
             }
+            if (punktOffen) PunktSetzenDialog(ansicht) { punktOffen = false }
             val hinweis = when {
                 aktionen.isNotEmpty() -> "„${aktionen.first().aktion.titel}“ wartet auf Netz"
+                punktHinweis != null && jetzt - punktHinweis!!.third < 6000 -> punktHinweis!!.first
+                offenePunkte.isNotEmpty() -> if (offenePunkte.size == 1) "1 Punkt wartet auf Netz" else "${offenePunkte.size} Punkte warten auf Netz"
                 suchHinweis != null && jetzt - suchHinweis!!.second < 6000 -> suchHinweis!!.first
                 offen.isNotEmpty() -> if (offen.size == 1) "1 Meldung wartet auf Netz" else "${offen.size} Meldungen warten auf Netz"
                 gesendet != null && jetzt - gesendet!!.second < 4000 -> "„${gesendet!!.first.titel}“ gesendet"
                 else -> ""
             }
             Text(hinweis, Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.bodySmall,
-                color = if (offen.isNotEmpty()) Color(0xFFD9530F) else Color(0xFF2E8540))
+                color = when {
+                    punktHinweis?.second == false && jetzt - punktHinweis!!.third < 6000 -> Color(0xFFC62828)
+                    offen.isNotEmpty() || offenePunkte.isNotEmpty() -> Color(0xFFD9530F)
+                    else -> Color(0xFF2E8540)
+                })
 
             // Fußzeile
             Row(Modifier.fillMaxWidth().padding(16.dp, 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {

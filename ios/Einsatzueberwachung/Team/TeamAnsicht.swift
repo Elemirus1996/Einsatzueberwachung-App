@@ -37,6 +37,11 @@ final class TeamAnsicht: ObservableObject {
     @Published private(set) var offeneAktionen: [OffeneAktion]
     /// Kurzer Hinweis nach 409/403 oder Bestätigung, z. B. „Suche läuft bereits“.
     @Published private(set) var suchHinweis: (text: String, zeit: Date)?
+    /// Punkte, die noch auf die Bestätigung des Servers warten (Funkloch)
+    @Published private(set) var offenePunkte: [TeamPunkt]
+    /// Ergebnis des letzten Punkts zum kurzen Anzeigen
+    @Published private(set) var punktHinweis: (text: String, ok: Bool, zeit: Date)?
+    private var punkteLaufen = false
     private var aktionenLaufen = false
 
     private let schnittstelle: TeamAnsichtSchnittstelle
@@ -75,6 +80,8 @@ final class TeamAnsicht: ObservableObject {
             .flatMap { try? JSONDecoder().decode([OffeneMeldung].self, from: $0) } ?? []
         self.offeneAktionen = (speicher.data(forKey: "\(schluessel).aktionen"))
             .flatMap { try? JSONDecoder().decode([OffeneAktion].self, from: $0) } ?? []
+        self.offenePunkte = (speicher.data(forKey: "\(schluessel).punkte"))
+            .flatMap { try? JSONDecoder().decode([TeamPunkt].self, from: $0) } ?? []
     }
 
     // MARK: Ablauf
@@ -117,9 +124,11 @@ final class TeamAnsicht: ObservableObject {
         speicher.removeObject(forKey: "\(schluessel).gelesen")
         speicher.removeObject(forKey: "\(schluessel).meldungen")
         speicher.removeObject(forKey: "\(schluessel).aktionen")
+        speicher.removeObject(forKey: "\(schluessel).punkte")
         gelesen = []
         offeneMeldungen = []
         offeneAktionen = []
+        offenePunkte = []
     }
 
     private func liveSchleife() async {
@@ -243,6 +252,7 @@ final class TeamAnsicht: ObservableObject {
         }
         await meldungenSenden()
         await aktionenSenden()
+        await punkteSenden()
         if mitTracks { await tracksLaden(voll: tracksVoll) }
     }
 
@@ -346,6 +356,45 @@ final class TeamAnsicht: ObservableObject {
             offeneAktionen.removeAll { $0.id == offen.id }
             aktionenSpeichern()
         }
+    }
+
+    // MARK: Punkte (Abschnitt 13)
+
+    /// Punkt am eigenen Standort setzen. Im Funkloch wartet er auf dem Gerät; dieselbe `id` erzeugt nur einen Punkt.
+    func punktSetzen(text: String, lat: Double, lng: Double, genauigkeit: Double?, zeit: Date) async {
+        let inhalt = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(TeamPunkt.maxText))
+        guard !inhalt.isEmpty else { return }
+        offenePunkte.append(TeamPunkt(id: UUID().uuidString, text: inhalt, lat: lat, lng: lng, genauigkeit: genauigkeit, zeit: zeit))
+        punkteSpeichern()
+        await punkteSenden()
+        if !offenePunkte.isEmpty { punktHinweis = ("Kein Netz – der Punkt wird gesendet, sobald es wieder geht.", true, jetzt()) }
+    }
+
+    func punkteSenden() async {
+        guard !punkteLaufen else { return }
+        punkteLaufen = true
+        defer { punkteLaufen = false }
+        while let punkt = offenePunkte.first {
+            do {
+                try await schnittstelle.punkt(punkt)
+                punktHinweis = ("Punkt gesendet: \(punkt.text)", true, jetzt())
+            } catch SchnittstellenFehler.beendet {
+                beiSteuerung(.stop)
+                return
+            } catch PunktFehler.abgelehnt(let text) {
+                punktHinweis = (text ?? "Der Server hat den Punkt abgelehnt.", false, jetzt())
+            } catch SchnittstellenFehler.server(let status) where (400..<500).contains(status) && status != 429 {
+                punktHinweis = ("Der Server hat den Punkt abgelehnt.", false, jetzt())
+            } catch {
+                return
+            }
+            offenePunkte.removeAll { $0.id == punkt.id }
+            punkteSpeichern()
+        }
+    }
+
+    private func punkteSpeichern() {
+        speicher.set(try? JSONEncoder().encode(offenePunkte), forKey: "\(schluessel).punkte")
     }
 
     private func sucheUebernehmen(_ suche: TeamLage.Suche?) {

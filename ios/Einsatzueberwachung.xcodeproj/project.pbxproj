@@ -9,6 +9,8 @@
 /* Begin PBXBuildFile section */
 		0195198E4DE054DEE6B9DE77 /* ELTeamAktionenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EB5A1859E50907176417C9E /* ELTeamAktionenView.swift */; };
 		08DFB2CA7502DC3325DBE06D /* AppModell.swift in Sources */ = {isa = PBXBuildFile; fileRef = D0A1C0F7850179783614D223 /* AppModell.swift */; };
+		0FDA249F87B7DAF071DE40F4 /* NavigationspunkteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E2F804FB40D0A765AC2C0EB3 /* NavigationspunkteTests.swift */; };
+		13D49A607DB4DCE3828AA5AF /* NaviZiel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4089086BDE8D3D9E95172A19 /* NaviZiel.swift */; };
 		14A4774D80FC0A5F4D45954E /* TeamOrtungTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69CEBC84429C31F7F8C4A672 /* TeamOrtungTests.swift */; };
 		1B12822F1A247538D970EAB5 /* ELEinsatzView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C68F35498C530D450622E54F /* ELEinsatzView.swift */; };
 		1C98753FDBCCAA574B6AFDF9 /* TeamAnsichtView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFBE4E8B3659C84DE022CA21 /* TeamAnsichtView.swift */; };
@@ -18,6 +20,7 @@
 		2BC72B5D65654CD40240362A /* ELAnsicht.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FB7278E7BA2FD11AC8308A2 /* ELAnsicht.swift */; };
 		2CE2CBDF74B1E03F805333FA /* TeamSchnittstelle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 602266F6E27237F5A6F9575F /* TeamSchnittstelle.swift */; };
 		2D47A3B7AAAEEDEA83923B8C /* TeamLage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F2569C9D22B3E5711A81F0 /* TeamLage.swift */; };
+		4167F7A0E20AC5962CED7931 /* EinmalOrtung.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474936C6E865656679546095 /* EinmalOrtung.swift */; };
 		47806CDB947BFF78B4392CF0 /* PositionsPuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5AB257A4D6CC10859BDCE63 /* PositionsPuffer.swift */; };
 		515B5D3C7DD9A320E1E7361A /* EinstellungenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4796A57686D309891516479C /* EinstellungenView.swift */; };
 		5A6F46FC11967E1EDF36B4A3 /* EinsatzApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2F3419961231647750EF748 /* EinsatzApp.swift */; };
@@ -40,6 +43,7 @@
 		AC8F19C87FD06F962F9B94B2 /* HeimatStaffelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C49A3C66952DBE5E6E35822 /* HeimatStaffelTests.swift */; };
 		ADEE71A64E25479E44A3032D /* DatenschutzTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED9442063557DF280DFD2E03 /* DatenschutzTests.swift */; };
 		BA767C7EFFB7828D27A626E8 /* DatenschutzView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C42FB1FE5908EF2CC4B7DAC /* DatenschutzView.swift */; };
+		BD7D0DFAF9AECC658D5161AE /* Toene.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9883296AA44A11FAC0AF28E /* Toene.swift */; };
 		BF3D49BB7ADFB0B1D6B7C8BD /* ELAnmeldungView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B3C11402C4425DA07624D1A /* ELAnmeldungView.swift */; };
 		C0D161ED59E066250EC86B7A /* QRScannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDE0E5851EA7EDFF57DB8F64 /* QRScannerView.swift */; };
 		C78C9719322BA2789C1B70A6 /* HeimatStaffel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40C766A51FD148218A0B29EE /* HeimatStaffel.swift */; };
@@ -71,9 +75,11 @@
 		1B3C11402C4425DA07624D1A /* ELAnmeldungView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELAnmeldungView.swift; sourceTree = "<group>"; };
 		1B59E2709C134ABFF739D386 /* ELTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELTests.swift; sourceTree = "<group>"; };
 		4001B68B182590449211F7D6 /* ELVermisste.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELVermisste.swift; sourceTree = "<group>"; };
+		4089086BDE8D3D9E95172A19 /* NaviZiel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NaviZiel.swift; sourceTree = "<group>"; };
 		40C766A51FD148218A0B29EE /* HeimatStaffel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeimatStaffel.swift; sourceTree = "<group>"; };
 		42542B191DD57AAC94CE0EC0 /* TeamAnsicht.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamAnsicht.swift; sourceTree = "<group>"; };
 		44827FCB24819A3D28B7C44C /* Datenschutz.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Datenschutz.swift; sourceTree = "<group>"; };
+		474936C6E865656679546095 /* EinmalOrtung.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EinmalOrtung.swift; sourceTree = "<group>"; };
 		4796A57686D309891516479C /* EinstellungenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EinstellungenView.swift; sourceTree = "<group>"; };
 		4C49A3C66952DBE5E6E35822 /* HeimatStaffelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeimatStaffelTests.swift; sourceTree = "<group>"; };
 		4F9D34CFE0FCDBCA194CC8C5 /* ELVermissteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELVermissteView.swift; sourceTree = "<group>"; };
@@ -90,6 +96,7 @@
 		90922EA3579F26D42494A74A /* KernTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KernTests.swift; sourceTree = "<group>"; };
 		AB3AF33B59FBD33F2C44B2E5 /* OrtungsQuelle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrtungsQuelle.swift; sourceTree = "<group>"; };
 		B2F3419961231647750EF748 /* EinsatzApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EinsatzApp.swift; sourceTree = "<group>"; };
+		B9883296AA44A11FAC0AF28E /* Toene.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Toene.swift; sourceTree = "<group>"; };
 		BEB08B86E4BDD277798024C9 /* ELBetrieb.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELBetrieb.swift; sourceTree = "<group>"; };
 		BFBE4E8B3659C84DE022CA21 /* TeamAnsichtView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamAnsichtView.swift; sourceTree = "<group>"; };
 		C127025FCE3C8F3145640AA1 /* Signierung.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signierung.xcconfig; sourceTree = "<group>"; };
@@ -101,6 +108,7 @@
 		D0A1C0F7850179783614D223 /* AppModell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModell.swift; sourceTree = "<group>"; };
 		D2AC73FC5048EC687F22B01D /* ELVerlaengerungTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELVerlaengerungTests.swift; sourceTree = "<group>"; };
 		DC1B71859AD992E6E951AFDE /* ELUebersichtView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELUebersichtView.swift; sourceTree = "<group>"; };
+		E2F804FB40D0A765AC2C0EB3 /* NavigationspunkteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationspunkteTests.swift; sourceTree = "<group>"; };
 		EBA23EF762B87148EB23B089 /* EinsatzueberwachungTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = EinsatzueberwachungTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED9442063557DF280DFD2E03 /* DatenschutzTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatenschutzTests.swift; sourceTree = "<group>"; };
 		F0208DBE8A1D6C6A176561A4 /* ELKarte.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELKarte.swift; sourceTree = "<group>"; };
@@ -157,6 +165,7 @@
 				D2AC73FC5048EC687F22B01D /* ELVerlaengerungTests.swift */,
 				4C49A3C66952DBE5E6E35822 /* HeimatStaffelTests.swift */,
 				90922EA3579F26D42494A74A /* KernTests.swift */,
+				E2F804FB40D0A765AC2C0EB3 /* NavigationspunkteTests.swift */,
 				7A917F3FBFB4256F935A563E /* TeamAnsichtTests.swift */,
 				69CEBC84429C31F7F8C4A672 /* TeamOrtungTests.swift */,
 			);
@@ -178,6 +187,7 @@
 		B6B20A748AF5AD27EEFDF548 /* Team */ = {
 			isa = PBXGroup;
 			children = (
+				4089086BDE8D3D9E95172A19 /* NaviZiel.swift */,
 				FDE0E5851EA7EDFF57DB8F64 /* QRScannerView.swift */,
 				C59E8CF5D165989F439B72BD /* TeamAnmeldungView.swift */,
 				42542B191DD57AAC94CE0EC0 /* TeamAnsicht.swift */,
@@ -190,6 +200,7 @@
 			isa = PBXGroup;
 			children = (
 				44827FCB24819A3D28B7C44C /* Datenschutz.swift */,
+				474936C6E865656679546095 /* EinmalOrtung.swift */,
 				C14AEB1CFCD5BFB520E66C48 /* ELAktionen.swift */,
 				F0208DBE8A1D6C6A176561A4 /* ELKarte.swift */,
 				119EF115046BB0FA7AF52B80 /* ELSchnittstelle.swift */,
@@ -205,6 +216,7 @@
 				FC0EEBCA567221FF2529112D /* TeamModelle.swift */,
 				F92EA3A1472DD75C912F9D1D /* TeamOrtung.swift */,
 				602266F6E27237F5A6F9575F /* TeamSchnittstelle.swift */,
+				B9883296AA44A11FAC0AF28E /* Toene.swift */,
 			);
 			path = Kern;
 			sourceTree = "<group>";
@@ -337,10 +349,12 @@
 				F050670B2BC1CA2A79C712F1 /* ELVerlaengerung.swift in Sources */,
 				7BA6D9BA34CD555221A6CE44 /* ELVermisste.swift in Sources */,
 				C89B47CBDA4CCCA923E56062 /* ELVermissteView.swift in Sources */,
+				4167F7A0E20AC5962CED7931 /* EinmalOrtung.swift in Sources */,
 				5A6F46FC11967E1EDF36B4A3 /* EinsatzApp.swift in Sources */,
 				515B5D3C7DD9A320E1E7361A /* EinstellungenView.swift in Sources */,
 				C78C9719322BA2789C1B70A6 /* HeimatStaffel.swift in Sources */,
 				A7B4A6D3B2797E85F7592FF0 /* LageMeldungen.swift in Sources */,
+				13D49A607DB4DCE3828AA5AF /* NaviZiel.swift in Sources */,
 				1D85C57C6B2C8932F9BC62A4 /* OrtungsQuelle.swift in Sources */,
 				47806CDB947BFF78B4392CF0 /* PositionsPuffer.swift in Sources */,
 				C0D161ED59E066250EC86B7A /* QRScannerView.swift in Sources */,
@@ -354,6 +368,7 @@
 				759C53C6DB2F9A40004C24D6 /* TeamModelle.swift in Sources */,
 				D9316212B2329978232AA34B /* TeamOrtung.swift in Sources */,
 				2CE2CBDF74B1E03F805333FA /* TeamSchnittstelle.swift in Sources */,
+				BD7D0DFAF9AECC658D5161AE /* Toene.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -366,6 +381,7 @@
 				8E2266F5BED14D0B86E1087C /* ELVerlaengerungTests.swift in Sources */,
 				AC8F19C87FD06F962F9B94B2 /* HeimatStaffelTests.swift in Sources */,
 				DEA130868989542425090850 /* KernTests.swift in Sources */,
+				0FDA249F87B7DAF071DE40F4 /* NavigationspunkteTests.swift in Sources */,
 				6C7B4127674E4722256EA536 /* TeamAnsichtTests.swift in Sources */,
 				14A4774D80FC0A5F4D45954E /* TeamOrtungTests.swift in Sources */,
 			);

@@ -76,3 +76,12 @@ extension JSONDecoder {
         return decoder
     }()
 }
+
+extension JSONEncoder {
+    /// Zeiten an den Server: UTC mit `Z` (z. B. `2026-10-31T09:12:03Z`)
+    static let server: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }()
+}

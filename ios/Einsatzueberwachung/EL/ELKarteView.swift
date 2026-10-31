@@ -6,7 +6,9 @@ import SwiftUI
 struct ELKarteView: View {
     @ObservedObject var karte: ELKartenAnsicht
     let teams: [ELLage.Team]
+    @ObservedObject var betrieb: ELBetrieb
     @State private var kamera: MapCameraPosition = .automatic
+    @State private var gewaehlterPunkt: ELKarte.Punkt?
     @State private var satellit = false
 
     var body: some View {
@@ -45,6 +47,20 @@ struct ELKarteView: View {
                 MapPolyline(coordinates: teil.mensch.map(\.koordinate)).stroke(.blue, lineWidth: 3)
                 MapPolyline(coordinates: teil.hund.map(\.koordinate)).stroke(.red, lineWidth: 3)
             }
+            // Kartenpunkte (Variante C): antippen → an ein Team senden
+            ForEach(karte.karte?.punkte ?? []) { punkt in
+                Annotation(punkt.name ?? "Punkt", coordinate: CLLocationCoordinate2D(latitude: punkt.lat, longitude: punkt.lng)) {
+                    Button { gewaehlterPunkt = punkt } label: {
+                        Image(systemName: punkt.teamId == nil ? "mappin" : "mappin.and.ellipse")
+                            .font(.caption.bold())
+                            .foregroundStyle(.white)
+                            .padding(6)
+                            .background(Color(hex: punkt.farbe) ?? .blue, in: Circle())
+                            .overlay(Circle().stroke(.white, lineWidth: 2))
+                    }
+                    .accessibilityLabel("Punkt \(punkt.name ?? "")")
+                }
+            }
             ForEach(karte.karte?.positionen ?? []) { p in
                 Annotation(beschriftung(p), coordinate: CLLocationCoordinate2D(latitude: p.lat, longitude: p.lng)) {
                     Image(systemName: symbol(p.art))
@@ -73,6 +89,10 @@ struct ELKarteView: View {
         }
         .navigationTitle("Lagekarte")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $gewaehlterPunkt) { punkt in
+            ELPunktView(punkt: punkt, teams: teams, betrieb: betrieb)
+                .presentationDetents([.medium, .large])
+        }
         .onAppear { karte.starten() }
         .onDisappear { karte.anhalten() }
     }
@@ -116,3 +136,49 @@ struct ELKarteView: View {
     }
 }
 
+
+/// Kartenpunkt ansehen und als Navigationsziel an ein Team senden (`/teams/{teamId}/ziel`).
+struct ELPunktView: View {
+    let punkt: ELKarte.Punkt
+    let teams: [ELLage.Team]
+    @ObservedObject var betrieb: ELBetrieb
+    @Environment(\.dismiss) private var schliessen
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    if let beschreibung = punkt.beschreibung, !beschreibung.isEmpty { Text(beschreibung) }
+                    LabeledContent("Koordinate", value: String(format: "%.6f, %.6f", punkt.lat, punkt.lng))
+                    if let zeit = punkt.zeit { LabeledContent("Gesetzt") { Text(zeit, style: .time) } }
+                    if let teamId = punkt.teamId {
+                        LabeledContent("Von", value: teams.first { $0.teamId == teamId }?.teamName ?? "Team")
+                    }
+                }
+                Section {
+                    if teams.isEmpty {
+                        Text("Noch keine Teams im Einsatz.").foregroundStyle(.secondary)
+                    }
+                    ForEach(teams) { team in
+                        Button {
+                            let name = punkt.name ?? "Punkt"
+                            Task { await betrieb.ausfuehren(.ziel(team.teamId, name: team.teamName, punktId: punkt.id, punktName: name)) }
+                            schliessen()
+                        } label: {
+                            Label(team.teamName, systemImage: "paperplane")
+                        }
+                    }
+                } header: {
+                    Text("An Team senden")
+                } footer: {
+                    Text("Das Team bekommt den Punkt als Ziel und startet damit seine Navigation.")
+                }
+            }
+            .navigationTitle(punkt.name ?? "Punkt")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Fertig") { schliessen() } }
+            }
+        }
+    }
+}
