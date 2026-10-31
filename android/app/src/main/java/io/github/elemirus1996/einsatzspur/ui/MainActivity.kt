@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import io.github.elemirus1996.einsatzspur.kern.GeraeteHinweis
 import io.github.elemirus1996.einsatzspur.kern.GeraeteHinweise
+import io.github.elemirus1996.einsatzspur.kern.TeamAuswahl
 import io.github.elemirus1996.einsatzspur.kern.TeamQRCode
 import io.github.elemirus1996.einsatzspur.kern.TeamSitzung
 import androidx.compose.foundation.layout.fillMaxSize
@@ -55,12 +56,17 @@ class MainActivity : ComponentActivity() {
                 val elVerlaengerung by modell.elVerlaengerung.collectAsState()
                 val elHinweis by modell.elHinweis.collectAsState()
                 var elAnmeldungOffen by remember { mutableStateOf(elHinweis != null) }
+                var einstellungenOffen by remember { mutableStateOf(false) }
+                val datenschutzFrage by modell.datenschutzFrage.collectAsState()
+                val heimatFrage by modell.heimatFrage.collectAsState()
                 val ortung = team
                 val zugang = sitzung
                 val lage = ansicht
                 val elO = elOrtung
                 val elA = elAnsicht
-                if (elO != null && elA != null) {
+                if (einstellungenOffen) {
+                    EinstellungenScreen(modell.heimat, modell.datenschutz.alle(), version(), zurueck = { einstellungenOffen = false })
+                } else if (elO != null && elA != null) {
                     ELUebersichtScreen(elA, elO, elVerlaengerung, abmelden = {
                         modell.elAbmelden()
                         elAnmeldungOffen = false
@@ -87,19 +93,35 @@ class MainActivity : ComponentActivity() {
                         schliessen = modell::schliessen,
                     )
                 } else {
-                    val anmelden = { sitzung: TeamSitzung, zugang: TeamQRCode ->
+                    val anmelden = { sitzung: TeamSitzung, zugang: TeamQRCode, auswahl: TeamAuswahl ->
                         berechtigungenAnfragen()
-                        modell.anmelden(sitzung, zugang)
+                        modell.anmelden(sitzung, zugang, auswahl)
+                    }
+                    // #148: vor dem Token die Erklärung der Staffel
+                    val vorAuswahl = { zugang: TeamQRCode, auswahl: TeamAuswahl, abbrechen: () -> Unit ->
+                        modell.datenschutzFragen(auswahl.server?.kennung ?: zugang.server.name, auswahl.datenschutz, abbrechen)
+                        Unit
                     }
                     val wahl = teamWahl
                     if (wahl != null) {
                         Surface(Modifier.fillMaxSize()) {
-                            AnmeldungScreen(wahl, anmelden, zurueck = modell::teamWahlAbbrechen, zugangUngueltig = modell::zugangUngueltig)
+                            AnmeldungScreen(wahl, anmelden, zurueck = modell::teamWahlAbbrechen, zugangUngueltig = modell::zugangUngueltig,
+                                vorAuswahl = vorAuswahl, datenschutzOffen = datenschutzFrage != null)
                         }
                     } else {
-                        StartScreen(einsatzZugang, anmelden, zugangUngueltig = modell::zugangUngueltig, einsatzleitung = { elAnmeldungOffen = true })
+                        StartScreen(
+                            einsatzZugang, anmelden, zugangUngueltig = modell::zugangUngueltig, einsatzleitung = { elAnmeldungOffen = true },
+                            vorAuswahl = vorAuswahl, datenschutzOffen = datenschutzFrage != null,
+                            heimat = modell.heimat, einstellungen = { einstellungenOffen = true },
+                        )
                     }
                 }
+                // Zuerst Datenschutz, dann Heimatstaffel
+                datenschutzFrage?.let { frage ->
+                    DatenschutzAbfrage(frage, modell.datenschutzAbbrechenMoeglich,
+                        bestaetigen = modell::datenschutzBestaetigen, abbrechen = modell::datenschutzAbbrechen)
+                }
+                if (datenschutzFrage == null) heimatFrage?.let { (_, name) -> HeimatFrage(name, modell::heimatBeantworten) }
             }
         }
     }
@@ -119,6 +141,9 @@ class MainActivity : ComponentActivity() {
         hinweise.value = GeraeteHinweise.pruefen(this)
         modell.aktiviert()
     }
+
+    private fun version(): String =
+        runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() ?: "–"
 
     private fun berechtigungenAnfragen() {
         val liste = mutableListOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)

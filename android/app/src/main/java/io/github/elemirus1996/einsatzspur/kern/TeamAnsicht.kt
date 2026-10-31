@@ -61,6 +61,8 @@ class TeamAnsicht(
 
     /** Lokale Mitteilungen bei Änderungen der Lage. */
     var beiMeldungen: ((List<LageMeldung>) -> Unit)? = null
+    /** Jede neue Lage (z. B. neue Version der Datenschutzerklärung, #148) */
+    var beiLage: ((TeamLage) -> Unit)? = null
 
     var lageAbgerufenMs: Long? = null
         private set
@@ -205,6 +207,7 @@ class TeamAnsicht(
         val alt = _lage.value
         _lage.value = neu
         lageAbgerufenMs = jetzt()
+        beiLage?.invoke(neu)
         if (alt == null) return
         val meldungen = LageMeldung.vergleichen(alt, neu)
         if (meldungen.isNotEmpty()) beiMeldungen?.invoke(meldungen)

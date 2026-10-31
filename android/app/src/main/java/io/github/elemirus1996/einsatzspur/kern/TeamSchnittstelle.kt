@@ -22,7 +22,13 @@ sealed class SchnittstellenFehler(nachricht: String) : Exception(nachricht) {
     data object AntwortUngueltig : SchnittstellenFehler("Antwort ungültig")
 }
 
-data class TeamConfig(val teamName: String, val steuerung: SteuerAntwort)
+data class TeamConfig(
+    val teamName: String,
+    val steuerung: SteuerAntwort,
+    val server: ServerInfo? = null,
+    /** Nur die Version der Datenschutzerklärung (#148) */
+    val datenschutzVersion: String? = null,
+)
 
 /** Endpunkte der Rolle Team unter `api/team-mobile/app/v1`. */
 interface TeamSchnittstelle {
@@ -45,6 +51,13 @@ interface TeamAnsichtSchnittstelle {
 class TeamClient(private val sitzung: TeamSitzung) : TeamSchnittstelle, TeamAnsichtSchnittstelle {
 
     override suspend fun lage(): TeamLage = TeamLage.aus(anfrage("lage", "GET", null))
+
+    /** Ganze Erklärung zum Nachlesen bzw. bei neuer Version; 404 = keine hinterlegt (#148) */
+    suspend fun datenschutz(): Datenschutz? =
+        datenschutzAbrufen(sitzung.server.pfad("api/team-mobile/app/v1/datenschutz"), sitzung.token) { a, m, i, t -> http(a, m, i, t) }
+
+    /** Logo der Staffel als PNG; 404 = keins (Abschnitt 10) */
+    suspend fun logo(): ByteArray? = logoAbrufen(sitzung.server.pfad("api/team-mobile/app/v1/logo"), sitzung.token)
 
     override suspend fun tracks(seit: Long?): TeamTracks =
         TeamTracks.aus(anfrage(if (seit != null) "tracks?seit=$seit" else "tracks", "GET", null))
@@ -102,7 +115,7 @@ class TeamClient(private val sitzung: TeamSitzung) : TeamSchnittstelle, TeamAnsi
     override suspend fun config(): TeamConfig {
         val json = anfrage("config", "GET", null)
         return try {
-            TeamConfig(json.getString("teamName"), steuerAntwort(json))
+            TeamConfig(json.getString("teamName"), steuerAntwort(json), ServerInfo.aus(json.optJSONObject("server")), Datenschutz.version(json))
         } catch (e: JSONException) {
             throw SchnittstellenFehler.AntwortUngueltig
         }
@@ -180,3 +193,37 @@ internal suspend fun http(adresse: String, methode: String, inhalt: JSONObject?,
             verbindung.disconnect()
         }
     }
+
+/** Ganze Datenschutzerklärung (#148); 404 = keine hinterlegt, 410 = Token ungültig. */
+internal suspend fun datenschutzAbrufen(adresse: String, token: String, transport: Transport): Datenschutz? {
+    val (status, text) = transport(adresse, "GET", null, token)
+    return when (status) {
+        in 200..299 -> runCatching { JSONObject(text) }.getOrNull()?.let(Datenschutz::aus) ?: throw SchnittstellenFehler.AntwortUngueltig
+        404 -> null
+        410 -> throw SchnittstellenFehler.Beendet
+        else -> throw SchnittstellenFehler.Server(status)
+    }
+}
+
+/** Logo als PNG-Daten; 404 = keins. Nur HTTPS, ohne Cache. */
+internal suspend fun logoAbrufen(adresse: String, token: String): ByteArray? = withContext(Dispatchers.IO) {
+    val url = URL(adresse)
+    if (url.protocol != "https") throw IOException("nur https")
+    val verbindung = url.openConnection() as HttpsURLConnection
+    try {
+        verbindung.connectTimeout = 20_000
+        verbindung.readTimeout = 20_000
+        verbindung.useCaches = false
+        verbindung.instanceFollowRedirects = false
+        verbindung.setRequestProperty("Accept", "image/png")
+        verbindung.setRequestProperty("Authorization", "Bearer $token")
+        when (val status = verbindung.responseCode) {
+            200 -> verbindung.inputStream.use { it.readBytes() }
+            404 -> null
+            410 -> throw SchnittstellenFehler.Beendet
+            else -> throw SchnittstellenFehler.Server(status)
+        }
+    } finally {
+        verbindung.disconnect()
+    }
+}

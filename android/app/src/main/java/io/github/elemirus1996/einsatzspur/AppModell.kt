@@ -7,6 +7,14 @@ import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import io.github.elemirus1996.einsatzspur.dienst.OrtungsDienst
 import io.github.elemirus1996.einsatzspur.kern.Ablage
+import io.github.elemirus1996.einsatzspur.kern.Datenschutz
+import io.github.elemirus1996.einsatzspur.kern.DatenschutzAngabe
+import io.github.elemirus1996.einsatzspur.kern.DatenschutzFrage
+import io.github.elemirus1996.einsatzspur.kern.DatenschutzSpeicher
+import io.github.elemirus1996.einsatzspur.kern.HeimatStaffel
+import io.github.elemirus1996.einsatzspur.kern.ServerInfo
+import io.github.elemirus1996.einsatzspur.kern.TeamAuswahl
+import java.io.File
 import io.github.elemirus1996.einsatzspur.kern.ELAnmeldung
 import io.github.elemirus1996.einsatzspur.kern.ELAnsicht
 import io.github.elemirus1996.einsatzspur.kern.ELClient
@@ -103,6 +111,24 @@ class AppModell(private val context: Context) {
     val aktiveOrtung: StateFlow<TeamOrtung?> = combine(_team, _elOrtung) { t, e -> t ?: e }
         .stateIn(bereich, SharingStarted.Eagerly, null)
 
+    // Datenschutzerklärung der Staffel (#148) und Heimatstaffel: zuerst Datenschutz, dann Heimatstaffel
+    private val einstellungsAblage = object : Ablage {
+        override fun lesen(schluessel: String) = einstellungen.getString(schluessel, null)
+        override fun schreiben(schluessel: String, wert: String?) = einstellungen.edit().putString(schluessel, wert).apply()
+    }
+    val datenschutz = DatenschutzSpeicher(einstellungsAblage)
+    val heimat = HeimatStaffel(einstellungsAblage, File(context.filesDir, "heimatstaffel-logo.png"))
+    private val _datenschutzFrage = MutableStateFlow<DatenschutzFrage?>(null)
+    val datenschutzFrage: StateFlow<DatenschutzFrage?> = _datenschutzFrage
+    private var datenschutzAbbruch: (() -> Unit)? = null
+    private var datenschutzLaedt = false
+    /** Offene Frage „Ist das deine eigene Staffel?“ */
+    private val _heimatFrage = MutableStateFlow<Pair<ServerInfo, String>?>(null)
+    val heimatFrage: StateFlow<Pair<ServerInfo, String>?> = _heimatFrage
+    private var heimatWartet: Pair<ServerInfo, String>? = null
+    /** Feste Kennung des Team-Servers (aus login/teams bzw. config); ohne sie keine Versionsprüfung */
+    private var teamKennung: String? = null
+
     init {
         schluesselbund.elSitzungLesen()?.let { elStarten(it) }
         schluesselbund.sitzungLesen()?.let {
@@ -111,7 +137,11 @@ class AppModell(private val context: Context) {
         }
     }
 
-    fun anmelden(sitzung: TeamSitzung, zugang: TeamQRCode) {
+    fun anmelden(sitzung: TeamSitzung, zugang: TeamQRCode, auswahl: TeamAuswahl? = null) {
+        teamKennung = auswahl?.server?.kennung
+        auswahl?.server?.let { info ->
+            if (heimat.sollFragen(info)) heimatFragen(info, info.staffel ?: auswahl.staffel ?: sitzung.server.name)
+        }
         schluesselbund.zugangSpeichern(zugang)
         _einsatzZugang.value = zugang
         _teamWahl.value = null
@@ -162,14 +192,98 @@ class AppModell(private val context: Context) {
         if (sichtbar) _elAnsicht.value?.starten() else _elAnsicht.value?.anhalten()
     }
 
+    // MARK: Datenschutz (#148) und Heimatstaffel
+
+    /**
+     * Vor bzw. direkt nach der Anmeldung: Erklärung zeigen, wenn diese Version hier noch nicht bestätigt ist,
+     * oder Hinweis, wenn die Staffel keine hinterlegt hat. `true`, wenn eine Abfrage offen ist.
+     */
+    fun datenschutzFragen(kennung: String, angabe: DatenschutzAngabe, abbrechen: (() -> Unit)? = null): Boolean {
+        when (angabe) {
+            DatenschutzAngabe.Fehlt -> return false
+            DatenschutzAngabe.Keine -> _datenschutzFrage.value = DatenschutzFrage(kennung, null)
+            is DatenschutzAngabe.Erklaerung -> {
+                datenschutz.merken(angabe.datenschutz, kennung)
+                if (!datenschutz.offen(kennung, angabe.datenschutz.version)) return false
+                _datenschutzFrage.value = DatenschutzFrage(kennung, angabe.datenschutz)
+            }
+        }
+        datenschutzAbbruch = abbrechen
+        return true
+    }
+
+    /** „Zur Kenntnis genommen“ (bzw. „OK“ beim Hinweis); danach ggf. die Frage nach der Heimatstaffel */
+    fun datenschutzBestaetigen() {
+        _datenschutzFrage.value?.let { frage -> frage.erklaerung?.let { datenschutz.bestaetigen(frage.kennung, it.version) } }
+        _datenschutzFrage.value = null
+        datenschutzAbbruch = null
+        heimatWartet?.let {
+            heimatWartet = null
+            _heimatFrage.value = it
+        }
+    }
+
+    /** Anmeldung abbrechen statt bestätigen (nur vor bzw. direkt nach der Anmeldung angeboten) */
+    fun datenschutzAbbrechen() {
+        val abbruch = datenschutzAbbruch
+        _datenschutzFrage.value = null
+        datenschutzAbbruch = null
+        heimatWartet = null
+        abbruch?.invoke()
+    }
+
+    val datenschutzAbbrechenMoeglich: Boolean get() = datenschutzAbbruch != null
+
+    /** `config`/`lage` melden eine Version: Ist sie neu, die ganze Erklärung holen und erneut fragen. */
+    private fun datenschutzVersionPruefen(version: String?, kennung: String?, laden: suspend () -> Datenschutz?) {
+        if (kennung == null || !datenschutz.offen(kennung, version) || _datenschutzFrage.value != null || datenschutzLaedt) return
+        datenschutzLaedt = true
+        bereich.launch {
+            try {
+                val d = runCatching { laden() }.getOrNull() ?: return@launch
+                if (_datenschutzFrage.value == null) datenschutzFragen(kennung, DatenschutzAngabe.Erklaerung(d))
+            } finally {
+                datenschutzLaedt = false
+            }
+        }
+    }
+
+    private fun heimatFragen(info: ServerInfo, name: String) {
+        if (_datenschutzFrage.value != null) heimatWartet = info to name else _heimatFrage.value = info to name
+    }
+
+    fun heimatBeantworten(eigeneStaffel: Boolean) {
+        val (info, name) = _heimatFrage.value ?: return
+        _heimatFrage.value = null
+        if (!eigeneStaffel) {
+            heimat.ablehnen(info)
+            return
+        }
+        heimat.uebernehmen(info, name)
+        val team = _sitzung.value
+        val el = _elSitzung.value
+        bereich.launch {
+            if (team != null) heimat.aktualisieren(info) { TeamClient(team).logo() }
+            else if (el != null) heimat.aktualisieren(info) { ELClient(ELZugang(el)).logo() }
+        }
+    }
+
     // MARK: Einsatzleitung
 
     /** Anmeldung mit dem Staffel-Passwort an der internen Adresse (nur im VPN erreichbar). */
     suspend fun elAnmelden(server: ServerAdresse, passwort: String, geraet: String?) {
-        val (sitzung, _) = ELAnmeldung(server).anmelden(passwort, geraet)
+        val angemeldet = ELAnmeldung(server).anmelden(passwort, geraet)
+        val sitzung = angemeldet.sitzung
+        val info = angemeldet.server
         schluesselbund.elSitzungSpeichern(sitzung)
         elServerAdresse = server.name
         _elHinweis.value = null
+        datenschutzFragen(info?.kennung ?: server.name, angemeldet.datenschutz) { bereich.launch { elAbmelden() } }
+        if (info != null && heimat.sollFragen(info)) {
+            heimatFragen(info, info.staffel ?: server.name)
+        } else if (info != null) {
+            bereich.launch { heimat.aktualisieren(info) { ELClient(ELZugang(sitzung)).logo() } }
+        }
         elStarten(sitzung)
     }
 
@@ -204,7 +318,10 @@ class AppModell(private val context: Context) {
             _elSitzung.value = neu
             _elOrtung.value?.ablaufSetzen(neu.expiresAtMs)
         }
-        ansicht.nachLage = { lage -> verlaengerung.pruefen(lage.einsatz.aktiv) }
+        ansicht.nachLage = { lage ->
+            verlaengerung.pruefen(lage.einsatz.aktiv)
+            datenschutzVersionPruefen(lage.datenschutzVersion, zugang.sitzung.kennung) { client.datenschutz() }
+        }
         _elVerlaengerung.value = verlaengerung
         _elOrtung.value = ortung
         _elAnsicht.value = ansicht
@@ -296,7 +413,14 @@ class AppModell(private val context: Context) {
         val team = _team.value ?: return
         bereich.launch {
             try {
-                team.anwenden(TeamClient(sitzung).config().steuerung)
+                val client = TeamClient(sitzung)
+                val config = client.config()
+                team.anwenden(config.steuerung)
+                config.server?.let { info ->
+                    teamKennung = info.kennung
+                    heimat.aktualisieren(info) { client.logo() }
+                }
+                datenschutzVersionPruefen(config.datenschutzVersion, teamKennung) { client.datenschutz() }
             } catch (e: SchnittstellenFehler.Beendet) {
                 team.anwenden(SteuerAntwort.STOP)
             } catch (e: Exception) {
@@ -322,6 +446,7 @@ class AppModell(private val context: Context) {
         }
         team.beiModuswechsel = { ansicht.modusGeaendert() }
         ansicht.beiMeldungen = { liste -> liste.forEach(mitteilungen::senden) }
+        ansicht.beiLage = { lage -> datenschutzVersionPruefen(lage.datenschutzVersion, teamKennung) { client.datenschutz() } }
         _team.value = team
         _ansicht.value = ansicht
         if (imVordergrund) ansicht.starten() else ansicht.hintergrund()

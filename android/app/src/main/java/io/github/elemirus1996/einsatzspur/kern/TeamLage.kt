@@ -33,6 +33,8 @@ data class TeamLage(
     val suchgebiet: Suchgebiet?,
     val halsband: Halsband?,
     val mitteilungen: List<Mitteilung>,
+    /** Nur die Version der Datenschutzerklärung (#148) */
+    val datenschutzVersion: String? = null,
 ) {
     enum class SucheStatus { BEREIT, LAEUFT, KURZPAUSE, BEENDET }
     /** `darfSteuern`: Das Team darf die Suche selbst steuern (Abschnitt 11); ohne Angabe (älterer Server) nein. */
@@ -63,6 +65,7 @@ data class TeamLage(
                 mitteilungen = json.optJSONArray("mitteilungen")?.let { a ->
                     (0 until a.length()).map { mitteilung(a.getJSONObject(it)) }
                 } ?: emptyList(),
+                datenschutzVersion = Datenschutz.version(json),
             )
         } catch (e: JSONException) {
             throw SchnittstellenFehler.AntwortUngueltig

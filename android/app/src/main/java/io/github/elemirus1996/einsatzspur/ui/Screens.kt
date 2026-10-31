@@ -46,7 +46,9 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import io.github.elemirus1996.einsatzspur.R
+import androidx.compose.ui.graphics.asImageBitmap
 import io.github.elemirus1996.einsatzspur.kern.AnmeldeFehler
+import io.github.elemirus1996.einsatzspur.kern.HeimatStaffel
 import io.github.elemirus1996.einsatzspur.kern.ServerAdresse
 import io.github.elemirus1996.einsatzspur.kern.TeamAnmeldung
 import io.github.elemirus1996.einsatzspur.kern.TeamAuswahl
@@ -66,28 +68,46 @@ import java.util.Date
 @Composable
 fun StartScreen(
     einsatzZugang: TeamQRCode?,
-    anmelden: (TeamSitzung, TeamQRCode) -> Unit,
+    anmelden: (TeamSitzung, TeamQRCode, TeamAuswahl) -> Unit,
     zugangUngueltig: () -> Unit,
     einsatzleitung: () -> Unit,
+    vorAuswahl: (TeamQRCode, TeamAuswahl, () -> Unit) -> Unit,
+    datenschutzOffen: Boolean,
+    heimat: HeimatStaffel,
+    einstellungen: () -> Unit,
 ) {
     var anmeldungOffen by remember { mutableStateOf(false) }
+    val heimatEintrag by heimat.eintrag.collectAsState()
+    val heimatLogo by heimat.logo.collectAsState()
     Surface(Modifier.fillMaxSize()) {
         if (anmeldungOffen) {
-            AnmeldungScreen(einsatzZugang, fertig = anmelden, zurueck = { anmeldungOffen = false }, zugangUngueltig = zugangUngueltig)
+            AnmeldungScreen(einsatzZugang, fertig = anmelden, zurueck = { anmeldungOffen = false }, zugangUngueltig = zugangUngueltig,
+                vorAuswahl = vorAuswahl, datenschutzOffen = datenschutzOffen)
             return@Surface
+        }
+        Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+            TextButton(onClick = einstellungen, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) { Text("Einstellungen") }
         }
         Column(
             Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
         ) {
-            Box(
-                Modifier.size(96.dp).clip(RoundedCornerShape(22.dp)).background(Color(0xFF1D2A3A)),
-                contentAlignment = Alignment.Center,
-            ) {
-                Image(painterResource(R.drawable.ic_launcher_foreground), contentDescription = null, Modifier.size(140.dp))
+            val logoBild = heimatLogo?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) }
+            if (logoBild != null) {
+                Image(logoBild.asImageBitmap(), contentDescription = null, Modifier.size(96.dp))
+            } else {
+                Box(
+                    Modifier.size(96.dp).clip(RoundedCornerShape(22.dp)).background(Color(0xFF1D2A3A)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Image(painterResource(R.drawable.ic_launcher_foreground), contentDescription = null, Modifier.size(140.dp))
+                }
             }
             Text("EinsatzSpur", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+            heimatEintrag?.let {
+                Text(it.staffel, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             Spacer(Modifier.height(32.dp))
             Rollenknopf("Team", "QR-Code aus dem Einsatz scannen", aktiv = true) { anmeldungOffen = true }
             Rollenknopf("Einsatzleitung", "Nur im VPN der Staffel, mit Staffel-Passwort", aktiv = true, aktion = einsatzleitung)
@@ -126,9 +146,12 @@ private fun Rollenknopf(titel: String, text: String, aktiv: Boolean, aktion: () 
 @Composable
 fun AnmeldungScreen(
     vorgabe: TeamQRCode?,
-    fertig: (TeamSitzung, TeamQRCode) -> Unit,
+    fertig: (TeamSitzung, TeamQRCode, TeamAuswahl) -> Unit,
     zurueck: () -> Unit,
     zugangUngueltig: () -> Unit,
+    /** Nach dem Laden der Teamliste, vor dem Token: Datenschutzerklärung der Staffel (#148); Rückruf = „Nicht anmelden“ */
+    vorAuswahl: (TeamQRCode, TeamAuswahl, () -> Unit) -> Unit,
+    datenschutzOffen: Boolean,
 ) {
     val bereich = rememberCoroutineScope()
     var server by remember { mutableStateOf("") }
@@ -152,11 +175,16 @@ fun AnmeldungScreen(
         }
     }
 
+    fun auswahlSetzen(zugang: TeamQRCode, liste: TeamAuswahl) {
+        auswahl = zugang to liste
+        vorAuswahl(zugang, liste) { auswahl = null }
+    }
+
     LaunchedEffect(vorgabe) {
         if (vorgabe == null || auswahl != null) return@LaunchedEffect
         laedt = true
         try {
-            auswahl = vorgabe to TeamAnmeldung(vorgabe).teams()
+            auswahlSetzen(vorgabe, TeamAnmeldung(vorgabe).teams())
         } catch (e: AnmeldeFehler.CodeUngueltig) {
             // Gespeicherter Code gilt nicht mehr: neu eingeben bzw. scannen
             zugangUngueltig()
@@ -208,6 +236,10 @@ fun AnmeldungScreen(
             ) { Text("Weiter") }
         } else {
             val (zugang, liste) = aktuell
+            if (datenschutzOffen) {
+                Text("Bitte zuerst die Datenschutzerklärung der Staffel lesen.")
+                return@Column
+            }
             Text(if (liste.uebung) "Übung" else "Einsatz", style = MaterialTheme.typography.labelLarge)
             Text(liste.einsatz ?: "", style = MaterialTheme.typography.titleMedium)
             Text("${liste.staffel ?: ""} · ${zugang.server.name}", style = MaterialTheme.typography.bodySmall)
@@ -217,7 +249,7 @@ fun AnmeldungScreen(
             LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(liste.teams, key = TeamEintrag::teamId) { team ->
                     OutlinedButton(
-                        onClick = { ausfuehren { fertig(TeamAnmeldung(zugang).anmelden(team.teamId), zugang) } },
+                        onClick = { ausfuehren { fertig(TeamAnmeldung(zugang).anmelden(team.teamId), zugang, liste) } },
                         enabled = !laedt, modifier = Modifier.fillMaxWidth(),
                     ) {
                         Column(Modifier.fillMaxWidth()) {
@@ -240,7 +272,7 @@ fun AnmeldungScreen(
             confirmButton = {
                 TextButton(onClick = {
                     bestaetigen = null
-                    ausfuehren { auswahl = zugang to TeamAnmeldung(zugang).teams() }
+                    ausfuehren { auswahlSetzen(zugang, TeamAnmeldung(zugang).teams()) }
                 }) { Text("Anmelden") }
             },
             dismissButton = { TextButton(onClick = { bestaetigen = null }) { Text("Abbrechen") } },
