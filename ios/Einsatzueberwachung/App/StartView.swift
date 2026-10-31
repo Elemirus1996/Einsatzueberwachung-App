@@ -86,6 +86,9 @@ struct StartView: View {
             }
             Spacer()
         }
+        // iPad: Knöpfe nicht über die ganze Breite ziehen
+        .frame(maxWidth: 560)
+        .frame(maxWidth: .infinity)
         .padding()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {

@@ -28,11 +28,11 @@ struct ELEinsatzStartView: View {
                     TextField("Einsatzleiter", text: $daten.einsatzleiter)
                     TextField("Führungsassistent", text: $daten.fuehrungsassistent)
                 }
-                if eigenePosition != nil {
+                if let p = eigenePosition {
                     Section {
                         Toggle("Eigenen Standort als Einsatzort", isOn: $standortUebernehmen)
                     } footer: {
-                        Text("Die Koordinate hilft beim Wetter und als Mittelpunkt der Karte.")
+                        Text("Die Koordinate hilft beim Wetter und als Mittelpunkt der Karte. Genauigkeit \(TeamAnsichtView.genauigkeit(p.accuracy)).")
                     }
                 }
             }
