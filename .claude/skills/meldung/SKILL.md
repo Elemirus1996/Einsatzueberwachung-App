@@ -19,6 +19,13 @@ Entscheidung nötig: <Frage mit Vorschlag, sonst „keine“>
 Weiter mit: <nächster Schritt>
 ```
 
+## Neustart nach jeder Stufe
+
+Nach jeder abgeschlossenen Stufe bzw. jedem größeren PR, spätestens wenn die Leitung „Neustart“ meldet:
+1. Übergabe in die eigene Board-Karte schreiben (`mac-uebergabe` bzw. `server-1b`): Fertiges, Offenes in Reihenfolge, offene Branches, Besonderheiten.
+2. Meldung mit `Weiter mit: Neustart nötig, danach <nächster Schritt>`.
+3. Nichts Neues anfangen. Paul startet eine neue Sitzung im Repo-Ordner (`claude`, `/remote-control`), die ruft `/einweisung` auf.
+
 ## Danach
 
 - Den Stand in die eigene Board-Karte schreiben: https://claude.ai/artifact/EDiazzj2cArneXUVzCHb8K, Sammlung `aufgaben`, Werkzeug ArtifactData. Vor jedem Schreiben lesen und mit `if_version` schreiben.
