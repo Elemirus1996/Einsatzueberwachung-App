@@ -30,6 +30,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -58,6 +59,7 @@ import io.github.elemirus1996.einsatzspur.kern.ELBetrieb
 import io.github.elemirus1996.einsatzspur.kern.ELKartenAnsicht
 import io.github.elemirus1996.einsatzspur.kern.ELLage
 import io.github.elemirus1996.einsatzspur.kern.ELVerlaengerung
+import io.github.elemirus1996.einsatzspur.kern.ELVermissteAnsicht
 import io.github.elemirus1996.einsatzspur.kern.ServerAdresse
 import io.github.elemirus1996.einsatzspur.kern.TeamLage
 import io.github.elemirus1996.einsatzspur.kern.TeamOrtung
@@ -173,16 +175,22 @@ fun ELUebersichtScreen(
     ortung: TeamOrtung,
     betrieb: ELBetrieb,
     karte: ELKartenAnsicht?,
+    vermisste: ELVermissteAnsicht?,
     verlaengerung: ELVerlaengerung?,
     abmelden: suspend () -> Unit,
 ) {
     var funkOffen by remember { mutableStateOf(false) }
     var karteOffen by remember { mutableStateOf(false) }
+    var vermissteOffen by remember { mutableStateOf(false) }
     var gewaehltesTeam by remember { mutableStateOf<ELLage.Team?>(null) }
     val offen by betrieb.offen.collectAsState()
     val betriebHinweis by betrieb.hinweis.collectAsState()
     if (funkOffen) {
         ELFunkScreen(betrieb, ansicht.lage.collectAsState().value?.teams ?: emptyList(), zurueck = { funkOffen = false })
+        return
+    }
+    if (vermissteOffen && vermisste != null) {
+        ELVermissteScreen(vermisste, betrieb, zurueck = { vermissteOffen = false })
         return
     }
     if (karteOffen && karte != null) {
@@ -232,9 +240,15 @@ fun ELUebersichtScreen(
             item(span = { GridItemSpan(maxLineSpan) }) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("Einsatzleitung", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    if (karte != null) TextButton(onClick = { karteOffen = true }) { Text("Karte") }
-                    TextButton(onClick = { funkOffen = true }) { Text("Funk & Notizen") }
                     TextButton(onClick = { abmeldenFragen = true }) { Text("Abmelden") }
+                }
+            }
+            // Eigene Zeile, damit auf dem Telefon alles Platz hat
+            item(span = { GridItemSpan(maxLineSpan) }) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (karte != null) OutlinedButton(onClick = { karteOffen = true }) { Text("Karte") }
+                    if (vermisste != null) OutlinedButton(onClick = { vermissteOffen = true }) { Text("Vermisste") }
+                    OutlinedButton(onClick = { funkOffen = true }) { Text("Funk & Notizen") }
                 }
             }
             val wartet = offen.firstOrNull()
