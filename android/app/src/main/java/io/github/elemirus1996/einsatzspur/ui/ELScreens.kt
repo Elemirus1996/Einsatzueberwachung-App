@@ -156,14 +156,8 @@ fun ELAnmeldungScreen(
     }
 }
 
-private fun elFehlerText(e: Exception): String = when (e) {
-    ELAnmeldeFehler.PasswortFalsch -> "Das Staffel-Passwort ist falsch."
-    is ELAnmeldeFehler.Gesperrt -> "Zu viele Fehlversuche. Bitte in ${(e.sekunden / 60).coerceAtLeast(1)} Minuten erneut versuchen."
-    ELAnmeldeFehler.KeinPasswort -> "Auf dem Server ist noch kein Staffel-Passwort eingerichtet (Einstellungen im Monitor)."
-    ELAnmeldeFehler.NichtErreichbar ->
-        "Server nicht erreichbar. Ist WireGuard eingeschaltet? Die Einsatzleitung geht nur über das VPN der Staffel."
-    else -> "Der Server meldet einen Fehler. Bitte später erneut versuchen."
-}
+private fun elFehlerText(e: Exception): String =
+    (e as? ELAnmeldeFehler)?.meldung ?: "Der Server meldet einen Fehler. Bitte später erneut versuchen."
 
 /**
  * Übersicht der Einsatzleitung (Nachbau von `/el`) wie iOS `ELUebersichtView`: Einsatz, Teams mit Suchzeit und

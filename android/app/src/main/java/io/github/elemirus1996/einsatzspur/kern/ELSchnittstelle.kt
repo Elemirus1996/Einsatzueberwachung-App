@@ -12,10 +12,12 @@ import org.json.JSONException
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.IOException
+import java.net.UnknownHostException
 import java.net.URL
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 import javax.net.ssl.HttpsURLConnection
+import javax.net.ssl.SSLException
 
 /** Zugangsdaten der Einsatzleitung (APP_API.md „Rolle Einsatzleitung – native App“). Nur verschlüsselt im Keystore. */
 data class ELSitzung(
@@ -237,10 +239,50 @@ sealed class ELAnmeldeFehler(nachricht: String) : Exception(nachricht) {
     data class Gesperrt(val sekunden: Int) : ELAnmeldeFehler("gesperrt")
     /** 409: auf dem Server noch kein Staffel-Passwort eingerichtet */
     data object KeinPasswort : ELAnmeldeFehler("kein Passwort")
-    /** Netz nicht erreichbar oder öffentlicher Zugang (404): meist ist das VPN aus */
-    data object NichtErreichbar : ELAnmeldeFehler("nicht erreichbar")
+    /** Eingetragen ist der Zugang zum WireGuard-VPN (Port 51820), nicht der Server */
+    data object VpnAdresse : ELAnmeldeFehler("VPN-Adresse")
+    /** Name nicht auflösbar (Tippfehler, `.local` über das VPN) */
+    data class NameUnbekannt(val technisch: String) : ELAnmeldeFehler(technisch)
+    /** Keine Verbindung: meist ist das VPN aus */
+    data class NichtErreichbar(val technisch: String) : ELAnmeldeFehler(technisch)
+    /** Zertifikat nicht vertrauenswürdig oder nicht für diese Adresse (selbst ausgestellt, Zugriff über die IP) */
+    data class Zertifikat(val technisch: String) : ELAnmeldeFehler(technisch)
+    /** 404: öffentliche Adresse der Teams (dort gibt es keine EL-Pfade) oder Server älter als 1.12 */
+    data object KeineElAnmeldung : ELAnmeldeFehler("HTTP 404")
     data class Server(val status: Int) : ELAnmeldeFehler("HTTP $status")
     data object AntwortUngueltig : ELAnmeldeFehler("Antwort ungültig")
+
+    /** Text für die Einsatzleitung, mit technischer Angabe zum Nachfragen */
+    val meldung: String
+        get() = when (this) {
+            PasswortFalsch -> "Das Staffel-Passwort ist falsch."
+            is Gesperrt -> "Zu viele Fehlversuche. Bitte in ${(sekunden / 60).coerceAtLeast(1)} Minuten erneut versuchen."
+            KeinPasswort -> "Auf dem Server ist noch kein Staffel-Passwort eingerichtet (Einstellungen im Monitor)."
+            VpnAdresse -> "Das ist die Adresse des WireGuard-VPN (Port 51820), nicht des Servers. Bitte die interne Adresse " +
+                "eintragen, unter der der Monitor bei eingeschaltetem VPN im Browser läuft."
+            is NameUnbekannt -> "Der Servername wurde nicht gefunden. Bitte die Adresse prüfen. Namen auf „.local“ funktionieren " +
+                "über das VPN nicht. ($technisch)"
+            is NichtErreichbar -> "Server nicht erreichbar. Ist WireGuard eingeschaltet? Die Einsatzleitung geht nur über das " +
+                "VPN der Staffel. ($technisch)"
+            is Zertifikat -> "Dem Zertifikat des Servers wird nicht vertraut, oder es gilt nicht für diese Adresse (z. B. selbst " +
+                "ausgestellt oder Zugriff über die IP). Bitte die interne Adresse mit gültigem Zertifikat eintragen. ($technisch)"
+            KeineElAnmeldung -> "Unter dieser Adresse gibt es keine Anmeldung der Einsatzleitung. Meist ist es die öffentliche " +
+                "Adresse der Teams; bitte die interne Adresse eintragen. Oder der Server ist älter als Version 1.12."
+            is Server -> "Der Server meldet einen Fehler (HTTP $status). Bitte später erneut versuchen."
+            AntwortUngueltig -> "Die Antwort des Servers ist unverständlich. Ist das die richtige Adresse?"
+        }
+
+    companion object {
+        /** Netzfehler nach Ursache; die Klasse der Ausnahme dient als technische Angabe */
+        fun aus(e: IOException): ELAnmeldeFehler {
+            val technisch = e.javaClass.simpleName
+            return when (e) {
+                is UnknownHostException -> NameUnbekannt(technisch)
+                is SSLException -> Zertifikat(technisch)
+                else -> NichtErreichbar(technisch)
+            }
+        }
+    }
 }
 
 /** 409 auf `/verlaengern`: kein Einsatz läuft oder 72 h erreicht – nicht wiederholen, nach Ablauf neu anmelden. */
@@ -260,13 +302,19 @@ data class ELAngemeldet(val sitzung: ELSitzung, val server: ServerInfo?, val dat
 
 /** Anmeldung der Einsatzleitung (`POST /login`), nur an der internen Adresse im VPN. */
 class ELAnmeldung(private val server: ServerAdresse, private val transport: Transport = ::http) {
+    companion object {
+        /** Standard-Port von WireGuard; dort spricht der Server kein HTTPS */
+        const val VPN_PORT = 51820
+    }
+
     suspend fun anmelden(passwort: String, geraet: String?): ELAngemeldet {
         val name = geraet?.trim()?.take(40)?.ifEmpty { null }
         val inhalt = JSONObject().put("passwort", passwort).apply { name?.let { put("geraet", it) } }
+        if (server.port == VPN_PORT) throw ELAnmeldeFehler.VpnAdresse
         val (status, text) = try {
             transport(server.pfad("api/el/app/v1/login"), "POST", inhalt, null)
         } catch (e: IOException) {
-            throw ELAnmeldeFehler.NichtErreichbar
+            throw ELAnmeldeFehler.aus(e)
         }
         val json = runCatching { JSONObject(text) }.getOrNull()
         return when (status) {
@@ -279,8 +327,8 @@ class ELAnmeldung(private val server: ServerAdresse, private val transport: Tran
             401 -> throw ELAnmeldeFehler.PasswortFalsch
             429 -> throw ELAnmeldeFehler.Gesperrt(json?.optInt("wiederholenNachSec", 300) ?: 300)
             409 -> throw ELAnmeldeFehler.KeinPasswort
-            // Öffentlicher Zugang: alle EL-Pfade 404 → nicht im VPN
-            404 -> throw ELAnmeldeFehler.NichtErreichbar
+            // Öffentlicher Zugang: alle EL-Pfade 404
+            404 -> throw ELAnmeldeFehler.KeineElAnmeldung
             else -> throw ELAnmeldeFehler.Server(status)
         }
     }

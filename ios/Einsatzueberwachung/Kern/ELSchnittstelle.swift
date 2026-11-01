@@ -160,10 +160,58 @@ enum ELAnmeldeFehler: Error, Equatable {
     case gesperrt(sekunden: Int)
     /// 409: auf dem Server noch kein Staffel-Passwort eingerichtet
     case keinPasswort
-    /// Netz nicht erreichbar: meist ist das VPN aus
-    case nichtErreichbar
+    /// Eingetragen ist der Zugang zum WireGuard-VPN (Port 51820), nicht der Server
+    case vpnAdresse
+    /// Name nicht auflösbar (Tippfehler, `.local` über das VPN)
+    case nameUnbekannt(code: Int)
+    /// Keine Verbindung: meist ist das VPN aus
+    case nichtErreichbar(code: Int)
+    /// Zertifikat nicht vertrauenswürdig oder nicht für diese Adresse (selbst ausgestellt, Zugriff über die IP)
+    case zertifikat(code: Int)
+    /// 404: öffentliche Adresse der Teams (dort gibt es keine EL-Pfade) oder Server älter als 1.12
+    case keineELAnmeldung
     case server(status: Int)
     case antwortUngueltig
+
+    /// Standard-Port von WireGuard; dort spricht der Server kein HTTPS
+    static let vpnPort = 51820
+
+    /// Netzfehler nach Ursache; der Code von `URLError` dient als technische Angabe
+    static func aus(_ fehler: URLError) -> ELAnmeldeFehler {
+        switch fehler.code {
+        case .cannotFindHost, .dnsLookupFailed:
+            return .nameUnbekannt(code: fehler.code.rawValue)
+        case .serverCertificateUntrusted, .serverCertificateHasBadDate, .serverCertificateHasUnknownRoot,
+             .serverCertificateNotYetValid, .secureConnectionFailed, .clientCertificateRejected, .clientCertificateRequired:
+            return .zertifikat(code: fehler.code.rawValue)
+        default:
+            return .nichtErreichbar(code: fehler.code.rawValue)
+        }
+    }
+
+    /// Text für die Einsatzleitung, mit technischer Angabe zum Nachfragen
+    var meldung: String {
+        switch self {
+        case .passwortFalsch: "Das Staffel-Passwort ist falsch."
+        case .gesperrt(let sekunden): "Zu viele Fehlversuche. Bitte in \(max(1, sekunden / 60)) Minuten erneut versuchen."
+        case .keinPasswort: "Auf dem Server ist noch kein Staffel-Passwort eingerichtet (Einstellungen im Monitor)."
+        case .vpnAdresse:
+            "Das ist die Adresse des WireGuard-VPN (Port 51820), nicht des Servers. Bitte die interne Adresse eintragen, "
+                + "unter der der Monitor bei eingeschaltetem VPN im Browser läuft."
+        case .nameUnbekannt(let code):
+            "Der Servername wurde nicht gefunden. Bitte die Adresse prüfen. Namen auf „.local“ funktionieren über das VPN nicht. (Fehler \(code))"
+        case .nichtErreichbar(let code):
+            "Server nicht erreichbar. Ist WireGuard eingeschaltet? Die Einsatzleitung geht nur über das VPN der Staffel. (Fehler \(code))"
+        case .zertifikat(let code):
+            "Dem Zertifikat des Servers wird nicht vertraut, oder es gilt nicht für diese Adresse (z. B. selbst ausgestellt oder "
+                + "Zugriff über die IP). Bitte die interne Adresse mit gültigem Zertifikat eintragen. (Fehler \(code))"
+        case .keineELAnmeldung:
+            "Unter dieser Adresse gibt es keine Anmeldung der Einsatzleitung. Meist ist es die öffentliche Adresse der Teams; "
+                + "bitte die interne Adresse eintragen. Oder der Server ist älter als Version 1.12."
+        case .server(let status): "Der Server meldet einen Fehler (HTTP \(status)). Bitte später erneut versuchen."
+        case .antwortUngueltig: "Die Antwort des Servers ist unverständlich. Ist das die richtige Adresse?"
+        }
+    }
 }
 
 /// Anmeldung der Einsatzleitung (`POST /login`), nur über die interne Adresse im VPN.
@@ -201,12 +249,13 @@ struct ELAnmeldung: Sendable {
         var inhalt = ["passwort": passwort]
         if let geraet, !geraet.isEmpty { inhalt["geraet"] = String(geraet.prefix(40)) }
         request.httpBody = try JSONEncoder().encode(inhalt)
+        guard server.url.port != ELAnmeldeFehler.vpnPort else { throw ELAnmeldeFehler.vpnAdresse }
         let daten: Data
         let antwort: URLResponse
         do {
             (daten, antwort) = try await session.data(for: request)
-        } catch let fehler as URLError where Self.netzFehler.contains(fehler.code) {
-            throw ELAnmeldeFehler.nichtErreichbar
+        } catch let fehler as URLError {
+            throw ELAnmeldeFehler.aus(fehler)
         }
         guard let http = antwort as? HTTPURLResponse else { throw ELAnmeldeFehler.antwortUngueltig }
         switch http.statusCode {
@@ -220,15 +269,12 @@ struct ELAnmeldung: Sendable {
             let sekunden = ((try? JSONSerialization.jsonObject(with: daten)) as? [String: Any])?["wiederholenNachSec"] as? Int
             throw ELAnmeldeFehler.gesperrt(sekunden: sekunden ?? 300)
         case 409: throw ELAnmeldeFehler.keinPasswort
-        // Öffentlicher Zugang: alle EL-Pfade 404 → nicht im VPN
-        case 404: throw ELAnmeldeFehler.nichtErreichbar
+        // Öffentlicher Zugang: alle EL-Pfade 404
+        case 404: throw ELAnmeldeFehler.keineELAnmeldung
         default: throw ELAnmeldeFehler.server(status: http.statusCode)
         }
     }
 
-    static let netzFehler: Set<URLError.Code> = [
-        .cannotFindHost, .cannotConnectToHost, .timedOut, .networkConnectionLost, .notConnectedToInternet, .dnsLookupFailed,
-    ]
 }
 
 /// Endpunkte der Einsatzleitung mit Token. Erfüllt `TeamSchnittstelle`, damit dieselbe Ortungssteuerung

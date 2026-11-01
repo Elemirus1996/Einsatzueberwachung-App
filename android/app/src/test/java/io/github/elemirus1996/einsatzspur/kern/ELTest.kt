@@ -77,10 +77,37 @@ class ELModellTest {
         assertEquals("e3.x", s.token)
         assertEquals("Tablet", s.geraet)
         for ((status, fehler) in listOf(401 to ELAnmeldeFehler.PasswortFalsch, 409 to ELAnmeldeFehler.KeinPasswort,
-            404 to ELAnmeldeFehler.NichtErreichbar, 429 to ELAnmeldeFehler.Gesperrt(300))) {
+            404 to ELAnmeldeFehler.KeineElAnmeldung, 429 to ELAnmeldeFehler.Gesperrt(300))) {
             val e = runCatching { mit(status, """{ "wiederholenNachSec": 300 }""") }.exceptionOrNull()
             assertEquals(fehler, e)
         }
+    }
+
+    @Test fun anmeldungNetzfehlerNachUrsache() = runTest {
+        suspend fun mit(fehler: java.io.IOException) =
+            runCatching { ELAnmeldung(SERVER) { _, _, _, _ -> throw fehler }.anmelden("geheim", null) }.exceptionOrNull()
+        assertEquals(ELAnmeldeFehler.NameUnbekannt("UnknownHostException"), mit(java.net.UnknownHostException("einsatz.vpn.local")))
+        assertEquals(ELAnmeldeFehler.Zertifikat("SSLHandshakeException"), mit(javax.net.ssl.SSLHandshakeException("Trust anchor")))
+        assertEquals(ELAnmeldeFehler.Zertifikat("SSLPeerUnverifiedException"), mit(javax.net.ssl.SSLPeerUnverifiedException("Hostname")))
+        assertEquals(ELAnmeldeFehler.NichtErreichbar("ConnectException"), mit(java.net.ConnectException("refused")))
+        assertEquals(ELAnmeldeFehler.NichtErreichbar("SocketTimeoutException"), mit(java.net.SocketTimeoutException()))
+    }
+
+    @Test fun anmeldungWireGuardAdresseOhneAnfrage() = runTest {
+        var angefragt = false
+        val vpn = ServerAdresse.aus("https://dein-einsatz.mywire.org:51820")!!
+        assertEquals(51820, vpn.port)
+        assertNull(SERVER.port)
+        val e = runCatching { ELAnmeldung(vpn) { _, _, _, _ -> angefragt = true; 200 to "{}" }.anmelden("geheim", null) }.exceptionOrNull()
+        assertEquals(ELAnmeldeFehler.VpnAdresse, e)
+        assertFalse(angefragt)
+    }
+
+    @Test fun anmeldeMeldungen() {
+        assertTrue(ELAnmeldeFehler.VpnAdresse.meldung.contains("WireGuard-VPN"))
+        assertTrue(ELAnmeldeFehler.Zertifikat("SSLHandshakeException").meldung.endsWith("(SSLHandshakeException)"))
+        assertTrue(ELAnmeldeFehler.KeineElAnmeldung.meldung.contains("öffentliche Adresse"))
+        assertTrue(ELAnmeldeFehler.Server(502).meldung.contains("HTTP 502"))
     }
 }
 

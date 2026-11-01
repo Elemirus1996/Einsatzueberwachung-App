@@ -50,8 +50,32 @@ struct ELAnmeldungTests {
         await #expect(throws: ELAnmeldeFehler.passwortFalsch) { try await anmelden(401) }
         await #expect(throws: ELAnmeldeFehler.gesperrt(sekunden: 300)) { try await anmelden(429, #"{ "error": "gesperrt", "wiederholenNachSec": 300 }"#) }
         await #expect(throws: ELAnmeldeFehler.keinPasswort) { try await anmelden(409) }
-        await #expect(throws: ELAnmeldeFehler.nichtErreichbar, "öffentlicher Zugang: 404") { try await anmelden(404) }
-        await #expect(throws: ELAnmeldeFehler.nichtErreichbar, "ohne VPN") { try await anmelden(0, fehler: URLError(.cannotFindHost)) }
+        await #expect(throws: ELAnmeldeFehler.keineELAnmeldung, "öffentlicher Zugang: 404") { try await anmelden(404) }
+        await #expect(throws: ELAnmeldeFehler.nameUnbekannt(code: URLError.cannotFindHost.rawValue)) {
+            try await anmelden(0, fehler: URLError(.cannotFindHost))
+        }
+        await #expect(throws: ELAnmeldeFehler.nichtErreichbar(code: URLError.timedOut.rawValue), "ohne VPN") {
+            try await anmelden(0, fehler: URLError(.timedOut))
+        }
+        await #expect(throws: ELAnmeldeFehler.zertifikat(code: URLError.serverCertificateUntrusted.rawValue), "selbst ausgestellt") {
+            try await anmelden(0, fehler: URLError(.serverCertificateUntrusted))
+        }
+    }
+
+    @Test func wireGuardAdresseOhneAnfrage() async {
+        let vpn = ServerAdresse(URL(string: "https://dein-einsatz.mywire.org:51820")!)!
+        StubProtokoll.letzteAnfrage = nil
+        await #expect(throws: ELAnmeldeFehler.vpnAdresse) {
+            try await ELAnmeldung(server: vpn, session: StubProtokoll.session).anmelden(passwort: "geheim", geraet: nil)
+        }
+        #expect(StubProtokoll.letzteAnfrage == nil)
+    }
+
+    @Test func meldungen() {
+        #expect(ELAnmeldeFehler.vpnAdresse.meldung.contains("WireGuard-VPN"))
+        #expect(ELAnmeldeFehler.zertifikat(code: -1202).meldung.hasSuffix("(Fehler -1202)"))
+        #expect(ELAnmeldeFehler.keineELAnmeldung.meldung.contains("öffentliche Adresse"))
+        #expect(ELAnmeldeFehler.server(status: 502).meldung.contains("HTTP 502"))
     }
 }
 
