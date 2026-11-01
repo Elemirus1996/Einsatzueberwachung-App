@@ -63,16 +63,8 @@ struct ELAnmeldungView: View {
         do {
             try await modell.elAnmelden(server: adresse, passwort: passwort, geraet: geraet)
             passwort = ""
-        } catch ELAnmeldeFehler.passwortFalsch {
-            fehler = "Das Staffel-Passwort ist falsch."
-        } catch ELAnmeldeFehler.gesperrt(let sekunden) {
-            fehler = "Zu viele Fehlversuche. Bitte in \(max(1, sekunden / 60)) Minuten erneut versuchen."
-        } catch ELAnmeldeFehler.keinPasswort {
-            fehler = "Auf dem Server ist noch kein Staffel-Passwort eingerichtet (Einstellungen im Monitor)."
-        } catch ELAnmeldeFehler.nichtErreichbar {
-            fehler = "Server nicht erreichbar. Ist WireGuard eingeschaltet? Die Einsatzleitung geht nur über das VPN der Staffel."
-        } catch ELAnmeldeFehler.server(let status) where status == 404 {
-            fehler = "Der Server unterstützt die App-Anmeldung der Einsatzleitung noch nicht."
+        } catch let e as ELAnmeldeFehler {
+            fehler = e.meldung
         } catch {
             fehler = "Der Server meldet einen Fehler. Bitte später erneut versuchen."
         }

@@ -11,6 +11,9 @@ value class ServerAdresse private constructor(val basis: String) {
 
     fun pfad(pfad: String): String = "$basis/${pfad.trimStart('/')}"
 
+    /** Ausdrücklich angegebener Port, sonst `null` (443) */
+    val port: Int? get() = basis.substringAfter("://").substringAfter(':', "").toIntOrNull()
+
     companion object {
         fun aus(text: String): ServerAdresse? {
             val uri = runCatching { URI(text.trim()) }.getOrNull() ?: return null
