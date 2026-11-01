@@ -10,21 +10,26 @@ struct StartView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        Group {
             if let ansicht = modell.elAnsicht, let ortung = modell.elOrtung, let betrieb = modell.elBetrieb,
                let karte = modell.elKarte, let vermisste = modell.elVermisste {
-                ELUebersichtView(ansicht: ansicht, ortung: ortung, betrieb: betrieb, karte: karte, vermisste: vermisste)
-            } else if let team = modell.team, let ansicht = modell.teamAnsicht, let sitzung = modell.teamSitzung {
-                TeamAnsichtView(ortung: team, ansicht: ansicht, sitzung: sitzung)
-            } else if let wahl = modell.teamWahl {
-                TeamAnmeldungView(vorgabe: wahl)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button("Abbrechen") { modell.teamWahlAbbrechen() }
-                        }
-                    }
+                // Einsatzleitung mit eigenen Reitern, jeder mit eigenem Navigationsstapel
+                ELHauptView(ansicht: ansicht, ortung: ortung, betrieb: betrieb, karte: karte, vermisste: vermisste)
             } else {
-                rollenAuswahl
+                NavigationStack {
+                    if let team = modell.team, let ansicht = modell.teamAnsicht, let sitzung = modell.teamSitzung {
+                        TeamAnsichtView(ortung: team, ansicht: ansicht, sitzung: sitzung)
+                    } else if let wahl = modell.teamWahl {
+                        TeamAnmeldungView(vorgabe: wahl)
+                            .toolbar {
+                                ToolbarItem(placement: .cancellationAction) {
+                                    Button("Abbrechen") { modell.teamWahlAbbrechen() }
+                                }
+                            }
+                    } else {
+                        rollenAuswahl
+                    }
+                }
             }
         }
         // Nach An- oder Abmeldung neu aufbauen, damit keine Anmeldeseite auf dem Stapel liegen bleibt
@@ -33,7 +38,7 @@ struct StartView: View {
         .sheet(item: Binding(get: { modell.datenschutzFrage }, set: { _ in })) { frage in
             DatenschutzAbfrageView(frage: frage)
         }
-        .alert("Ist „\(modell.heimatFrage?.name ?? "")“ deine eigene Staffel?",
+        .alert(modell.heimatFrage.map { $0.name.isEmpty ? "Ist das deine eigene Staffel?" : "Ist „\($0.name)“ deine eigene Staffel?" } ?? "",
                isPresented: Binding(get: { modell.heimatFrage != nil }, set: { _ in })) {
             Button("Ja, meine Staffel") { modell.heimatBeantworten(true) }
             Button("Nein", role: .cancel) { modell.heimatBeantworten(false) }
