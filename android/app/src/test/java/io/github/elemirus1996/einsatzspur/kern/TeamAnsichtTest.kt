@@ -68,7 +68,14 @@ class TestAnsichtSchnittstelle(var lageAntwort: Result<TeamLage> = Result.succes
         punktFehler?.let { throw it }
     }
 
-    override fun ereignisse(): Flow<TeamEreignis> = if (offenerStrom) flow { awaitCancellation() } else emptyFlow()
+    /** Gesetzt: Live-Ereignisse kommen aus diesem Strom */
+    var strom: Flow<TeamEreignis>? = null
+    var stromOeffnungen = 0
+
+    override fun ereignisse(): Flow<TeamEreignis> {
+        stromOeffnungen++
+        return strom ?: if (offenerStrom) flow { awaitCancellation() } else emptyFlow()
+    }
 }
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -188,6 +195,24 @@ class TeamAnsichtTest {
         val vorher = server.lageAbrufe
         advanceTimeBy(3_600_000)
         assertEquals(vorher, server.lageAbrufe)
+    }
+
+    @Test
+    fun gesperrtKommtMitteilungSofortUeberLive() = runTest {
+        val strom = kotlinx.coroutines.flow.MutableSharedFlow<TeamEreignis>()
+        server.strom = strom
+        val a = ansicht()
+        a.neuLaden()
+        a.hintergrund()
+        runCurrent()
+        assertTrue("Live-Verbindung auch gesperrt offen", a.live.value)
+        strom.emit(TeamEreignis.NeueMitteilung(Mitteilung("m9", "Bitte Gebiet C absuchen", jetzt)))
+        runCurrent()
+        assertEquals("Bitte Gebiet C absuchen", gemeldet.single().text)
+        advanceTimeBy(61_000)
+        a.anhalten()
+        assertTrue("im Hintergrund keine Laufwege", server.trackAbrufe.size <= 1)
+        assertEquals("keine Minutenabfrage, solange live", 2, server.lageAbrufe)
     }
 
     @Test

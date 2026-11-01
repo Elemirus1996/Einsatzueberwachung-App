@@ -99,11 +99,18 @@ class TeamAnsicht(
         imHintergrund = false
     }
 
-    /** Hintergrund: keine Live-Verbindung, keine Laufwege, aber jede Minute die Lage. */
+    /**
+     * Hintergrund (Handy gesperrt, Vordergrunddienst der Ortung läuft): Die Live-Verbindung bleibt offen, damit
+     * Mitteilungen der EL, neue Suchgebiete und Navigationsziele sofort als Mitteilung erscheinen (entschieden
+     * 01.11.2026, kein Firebase). Keine Laufwege. Reißt die Verbindung ab, holt die App die Lage jede Minute.
+     */
     fun hintergrund() {
         anhalten()
         imHintergrund = true
-        aufgaben = listOf(bereich.launch { schleife(lageTaktMs) { neuLaden(tracksVoll = false, mitTracks = false) } })
+        aufgaben = listOf(
+            bereich.launch { liveSchleife() },
+            bereich.launch { schleife(lageTaktMs) { if (!_live.value) neuLaden(tracksVoll = false, mitTracks = false) } },
+        )
     }
 
     /** Bei Abmeldung oder Einsatzende: nichts auf dem Gerät zurücklassen. */
@@ -133,7 +140,7 @@ class TeamAnsicht(
     }
 
     private suspend fun liveSchleife() {
-        neuLaden()
+        neuLaden(mitTracks = !imHintergrund)
         while (true) {
             var warVerbunden = false
             try {
@@ -151,7 +158,7 @@ class TeamAnsicht(
             }
             _live.value = false
             delay(verdraengtWartenMs?.also { verdraengtWartenMs = null } ?: if (warVerbunden) NEU_VERBINDEN_MS else POLL_TAKT_MS)
-            neuLaden()
+            neuLaden(mitTracks = !imHintergrund)
         }
     }
 
@@ -171,7 +178,7 @@ class TeamAnsicht(
                 if (alt.mitteilungen.any { it.id == ereignis.mitteilung.id }) return
                 lageUebernehmen(alt.copy(mitteilungen = (alt.mitteilungen + ereignis.mitteilung).takeLast(20)))
             }
-            TeamEreignis.Lage -> neuLaden(tracksVoll = true)
+            TeamEreignis.Lage -> neuLaden(tracksVoll = true, mitTracks = !imHintergrund)
             // Absicherung: `stop` heißt echtes Ende, ältere Server schickten es auch bei Verdrängung; /lage entscheidet
             TeamEreignis.Stop -> if (lageBestaetigtStop() == false) verdraengtWartenMs = NACH_VERDRAENGUNG_MS
             is TeamEreignis.Verdraengt -> verdraengtWartenMs = ereignis.wiederholenNachSec.coerceIn(5, 600) * 1000L

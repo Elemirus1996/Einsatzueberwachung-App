@@ -24,7 +24,7 @@ Die App darf nichts öffnen, was heute verschlossen ist.
 2. **Team nur per QR-Code, wie bisher.** Die App scannt den **bestehenden** QR-Code aus dem Monitor (Team-Dialog), das Mitglied wählt in der nativen Oberfläche sein Team. Erst danach gibt der Server der App ein App-Token. Es gilt nur für diesen Einsatz und dieses Team und läuft spätestens nach 24 h ab. Bei Einsatzende wird es ungültig (Token-Generation).
 3. **Nur HTTPS**, nur an die Adresse aus dem QR-Code bzw. die eingerichtete VPN-Adresse. Keine fest eingebaute Server-Adresse, damit auch andere Staffeln die App nutzen können.
 4. **Token im Schlüsselbund** (iOS Keychain / Android Keystore), nie im Klartext gespeichert oder geloggt.
-5. **Keine Daten an Dritte:** keine Analyse-SDKs, keine Absturzberichte an Fremddienste, keine Werbung. **Einzige Ausnahme (entschieden 28.10.2026): Push** über Apple (APNs) und Google (Firebase Cloud Messaging, nur das Messaging-Modul, Analytics aus). Push-Inhalte ohne Namen, Orte oder Positionen.
+5. **Keine Daten an Dritte:** keine Analyse-SDKs, keine Absturzberichte an Fremddienste, keine Werbung. **Einzige Ausnahme: Push über Apple (APNs)**, im System eingebaut, ohne Fremd-SDK. Android ohne Firebase: Der Vordergrunddienst hält während des Einsatzes die Live-Verbindung und zeigt Mitteilungen selbst an (entschieden 01.11.2026, ersetzt die Firebase-Ausnahme vom 28.10.2026). Sichtbare Push-Mitteilungen dürfen den Text der Mitteilung der Einsatzleitung enthalten, damit das Team ihn auf dem Sperrbildschirm liest (entschieden 01.11.2026); keine Positionen im Push.
 6. **Bestätigung vor dem Start:** „Ortung für Team <Name>, Einsatz <Stichwort> auf <Server> starten?“
 
 ## Steuerung der Ortung (Kern)
