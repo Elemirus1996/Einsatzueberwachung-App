@@ -9,6 +9,7 @@ struct ELKarteView: View {
     @ObservedObject var betrieb: ELBetrieb
     @State private var kamera: MapCameraPosition = .automatic
     @State private var gewaehlterPunkt: ELKarte.Punkt?
+    @State private var gewaehltesGebiet: ELKarte.Suchgebiet?
     @State private var satellit = false
 
     var body: some View {
@@ -22,19 +23,27 @@ struct ELKarteView: View {
                         .foregroundStyle(farbe.opacity(fertig ? 0.06 : 0.15))
                         .stroke(farbe.opacity(fertig ? 0.6 : 1), style: StrokeStyle(lineWidth: 2, dash: fertig ? [6, 4] : []))
                     if let mitte = mitte(gebiet.punkte) {
+                        // Antippen → Team zuweisen (Idee 6.4)
                         Annotation("", coordinate: mitte) {
-                            VStack(spacing: 0) {
-                                HStack(spacing: 3) {
-                                    if fertig { Image(systemName: "checkmark.circle.fill").foregroundStyle(.green) }
-                                    Text(gebiet.name ?? "")
+                            Button { gewaehltesGebiet = gebiet } label: {
+                                VStack(spacing: 0) {
+                                    HStack(spacing: 3) {
+                                        if fertig { Image(systemName: "checkmark.circle.fill").foregroundStyle(.green) }
+                                        Text(gebiet.name ?? "")
+                                    }
+                                    .font(.caption.bold())
+                                    if let team = teams.first(where: { $0.teamId == gebiet.teamId }) {
+                                        Text(team.teamName).font(.caption2)
+                                    }
+                                    if let abdeckung = gebiet.abdeckungProzent {
+                                        Text("\(Int(abdeckung.rounded())) %").font(.caption2)
+                                    }
                                 }
-                                .font(.caption.bold())
-                                if let abdeckung = gebiet.abdeckungProzent {
-                                    Text("\(Int(abdeckung.rounded())) %").font(.caption2)
-                                }
+                                .foregroundStyle(.primary)
+                                .padding(4)
+                                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
                             }
-                            .padding(4)
-                            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+                            .accessibilityLabel("Suchgebiet \(gebiet.name ?? "") – Team zuweisen")
                         }
                     }
                 }
@@ -92,6 +101,12 @@ struct ELKarteView: View {
         .sheet(item: $gewaehlterPunkt) { punkt in
             ELPunktView(punkt: punkt, teams: teams, betrieb: betrieb)
                 .presentationDetents([.medium, .large])
+        }
+        .sheet(item: $gewaehltesGebiet) { gebiet in
+            ELSuchgebietView(gebiet: gebiet, teams: teams, betrieb: betrieb) {
+                Task { await karte.karteNeuLaden() }
+            }
+            .presentationDetents([.medium, .large])
         }
         .onAppear { karte.starten() }
         .onDisappear { karte.anhalten() }
@@ -180,5 +195,83 @@ struct ELPunktView: View {
                 ToolbarItem(placement: .confirmationAction) { Button("Fertig") { schliessen() } }
             }
         }
+    }
+}
+
+/// Suchgebiet einem Team zuweisen oder die Zuweisung aufheben (`/teams/{teamId}/suchgebiet`, Idee 6.4).
+struct ELSuchgebietView: View {
+    let gebiet: ELKarte.Suchgebiet
+    let teams: [ELLage.Team]
+    @ObservedObject var betrieb: ELBetrieb
+    /// Nach der Aktion: Karte neu laden (Zuweisung in `suchgebiete[].teamId`)
+    let geaendert: () -> Void
+    @Environment(\.dismiss) private var schliessen
+    @State private var wechselFrage: ELLage.Team?
+
+    private var bisher: ELLage.Team? { teams.first { $0.teamId == gebiet.teamId } }
+    private var name: String { gebiet.name ?? "Suchgebiet" }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    if teams.isEmpty {
+                        Text("Noch keine Teams im Einsatz.").foregroundStyle(.secondary)
+                    }
+                    ForEach(teams) { team in
+                        Button {
+                            if team.teamId == gebiet.teamId { schliessen() }
+                            else if bisher != nil { wechselFrage = team }
+                            else { zuweisen(team) }
+                        } label: {
+                            HStack {
+                                Label(team.teamName, systemImage: team.teamId == gebiet.teamId ? "checkmark.circle.fill" : "circle")
+                                Spacer()
+                                if let anderes = team.suchgebiet, anderes.id != gebiet.id {
+                                    Text(anderes.name ?? "anderes Gebiet").font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Team zuweisen")
+                } footer: {
+                    Text("Ein Team hat höchstens ein Suchgebiet – ein bisheriges wird frei. Die Team-App zeigt das neue Gebiet sofort.")
+                }
+                if let bisher {
+                    Section {
+                        Button("Zuweisung von \(bisher.teamName) aufheben", role: .destructive) {
+                            Task {
+                                await betrieb.ausfuehren(.suchgebiet(bisher.teamId, name: bisher.teamName, suchgebietId: nil, gebietName: name))
+                                geaendert()
+                            }
+                            schliessen()
+                        }
+                    }
+                }
+            }
+            .navigationTitle(name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) { Button("Fertig") { schliessen() } }
+            }
+            .confirmationDialog("„\(name)“ gehört \(bisher?.teamName ?? "einem anderen Team")",
+                                isPresented: Binding(get: { wechselFrage != nil }, set: { if !$0 { wechselFrage = nil } }),
+                                titleVisibility: .visible) {
+                if let team = wechselFrage {
+                    Button("An \(team.teamName) geben") { zuweisen(team) }
+                }
+            } message: {
+                Text("\(bisher?.teamName ?? "Das andere Team") hat danach kein Suchgebiet mehr.")
+            }
+        }
+    }
+
+    private func zuweisen(_ team: ELLage.Team) {
+        Task {
+            await betrieb.ausfuehren(.suchgebiet(team.teamId, name: team.teamName, suchgebietId: gebiet.id, gebietName: name))
+            geaendert()
+        }
+        schliessen()
     }
 }

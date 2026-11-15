@@ -46,6 +46,12 @@ data class ELAktion(
         /** Kartenpunkt als Navigationsziel an das Team (Abschnitt 7, Variante C) */
         fun ziel(teamId: String, name: String, punktId: String, punktName: String) =
             neu("teams/$teamId/ziel", "Ziel „$punktName“ an $name", JSONObject().put("punktId", punktId))
+        /** Suchgebiet zuweisen (Idee 6.4); `suchgebietId` null = Zuweisung des Teams aufheben */
+        fun suchgebiet(teamId: String, name: String, suchgebietId: String?, gebietName: String?) = neu(
+            "teams/$teamId/suchgebiet",
+            if (suchgebietId == null) "Suchgebiet von $name entfernt" else "„${gebietName ?: "Suchgebiet"}“ an $name",
+            JSONObject().put("suchgebietId", oderNull(suchgebietId)),
+        )
         fun notiz(text: String, teamId: String?) = neu("notizen", "Notiz", JSONObject().put("text", text).put("teamId", oderNull(teamId)))
         fun notizLoeschen(notizId: String) = neu("notizen/$notizId/loeschen", "Notiz löschen")
         fun funk(text: String, teamId: String?, antwortAuf: String?) = neu(
