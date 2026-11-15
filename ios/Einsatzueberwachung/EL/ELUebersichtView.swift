@@ -413,6 +413,7 @@ struct ELTeamKarte: View {
                 ELWarnbalken(dauer: dauer, stufe1Min: team.warnung1Min, stufe2Min: w2, farbe: zeitFarbe)
             }
             geraete
+            ortungsHinweise
             if let bis = team.pause?.erforderlichBis, bis > zeitpunkt {
                 Label { Text("PAUSE BIS ") + Text(bis, style: .time) } icon: { Image(systemName: "cup.and.saucer") }
                     .font(ELStil.mono(11, .semibold)).foregroundStyle(ELStil.warnung1)
@@ -445,6 +446,19 @@ struct ELTeamKarte: View {
             .foregroundStyle(ELStil.vermerk)
             .lineLimit(1)
             .labelStyle(.titleAndIcon)
+        }
+    }
+
+    /// Schwacher Akku und Funkloch, damit es auffällt, ohne auf die Gerätezeile zu schauen
+    @ViewBuilder
+    private var ortungsHinweise: some View {
+        let texte = ELOrtungsHinweis.texte(team: team, alterHalsband: ansicht.alter(team.halsband?.zeit, um: zeitpunkt),
+                                           alterHandy: ansicht.alter(team.handy?.zeit, um: zeitpunkt))
+        if !texte.isEmpty {
+            Label(texte.joined(separator: " · "), systemImage: "exclamationmark.triangle.fill")
+                .font(ELStil.mono(11))
+                .foregroundStyle(ELStil.warnung1)
+                .lineLimit(2)
         }
     }
 

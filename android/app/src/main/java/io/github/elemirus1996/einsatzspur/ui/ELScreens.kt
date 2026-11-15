@@ -61,6 +61,7 @@ import io.github.elemirus1996.einsatzspur.kern.ELLage
 import io.github.elemirus1996.einsatzspur.kern.ELVerlaengerung
 import io.github.elemirus1996.einsatzspur.kern.ELVermissteAnsicht
 import io.github.elemirus1996.einsatzspur.kern.HalsbandAkku
+import io.github.elemirus1996.einsatzspur.kern.OrtungsHinweise
 import io.github.elemirus1996.einsatzspur.kern.ServerAdresse
 import io.github.elemirus1996.einsatzspur.kern.TeamLage
 import io.github.elemirus1996.einsatzspur.kern.TeamOrtung
@@ -428,6 +429,11 @@ private fun TeamKarte(team: ELLage.Team, ansicht: ELAnsicht, jetzt: Long) {
         ).joinToString(" · ")
         if (geraete.isNotEmpty()) {
             Text(geraete, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+        }
+        // Schwacher Akku und Funkloch, damit es auffällt, ohne auf die Gerätezeile zu schauen
+        val hinweise = OrtungsHinweise.texte(team, ansicht.alterSec(team.halsband?.zeitMs, jetzt), ansicht.alterSec(team.handy?.zeitMs, jetzt))
+        if (hinweise.isNotEmpty()) {
+            Text("⚠ " + hinweise.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = ORANGE, maxLines = 2)
         }
         team.pauseErforderlichBisMs?.takeIf { it > jetzt }?.let {
             Text("Pause bis " + DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it)), color = ORANGE, style = MaterialTheme.typography.bodySmall)

@@ -547,3 +547,22 @@ object HalsbandAkku {
         else -> null
     }
 }
+
+/** Hinweise auf der Teamkarte der Einsatzleitung: schwacher Akku und Funkloch (keine Position mehr während der Suche), wie iOS `ELOrtungsHinweis`. */
+object OrtungsHinweise {
+    /** Ab so langer Stille aller Geräte eines suchenden Teams gilt es als Funkloch */
+    const val FUNKLOCH_NACH_SEC = 180L
+    const val HANDY_AKKU_NIEDRIG = 15
+
+    fun texte(team: ELLage.Team, alterHalsbandSec: Long?, alterHandySec: Long?): List<String> {
+        val texte = mutableListOf<String>()
+        if (team.suche.status == TeamLage.SucheStatus.LAEUFT && (team.halsband != null || team.handy != null)) {
+            val alter = listOfNotNull(team.halsband?.let { alterHalsbandSec ?: Long.MAX_VALUE }, team.handy?.let { alterHandySec ?: Long.MAX_VALUE })
+            val juengste = alter.min()
+            if (juengste >= FUNKLOCH_NACH_SEC) texte += if (juengste == Long.MAX_VALUE) "Kein Signal" else "Kein Signal seit ${juengste / 60} min"
+        }
+        if (team.halsband?.akku == 1) texte += "Halsband-Akku niedrig"
+        team.handy?.akku?.takeIf { it <= HANDY_AKKU_NIEDRIG }?.let { texte += "Handy-Akku $it %" }
+        return texte
+    }
+}
