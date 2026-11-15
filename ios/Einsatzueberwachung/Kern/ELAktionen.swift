@@ -54,9 +54,10 @@ struct ELAktion: Codable, Equatable, Identifiable, Sendable {
     /// Einsatz beenden wie `/el/beenden`; `ressourcenGeprueft` muss wahr sein.
     /// `teamIds` nil = alle Teams im Bericht; `endzeit` nil = jetzt (Server), sonst als UTC mit `Z`.
     /// `mitPunkten`: Kartenpunkte ins Archiv und in den Bericht (sonst werden sie nicht archiviert)
+    /// `personalIds`/`hundeIds`: wer vor Ort war (IDs aus `GET /einsatz/vorort`); nil = Vorauswahl des Servers aus den Teams
     static func einsatzBeenden(ergebnis: String, mitTracks: Bool, kartenart: String = ELKartenart.streets.rawValue,
                                teamIds: [String]? = nil, endzeit: Date? = nil, bemerkungen: String? = nil,
-                               mitPunkten: Bool = false) -> ELAktion {
+                               mitPunkten: Bool = false, personalIds: [String]? = nil, hundeIds: [String]? = nil) -> ELAktion {
         var inhalt: [String: ELWert] = [
             "ergebnis": .text(ergebnis),
             "ressourcenGeprueft": .wahr(true),
@@ -65,6 +66,8 @@ struct ELAktion: Codable, Equatable, Identifiable, Sendable {
                             "punkte": .wahr(mitPunkten)]),
         ]
         if let endzeit { inhalt["endzeit"] = .text(ELEinsatzEnde.utc(endzeit)) }
+        if let personalIds { inhalt["personalIds"] = .liste(personalIds.map(ELWert.text)) }
+        if let hundeIds { inhalt["hundeIds"] = .liste(hundeIds.map(ELWert.text)) }
         if let text = bemerkungen?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty { inhalt["bemerkungen"] = .text(text) }
         return neu("einsatz/beenden", "Einsatz beenden", inhalt)
     }
@@ -270,6 +273,17 @@ struct ELVorlage: Decodable, Equatable, Sendable {
     private enum Schluessel: String, CodingKey { case aktiv, szenarien, divera, einsatzleiter, fuehrungsassistenten, ergebnisse, kartenarten }
 }
 
+/// Anwesenheit für das Einsatzende (`GET /einsatz/vorort`, Server 1.14.1), Vorauswahl = in einem Team eingeteilt.
+struct ELVorOrt: Decodable, Equatable, Sendable {
+    struct Eintrag: Decodable, Equatable, Identifiable, Sendable {
+        var id: String
+        var name: String
+        var vorausgewaehlt: Bool
+    }
+    var personal: [Eintrag]
+    var hunde: [Eintrag]
+}
+
 /// Antwort von `POST /einsatz/beenden`: Archiv-Eintrag und ob der PDF-Bericht erstellt wurde.
 struct ELEinsatzEnde: Decodable, Equatable, Sendable {
     struct Pdf: Decodable, Equatable, Sendable {
@@ -369,4 +383,5 @@ protocol ELAktionsSchnittstelle: Sendable {
     func notizen(vor: String?) async throws -> ELNotizSeite
     func halsbaender() async throws -> ELHalsbaender
     func ergebnisse() async throws -> [ELErgebnis]
+    func vorOrt() async throws -> ELVorOrt
 }

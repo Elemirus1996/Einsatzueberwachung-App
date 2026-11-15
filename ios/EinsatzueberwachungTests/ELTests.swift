@@ -188,6 +188,7 @@ final class TestELAktionen: ELAktionsSchnittstelle, @unchecked Sendable {
         return antwort
     }
     func vorlage() async throws -> ELVorlage { try JSONDecoder.server.decode(ELVorlage.self, from: Data(ELEinsatzTests.vorlageJSON.utf8)) }
+    func vorOrt() async throws -> ELVorOrt { throw SchnittstellenFehler.server(status: 404) }
     func notizen(vor: String?) async throws -> ELNotizSeite { ELNotizSeite(notizen: notizListe, weitere: false) }
     func halsbaender() async throws -> ELHalsbaender {
         try JSONDecoder.server.decode(ELHalsbaender.self, from: Data(#"[ { "id": "HB-1", "name": "Halsband 1", "akku": 80 } ]"#.utf8))
@@ -458,6 +459,21 @@ struct ELEinsatzTests {
         #expect((json?["pdf"] as? [String: Any])?["teamIds"] as? [String] == ["t1", "t2"])
         let wieder = try JSONDecoder().decode(ELAktion.self, from: JSONEncoder().encode(a))
         #expect(wieder == a, "Liste übersteht die Warteschlange")
+    }
+
+    @Test func beendenMitAnwesenheit() throws {
+        let ohne = try JSONSerialization.jsonObject(with: JSONEncoder().encode(
+            ELAktion.einsatzBeenden(ergebnis: "x", mitTracks: true).inhalt)) as? [String: Any]
+        #expect(ohne?["personalIds"] == nil && ohne?["hundeIds"] == nil, "ohne Liste = Vorauswahl des Servers")
+        let a = ELAktion.einsatzBeenden(ergebnis: "x", mitTracks: true, personalIds: ["p1"], hundeIds: [])
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(a.inhalt)) as? [String: Any]
+        #expect(json?["personalIds"] as? [String] == ["p1"])
+        #expect(json?["hundeIds"] as? [String] == [], "leere Liste = niemand")
+        let liste = try JSONDecoder.server.decode(ELVorOrt.self, from: Data("""
+            { "personal": [ { "id": "p1", "name": "Anna Berg", "vorausgewaehlt": true } ],
+              "hunde": [ { "id": "h1", "name": "Rex", "vorausgewaehlt": false } ] }
+            """.utf8))
+        #expect(liste.personal.first?.vorausgewaehlt == true && liste.hunde.first?.name == "Rex")
     }
 
     @Test func beendenAntwortDekodieren() throws {

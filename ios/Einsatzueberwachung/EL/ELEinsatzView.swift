@@ -124,7 +124,7 @@ struct ELNamensFeld: View {
     }
 }
 
-/// Einsatz beenden (wie `/el/beenden`): Ergebnis, Prüfung der Ressourcen, Endzeit, PDF mit Tracks und Teamauswahl.
+/// Einsatz beenden (wie `/el/beenden`): Ergebnis, Anwesenheit, Prüfung der Ressourcen, Endzeit, PDF mit Tracks und Teamauswahl.
 struct ELEinsatzBeendenView: View {
     @ObservedObject var betrieb: ELBetrieb
     let lage: ELLage
@@ -142,6 +142,9 @@ struct ELEinsatzBeendenView: View {
     @State private var endzeit = Date()
     @State private var bemerkungen = ""
     @State private var fragen = false
+    @State private var vorOrt: ELVorOrt?
+    @State private var personalIds: Set<String> = []
+    @State private var hundeIds: Set<String> = []
 
     private var endzeitBereich: ClosedRange<Date> {
         let jetzt = Date()
@@ -160,6 +163,16 @@ struct ELEinsatzBeendenView: View {
                         ForEach(ergebnisse) { Text($0.anzeige).tag(Optional($0)) }
                     }
                     TextField("Bemerkungen (optional)", text: $bemerkungen, axis: .vertical)
+                }
+                if let vorOrt {
+                    Section {
+                        ELAnwesenheitListe(titel: "Personal", eintraege: vorOrt.personal, auswahl: $personalIds)
+                        ELAnwesenheitListe(titel: "Hunde", eintraege: vorOrt.hunde, auswahl: $hundeIds)
+                    } header: {
+                        Text("Vor Ort")
+                    } footer: {
+                        Text("Vorausgewählt ist, wer in einem Team eingeteilt war.")
+                    }
                 }
                 Section {
                     let aktive = lage.teams.filter { $0.suche.status == .laeuft || $0.suche.status == .kurzpause }
@@ -218,11 +231,14 @@ struct ELEinsatzBeendenView: View {
                     guard let ergebnis else { return }
                     // Reihenfolge der Teams wie in der Lage
                     let auswahl = alleTeams ? nil : lage.teams.map(\.teamId).filter(teamIds.contains)
+                    // Reihenfolge wie in der Liste; ohne Liste (alter Server) nimmt der Server die Vorauswahl
+                    let personal = vorOrt?.personal.map(\.id).filter(personalIds.contains)
+                    let hunde = vorOrt?.hunde.map(\.id).filter(hundeIds.contains)
                     Task {
                         await betrieb.ausfuehren(.einsatzBeenden(
                             ergebnis: ergebnis.wert, mitTracks: mitTracks, kartenart: kartenart, teamIds: auswahl,
                             endzeit: endzeitAngeben ? min(endzeit, Date()) : nil, bemerkungen: bemerkungen,
-                            mitPunkten: mitPunkten))
+                            mitPunkten: mitPunkten, personalIds: personal, hundeIds: hunde))
                     }
                     schliessen()
                 }
@@ -233,6 +249,33 @@ struct ELEinsatzBeendenView: View {
                 let vorlage = await betrieb.vorlage()
                 if let v = vorlage { kartenarten = v.kartenWahl }
                 ergebnisse = vorlage?.ergebnisse.isEmpty == false ? vorlage!.ergebnisse : await betrieb.ergebnisse()
+                if let liste = await betrieb.vorOrt() {
+                    personalIds = Set(liste.personal.filter(\.vorausgewaehlt).map(\.id))
+                    hundeIds = Set(liste.hunde.filter(\.vorausgewaehlt).map(\.id))
+                    vorOrt = liste
+                }
+            }
+        }
+    }
+}
+
+/// Aufklappbare Liste zum Ankreuzen (Personal oder Hunde vor Ort) mit Zähler wie in `/el/beenden`
+private struct ELAnwesenheitListe: View {
+    let titel: String
+    let eintraege: [ELVorOrt.Eintrag]
+    @Binding var auswahl: Set<String>
+
+    var body: some View {
+        DisclosureGroup("\(titel) (\(auswahl.count))") {
+            if eintraege.isEmpty {
+                Text("Keine aktiven Einträge in den Stammdaten.").foregroundStyle(.secondary)
+            }
+            ForEach(eintraege) { eintrag in
+                Button {
+                    if auswahl.contains(eintrag.id) { auswahl.remove(eintrag.id) } else { auswahl.insert(eintrag.id) }
+                } label: {
+                    Label(eintrag.name, systemImage: auswahl.contains(eintrag.id) ? "checkmark.circle.fill" : "circle")
+                }
             }
         }
     }

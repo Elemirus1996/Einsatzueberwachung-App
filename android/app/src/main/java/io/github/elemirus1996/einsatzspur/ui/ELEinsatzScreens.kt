@@ -47,6 +47,7 @@ import io.github.elemirus1996.einsatzspur.kern.ELErgebnis
 import io.github.elemirus1996.einsatzspur.kern.ELKartenart
 import io.github.elemirus1996.einsatzspur.kern.ELLage
 import io.github.elemirus1996.einsatzspur.kern.ELSzenario
+import io.github.elemirus1996.einsatzspur.kern.ELVorOrt
 import io.github.elemirus1996.einsatzspur.kern.ELVorlage
 import io.github.elemirus1996.einsatzspur.kern.Position
 import io.github.elemirus1996.einsatzspur.kern.TeamLage
@@ -122,7 +123,7 @@ fun ELEinsatzStartScreen(betrieb: ELBetrieb, eigenePosition: Position?, schliess
 }
 
 /**
- * Einsatz beenden (wie `/el/beenden`), wie iOS `ELEinsatzBeendenView`: Ergebnis, Prüfung der Ressourcen, Endzeit,
+ * Einsatz beenden (wie `/el/beenden`), wie iOS `ELEinsatzBeendenView`: Ergebnis, Anwesenheit, Prüfung der Ressourcen, Endzeit,
  * PDF mit Tracks, Kartenpunkten und Teamauswahl.
  */
 @Composable
@@ -142,11 +143,19 @@ fun ELEinsatzBeendenScreen(betrieb: ELBetrieb, lage: ELLage, schliessen: () -> U
     var endzeitAngeben by remember { mutableStateOf(false) }
     var endzeit by remember { mutableLongStateOf(System.currentTimeMillis()) }
     var fragen by remember { mutableStateOf(false) }
+    var vorOrt by remember { mutableStateOf<ELVorOrt?>(null) }
+    var personalIds by remember { mutableStateOf(emptySet<String>()) }
+    var hundeIds by remember { mutableStateOf(emptySet<String>()) }
     BackHandler(onBack = schliessen)
     LaunchedEffect(Unit) {
         val v = betrieb.vorlage()
         v?.let { kartenarten = it.kartenWahl }
         ergebnisse = v?.ergebnisse?.takeIf { it.isNotEmpty() } ?: betrieb.ergebnisse()
+        betrieb.vorOrt()?.let { liste ->
+            personalIds = liste.personal.filter { it.vorausgewaehlt }.map { it.id }.toSet()
+            hundeIds = liste.hunde.filter { it.vorausgewaehlt }.map { it.id }.toSet()
+            vorOrt = liste
+        }
     }
 
     Formular("Einsatz beenden", "Beenden", aktiv = ergebnis != null && geprueft && (alleTeams || teamIds.isNotEmpty()),
@@ -156,6 +165,13 @@ fun ELEinsatzBeendenScreen(betrieb: ELBetrieb, lage: ELLage, schliessen: () -> U
         Wahl("Ergebnis", ergebnis?.anzeige ?: "bitte wählen", ergebnisse.map { it.anzeige }) { ergebnis = ergebnisse[it] }
         Feld("Bemerkungen (optional)", bemerkungen, lang = true) { bemerkungen = it }
         HorizontalDivider()
+        vorOrt?.let { liste ->
+            Ueberschrift("Vor Ort")
+            AnwesenheitListe("Personal", liste.personal, personalIds) { personalIds = it }
+            AnwesenheitListe("Hunde", liste.hunde, hundeIds) { hundeIds = it }
+            Klein("Vorausgewählt ist, wer in einem Team eingeteilt war.")
+            HorizontalDivider()
+        }
         Ueberschrift("Ressourcen")
         val aktive = lage.teams.filter { it.suche.status == TeamLage.SucheStatus.LAEUFT || it.suche.status == TeamLage.SucheStatus.KURZPAUSE }
         if (aktive.isEmpty()) Text("Keine Suche läuft mehr", color = Color(0xFF2E9D4F))
@@ -210,10 +226,14 @@ fun ELEinsatzBeendenScreen(betrieb: ELBetrieb, lage: ELLage, schliessen: () -> U
                     val e = ergebnis ?: return@TextButton
                     // Reihenfolge der Teams wie in der Lage
                     val auswahl = if (alleTeams) null else lage.teams.map { it.teamId }.filter { it in teamIds }
+                    // Reihenfolge wie in der Liste; ohne Liste (alter Server) nimmt der Server die Vorauswahl
+                    val personal = vorOrt?.personal?.map { it.id }?.filter { it in personalIds }
+                    val hunde = vorOrt?.hunde?.map { it.id }?.filter { it in hundeIds }
                     bereich.launch {
                         betrieb.ausfuehren(ELAktion.einsatzBeenden(
                             e.wert, mitTracks, kartenart, auswahl,
                             if (endzeitAngeben) minOf(endzeit, System.currentTimeMillis()) else null, bemerkungen, mitPunkten,
+                            personal, hunde,
                         ))
                     }
                     schliessen()
@@ -225,6 +245,17 @@ fun ELEinsatzBeendenScreen(betrieb: ELBetrieb, lage: ELLage, schliessen: () -> U
 }
 
 private val ORANGE_HINWEIS = Color(0xFFF07A2A)
+
+/** Aufklappbare Liste zum Ankreuzen (Personal oder Hunde vor Ort) mit Zähler wie in `/el/beenden` */
+@Composable
+private fun AnwesenheitListe(titel: String, eintraege: List<ELVorOrt.Eintrag>, auswahl: Set<String>, aendern: (Set<String>) -> Unit) {
+    var offen by remember { mutableStateOf(false) }
+    TextButton(onClick = { offen = !offen }) { Text("$titel (${auswahl.size}) " + if (offen) "▾" else "▸") }
+    if (offen) {
+        if (eintraege.isEmpty()) Klein("Keine aktiven Einträge in den Stammdaten.")
+        eintraege.forEach { e -> Schalter(e.name, e.id in auswahl) { an -> aendern(if (an) auswahl + e.id else auswahl - e.id) } }
+    }
+}
 
 private fun alarmText(a: ELVorlage.DiveraAlarm) = listOfNotNull(
     a.titel ?: "Alarm ${a.id}", a.ort?.takeIf { it.isNotEmpty() }, a.zeitMs?.let { DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it)) },

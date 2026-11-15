@@ -442,6 +442,7 @@ class ELClient(
 
     override suspend fun halsbaender(): ELHalsbaender = ELHalsbaender.aus(anfrage("halsbaender", "GET", null))
     override suspend fun vorlage(): ELVorlage = ELVorlage.aus(anfrage("einsatz/vorlage", "GET", null))
+    override suspend fun vorOrt(): ELVorOrt = ELVorOrt.aus(anfrage("einsatz/vorort", "GET", null))
 
     override suspend fun ergebnisse(): List<ELErgebnis> {
         val (status, text) = roh("einsatz/ergebnisse", "GET", null)
