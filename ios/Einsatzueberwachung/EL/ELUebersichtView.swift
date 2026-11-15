@@ -667,6 +667,7 @@ struct ELAblaufHinweis: View {
 /// iPad: Reiter als Seitenleiste links (ab iOS 18), iPhone: Reiter unten
 private struct SeitenleisteAufIPad: ViewModifier {
     func body(content: Content) -> some View {
-        if #available(iOS 18, *) { content.tabViewStyle(.sidebarAdaptable) } else { content }
+        // Leiste oben als Standard, damit die Karte im Leitstand Platz hat; die Seitenleiste lässt sich einblenden
+        if #available(iOS 18, *) { content.tabViewStyle(.sidebarAdaptable).defaultAdaptableTabBarPlacement(.tabBar) } else { content }
     }
 }
