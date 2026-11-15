@@ -74,7 +74,7 @@ struct ELTeamAktionenView: View {
                             Text(h.name ?? h.id)
                             if h.id == zuletzt { Text("zuletzt").font(.caption).foregroundStyle(.secondary) }
                             Spacer()
-                            if let akku = h.akku { Text("\(akku) %").foregroundStyle(.secondary) }
+                            if let akku = HalsbandAkku.text(h.akku) { Text(akku).foregroundStyle(.secondary) }
                         }
                     }
                 }

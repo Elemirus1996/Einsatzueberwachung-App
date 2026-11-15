@@ -509,3 +509,16 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle,
         }
     }
 }
+
+/// Garmin-Halsbänder melden den Akku als Stufe 0–4, nicht in Prozent (APP_API.md). 0 und Unbekanntes werden nicht angezeigt.
+enum HalsbandAkku {
+    static func text(_ stufe: Int?) -> String? {
+        switch stufe {
+        case 4: "Akku voll"
+        case 3: "Akku hoch"
+        case 2: "Akku mittel"
+        case 1: "Akku niedrig"
+        default: nil
+        }
+    }
+}

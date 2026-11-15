@@ -60,6 +60,7 @@ import io.github.elemirus1996.einsatzspur.kern.ELKartenAnsicht
 import io.github.elemirus1996.einsatzspur.kern.ELLage
 import io.github.elemirus1996.einsatzspur.kern.ELVerlaengerung
 import io.github.elemirus1996.einsatzspur.kern.ELVermissteAnsicht
+import io.github.elemirus1996.einsatzspur.kern.HalsbandAkku
 import io.github.elemirus1996.einsatzspur.kern.ServerAdresse
 import io.github.elemirus1996.einsatzspur.kern.TeamLage
 import io.github.elemirus1996.einsatzspur.kern.TeamOrtung
@@ -422,8 +423,8 @@ private fun TeamKarte(team: ELLage.Team, ansicht: ELAnsicht, jetzt: Long) {
         }
         val geraete = listOfNotNull(
             team.suchgebiet?.name,
-            team.halsband?.let { "Halsband " + geraetText(it, ansicht, jetzt) },
-            team.handy?.let { "Handy " + geraetText(it, ansicht, jetzt) },
+            team.halsband?.let { "Halsband " + geraetText(it, ansicht, jetzt, halsband = true) },
+            team.handy?.let { "Handy " + geraetText(it, ansicht, jetzt, halsband = false) },
         ).joinToString(" · ")
         if (geraete.isNotEmpty()) {
             Text(geraete, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
@@ -434,10 +435,10 @@ private fun TeamKarte(team: ELLage.Team, ansicht: ELAnsicht, jetzt: Long) {
     }
 }
 
-private fun geraetText(g: ELLage.Geraet, ansicht: ELAnsicht, jetzt: Long): String {
+private fun geraetText(g: ELLage.Geraet, ansicht: ELAnsicht, jetzt: Long, halsband: Boolean): String {
     val teile = mutableListOf<String>()
     ansicht.alterSec(g.zeitMs, jetzt)?.let { teile += if (it < 120) "$it s" else "${it / 60} min" }
-    g.akku?.let { teile += "$it %" }
+    if (halsband) HalsbandAkku.text(g.akku)?.let { teile += it } else g.akku?.let { teile += "$it %" }
     return if (teile.isEmpty()) g.name ?: "–" else teile.joinToString(" ")
 }
 

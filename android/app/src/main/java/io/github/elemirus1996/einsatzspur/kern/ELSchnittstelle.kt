@@ -535,3 +535,14 @@ fun sseOeffnen(adresse: String, token: String): SseVerbindung {
 
 internal fun JSONObject.zahlOderNull(name: String): Double? = if (has(name) && !isNull(name)) optDouble(name) else null
 internal fun JSONObject.ganzOderNull(name: String): Int? = if (has(name) && !isNull(name)) optInt(name) else null
+
+/** Garmin-Halsbänder melden den Akku als Stufe 0–4, nicht in Prozent (APP_API.md). 0 und Unbekanntes werden nicht angezeigt. */
+object HalsbandAkku {
+    fun text(stufe: Int?): String? = when (stufe) {
+        4 -> "Akku voll"
+        3 -> "Akku hoch"
+        2 -> "Akku mittel"
+        1 -> "Akku niedrig"
+        else -> null
+    }
+}

@@ -451,8 +451,8 @@ struct ELTeamKarte: View {
     @ViewBuilder
     private var geraete: some View {
         let teile = [team.suchgebiet?.name.map { ("square.dashed", $0) },
-                     team.halsband.map { ("dot.radiowaves.left.and.right", geraeteText($0)) },
-                     team.handy.map { ("iphone", geraeteText($0)) }].compactMap { $0 }
+                     team.halsband.map { ("dot.radiowaves.left.and.right", geraeteText($0, halsband: true)) },
+                     team.handy.map { ("iphone", geraeteText($0, halsband: false)) }].compactMap { $0 }
         if !teile.isEmpty {
             HStack(spacing: 12) {
                 ForEach(teile, id: \.0) { teil in Label(teil.1, systemImage: teil.0) }
@@ -532,12 +532,16 @@ struct ELTeamKarte: View {
         }
     }
 
-    private func geraeteText(_ g: ELLage.Team.Geraet) -> String {
+    private func geraeteText(_ g: ELLage.Team.Geraet, halsband: Bool) -> String {
         var teile: [String] = []
         if let alter = ansicht.alter(g.zeit, um: zeitpunkt) {
             teile.append(alter < 120 ? "\(Int(alter)) s" : "\(Int(alter / 60)) min")
         }
-        if let akku = g.akku { teile.append("\(akku) %") }
+        if halsband {
+            if let akku = HalsbandAkku.text(g.akku) { teile.append(akku) }
+        } else if let akku = g.akku {
+            teile.append("\(akku) %")
+        }
         return teile.isEmpty ? (g.name ?? "–") : teile.joined(separator: " · ")
     }
 }
