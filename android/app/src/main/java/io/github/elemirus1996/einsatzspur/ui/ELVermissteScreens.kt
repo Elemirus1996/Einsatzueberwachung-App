@@ -2,6 +2,11 @@ package io.github.elemirus1996.einsatzspur.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,7 +57,8 @@ import kotlinx.coroutines.launch
 
 /** Vermisste (wie `/el`), wie iOS `ELVermissteView`: Szenario, Profile, Anlegen, Bearbeiten mit Versionsprüfung, Checkliste. */
 @Composable
-fun ELVermissteScreen(vermisste: ELVermissteAnsicht, betrieb: ELBetrieb, zurueck: () -> Unit) {
+fun ELVermissteScreen(vermisste: ELVermissteAnsicht, betrieb: ELBetrieb, lage: io.github.elemirus1996.einsatzspur.kern.ELLage? = null,
+                      zurueck: (() -> Unit)? = null) {
     val bereich = rememberCoroutineScope()
     val stand by vermisste.stand.collectAsState()
     val fehler by vermisste.fehler.collectAsState()
@@ -63,54 +69,107 @@ fun ELVermissteScreen(vermisste: ELVermissteAnsicht, betrieb: ELBetrieb, zurueck
         ELProfilScreen(profil, vermisste, betrieb, zurueck = { bearbeiten = null })
         return
     }
-    BackHandler(onBack = zurueck)
+    zurueck?.let { BackHandler(onBack = it) }
 
-    Surface(Modifier.fillMaxSize()) {
+    Column(Modifier.fillMaxSize().background(ELStil.papier)) {
+        ELReiterKopf("Vermisst", lage)
         Column(
-            Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(16.dp),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = zurueck) { Text("‹ Zurück") }
-                Text("Vermisste", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                TextButton(onClick = { bereich.launch { vermisste.laden() } }) { Text("Neu laden") }
-            }
             val s = stand
             if (s == null) {
-                Text(fehler ?: "Lade …", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(fehler ?: "Lade …", color = ELStil.vermerk)
                 return@Column
             }
-            Auswahl("Szenario", s.szenario.anzeige, ELSzenario.entries.map { it.anzeige }) { i ->
-                bereich.launch {
-                    betrieb.ausfuehren(ELAktion.szenario(ELSzenario.entries[i]))
-                    vermisste.laden()
-                }
-            }
-            Text(
-                if (s.mehrereErlaubt) "In diesem Szenario sind mehrere Personen möglich." else "In diesem Szenario wird eine Person gesucht.",
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            HorizontalDivider()
-            Text("Vermisste Personen", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            if (s.profile.isEmpty()) Text("Noch kein Profil angelegt.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-            s.profile.forEach { p ->
-                Column(Modifier.fillMaxWidth().clickable { bearbeiten = p }.padding(vertical = 6.dp)) {
-                    Text(p.vollerName ?: "Unbekannt", style = MaterialTheme.typography.titleMedium)
-                    val zeile = listOfNotNull(
-                        p.text("alter").takeIf { it.isNotEmpty() }?.let { "$it Jahre" }, p.text("kleidung").takeIf { it.isNotEmpty() },
-                    ).joinToString(" · ")
-                    if (zeile.isNotEmpty()) Text(zeile, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    p.text("zuletztGesehenOrt").takeIf { it.isNotEmpty() }?.let {
-                        Text("Zuletzt gesehen: $it", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(Modifier.elKarte()) {
+                Auswahl("Szenario", s.szenario.anzeige, ELSzenario.entries.map { it.anzeige }) { i ->
+                    bereich.launch {
+                        betrieb.ausfuehren(ELAktion.szenario(ELSzenario.entries[i]))
+                        vermisste.laden()
                     }
                 }
-                HorizontalDivider()
+                Text(
+                    if (s.mehrereErlaubt) "In diesem Szenario sind mehrere Personen möglich." else "In diesem Szenario wird eine Person gesucht.",
+                    style = MaterialTheme.typography.bodySmall, color = ELStil.vermerk,
+                )
             }
+            Text("Gesuchte Personen  ${s.profile.size}", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                color = ELStil.inschrift)
+            if (s.profile.isEmpty()) Text("Noch kein Profil angelegt.", color = ELStil.vermerk, modifier = Modifier.elKarte())
+            s.profile.forEach { p -> Steckbrief(p) { bearbeiten = p } }
             if (s.mehrereErlaubt || s.profile.isEmpty()) {
-                Button(onClick = { bearbeiten = ELVermisstenprofil() }) { Text("Person hinzufügen") }
+                TextButton(
+                    onClick = { bearbeiten = ELVermisstenprofil() },
+                    modifier = Modifier.fillMaxWidth().background(ELStil.aktion.copy(alpha = 0.1f), RoundedCornerShape(12.dp)),
+                ) { Text("+ Person hinzufügen", color = ELStil.aktion, fontWeight = FontWeight.SemiBold) }
             }
         }
     }
+}
+
+/** Steckbrief wie iOS `ELSteckbrief`: Initialen, Name, Warnchips, zuletzt gesehen, Checkliste */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun Steckbrief(p: ELVermisstenprofil, oeffnen: () -> Unit) {
+    Column(Modifier.clickable(onClick = oeffnen).elKarte(rand = ELStil.aktion), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            val initialen = listOf(p.text("vorname"), p.text("nachname")).mapNotNull { it.firstOrNull()?.toString() }.joinToString("").ifEmpty { "?" }
+            Box(Modifier.size(46.dp).background(ELStil.aktion.copy(alpha = 0.12f), CircleShape), contentAlignment = Alignment.Center) {
+                Text(initialen, color = ELStil.aktion, fontWeight = FontWeight.Bold)
+            }
+            Column(Modifier.weight(1f)) {
+                Text(p.vollerName ?: "Unbekannt", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = ELStil.inschrift)
+                val unter = listOfNotNull(p.text("alter").takeIf { it.isNotEmpty() }?.let { "$it Jahre" }, p.text("besonderheiten").takeIf { it.isNotEmpty() })
+                    .joinToString(" · ")
+                if (unter.isNotEmpty()) Text(unter, color = ELStil.vermerk)
+            }
+            Text("›", color = ELStil.vermerk, style = MaterialTheme.typography.titleLarge)
+        }
+        val warn = warnungen(p)
+        if (warn.isNotEmpty()) {
+            androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                warn.forEach { (text, stufe) ->
+                    ELChip(text, when (stufe) { 2 -> ELStil.warnung2; 1 -> ELStil.warnung1; else -> ELStil.pause })
+                }
+            }
+        }
+        listOf("Zuletzt gesehen" to "zuletztGesehenOrt", "Zeit" to "zuletztGesehenZeit", "Kleidung" to "kleidung", "Aussehen" to "beschreibung")
+            .forEach { (titel, feld) ->
+                p.text(feld).takeIf { it.isNotEmpty() }?.let {
+                    Row {
+                        Text(titel, color = ELStil.vermerk, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.width(120.dp))
+                        Text(it, color = ELStil.inschrift, style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+            }
+        p.checkliste?.takeIf { it.punkte.isNotEmpty() }?.let { c ->
+            val erledigt = c.punkte.count { it.erledigt }
+            Row {
+                Text("Checkliste ${c.name ?: ""}", modifier = Modifier.weight(1f), color = ELStil.inschrift)
+                Text("$erledigt / ${c.punkte.size}", color = ELStil.aktiv, fontWeight = FontWeight.SemiBold)
+            }
+            androidx.compose.material3.LinearProgressIndicator(
+                progress = { erledigt.toFloat() / c.punkte.size }, modifier = Modifier.fillMaxWidth(), color = ELStil.aktiv,
+            )
+        }
+    }
+}
+
+/** Warnchips: 2 = rot (Risiken), 1 = orange (Erkrankung, Medikamente, Orientierung), 0 = grau (Mobilität) */
+private fun warnungen(p: ELVermisstenprofil): List<Pair<String, Int>> {
+    val w = mutableListOf<Pair<String, Int>>()
+    if (p.auswahlen["suizidrisiko"] == "Ja") w += "Suizidrisiko" to 2
+    if (p.auswahlen["bewaffnet"] == "Ja") w += "Bewaffnet" to 2
+    p.text("vorerkrankungen").split(",").map { it.trim() }.filter { it.isNotEmpty() }.forEach { w += it to 1 }
+    p.text("medikamente").split(",").map { it.trim() }.filter { it.isNotEmpty() }.forEach { w += it to 1 }
+    if (p.auswahlen["orientierung"] == "Eingeschraenkt") w += "Orientierung eingeschränkt" to 1
+    when (val m = p.auswahlen["mobilitaet"]) {
+        null, "Unbekannt" -> Unit
+        "ZuFuss" -> w += "Zu Fuß" to 0
+        else -> w += m to 0
+    }
+    return w
 }
 
 /**

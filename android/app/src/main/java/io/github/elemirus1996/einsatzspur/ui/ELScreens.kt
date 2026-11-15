@@ -1,5 +1,27 @@
 package io.github.elemirus1996.einsatzspur.ui
 
+import io.github.elemirus1996.einsatzspur.kern.ELAktion
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.draw.clip
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationRailItemDefaults
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBar
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Spacer
+import androidx.activity.compose.BackHandler
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Build
@@ -220,9 +242,8 @@ fun ELUebersichtScreen(
     toene: io.github.elemirus1996.einsatzspur.kern.Toene,
     abmelden: suspend () -> Unit,
 ) {
-    var funkOffen by remember { mutableStateOf(false) }
-    var karteOffen by remember { mutableStateOf(false) }
-    var vermissteOffen by remember { mutableStateOf(false) }
+    // Bereiche wie die Reiter unter iOS: Lage, Karte, Funk, Vermisst
+    var bereichWahl by remember { mutableStateOf(ELBereich.LAGE) }
     var startOffen by remember { mutableStateOf(false) }
     var beendenOffen by remember { mutableStateOf(false) }
     var gewaehltesTeam by remember { mutableStateOf<ELLage.Team?>(null) }
@@ -235,10 +256,6 @@ fun ELUebersichtScreen(
     var berichtLaedt by remember { mutableStateOf(false) }
     val offen by betrieb.offen.collectAsState()
     val betriebHinweis by betrieb.hinweis.collectAsState()
-    if (funkOffen) {
-        ELFunkScreen(betrieb, ansicht.lage.collectAsState().value?.teams ?: emptyList(), zurueck = { funkOffen = false })
-        return
-    }
     if (startOffen) {
         ELEinsatzStartScreen(betrieb, ortung.letztePosition.collectAsState().value, schliessen = { startOffen = false })
         return
@@ -246,14 +263,6 @@ fun ELUebersichtScreen(
     val beendenLage = ansicht.lage.collectAsState().value
     if (beendenOffen && beendenLage != null) {
         ELEinsatzBeendenScreen(betrieb, beendenLage, schliessen = { beendenOffen = false })
-        return
-    }
-    if (vermissteOffen && vermisste != null) {
-        ELVermissteScreen(vermisste, betrieb, zurueck = { vermissteOffen = false })
-        return
-    }
-    if (karteOffen && karte != null) {
-        ELLagekarteScreen(karte, ansicht.lage.collectAsState().value?.teams ?: emptyList(), betrieb, zurueck = { karteOffen = false })
         return
     }
     val bereich = rememberCoroutineScope()
@@ -281,89 +290,105 @@ fun ELUebersichtScreen(
         onDispose { ansicht.beiWarnung = null }
     }
 
-    Surface(Modifier.fillMaxSize()) {
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(320.dp),
-            modifier = Modifier.fillMaxSize().safeDrawingPadding(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Einsatzleitung", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    TextButton(onClick = { abmeldenFragen = true }) { Text("Abmelden") }
-                }
-            }
-            // Eigene Zeile, damit auf dem Telefon alles Platz hat
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    if (karte != null) OutlinedButton(onClick = { karteOffen = true }) { Text("Karte") }
-                    if (vermisste != null) OutlinedButton(onClick = { vermissteOffen = true }) { Text("Vermisste") }
-                    OutlinedButton(onClick = { funkOffen = true }) { Text("Funk & Notizen") }
-                }
-            }
-            val wartet = offen.firstOrNull()
-            val h = betriebHinweis
-            if (wartet != null) {
-                item(span = { GridItemSpan(maxLineSpan) }) { Text("„${wartet.beschreibung}“ wartet auf Netz", color = ORANGE) }
-            } else if (h != null && jetzt - h.zeitMs < 6_000) {
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Text(h.text, color = if (h.fehler) Color.Red else Color(0xFF2E9D4F))
-                }
-            }
-            ablaufHinweis?.let { text -> item(span = { GridItemSpan(maxLineSpan) }) { Text(text, color = ORANGE) } }
-            warnung?.takeIf { jetzt - it.zeitMs < 30_000 }?.let { w ->
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Text(
-                        w.text, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.fillMaxWidth().background(
-                            (if (w.stufe >= 2) Color.Red else ORANGE).copy(alpha = 0.2f), RoundedCornerShape(12.dp),
-                        ).padding(16.dp),
+    // Tablet quer (ab 840 dp): Leiste links, Lage als Leitstand mit Teams, Karte und Funk; Telefon: Leiste unten
+    val breit = LocalConfiguration.current.screenWidthDp >= 840
+    val teams = lage?.teams.orEmpty()
+    if (bereichWahl != ELBereich.LAGE) BackHandler { bereichWahl = ELBereich.LAGE }
+    Row(Modifier.fillMaxSize().background(ELStil.papier)) {
+        if (breit) {
+            NavigationRail(containerColor = ELStil.platte, modifier = Modifier.safeDrawingPadding()) {
+                ELBereich.entries.forEach { b ->
+                    NavigationRailItem(
+                        selected = bereichWahl == b, onClick = { bereichWahl = b },
+                        icon = { Icon(painterResource(b.symbol), contentDescription = null) }, label = { Text(b.titel) },
+                        colors = NavigationRailItemDefaults.colors(selectedIconColor = ELStil.aktion, selectedTextColor = ELStil.aktion),
                     )
                 }
             }
-            teamPunkt?.takeIf { jetzt - it.second < 30_000 }?.let { (text, _) ->
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    Text(
-                        text, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.fillMaxWidth().background(ORANGE.copy(alpha = 0.2f), RoundedCornerShape(12.dp)).padding(16.dp),
-                    )
-                }
-            }
-            item(span = { GridItemSpan(maxLineSpan) }) { EinsatzKopf(lage, verbindungsfehler) }
-            lage?.let { l ->
-                item(span = { GridItemSpan(maxLineSpan) }) {
-                    if (l.einsatz.aktiv) {
-                        OutlinedButton(onClick = { beendenOffen = true }) { Text("Einsatz beenden") }
-                    } else {
-                        Button(onClick = { startOffen = true }) { Text("Einsatz starten") }
+        }
+        Column(Modifier.weight(1f).fillMaxHeight()) {
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                when (bereichWahl) {
+                    ELBereich.KARTE -> if (karte != null) ELLagekarteScreen(karte, teams, betrieb, lage)
+                    ELBereich.FUNK -> ELFunkScreen(betrieb, teams, lage)
+                    ELBereich.VERMISST -> if (vermisste != null) ELVermissteScreen(vermisste, betrieb, lage)
+                    ELBereich.LAGE -> Column(Modifier.fillMaxSize()) {
+                        EinsatzKopf(lage, verbindungsfehler, jetzt,
+                            starten = { startOffen = true }, beenden = { beendenOffen = true }, abmelden = { abmeldenFragen = true })
+                        val aktiv = lage?.takeIf { it.einsatz.aktiv }
+                        if (aktiv != null) ELStatusChips(aktiv.teams, live)
+                        val teamListe: @Composable (Modifier, Boolean) -> Unit = { mod, eineSpalte ->
+                            LazyVerticalGrid(
+                                columns = if (eineSpalte) GridCells.Fixed(1) else GridCells.Adaptive(320.dp),
+                                modifier = mod,
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp),
+                            ) {
+                                val wartet = offen.firstOrNull()
+                                val h = betriebHinweis
+                                if (wartet != null) {
+                                    item(span = { GridItemSpan(maxLineSpan) }) { Text("„${wartet.beschreibung}“ wartet auf Netz", color = ELStil.warnung1) }
+                                } else if (h != null && jetzt - h.zeitMs < 6_000) {
+                                    item(span = { GridItemSpan(maxLineSpan) }) { Text(h.text, color = if (h.fehler) ELStil.warnung2 else ELStil.aktiv) }
+                                }
+                                ablaufHinweis?.let { text -> item(span = { GridItemSpan(maxLineSpan) }) { Text(text, color = ELStil.warnung1) } }
+                                warnung?.takeIf { jetzt - it.zeitMs < 30_000 }?.let { w ->
+                                    item(span = { GridItemSpan(maxLineSpan) }) {
+                                        Text(w.text, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth()
+                                            .background((if (w.stufe >= 2) ELStil.warnung2 else ELStil.warnung1).copy(alpha = 0.18f), RoundedCornerShape(12.dp))
+                                            .padding(16.dp))
+                                    }
+                                }
+                                teamPunkt?.takeIf { jetzt - it.second < 30_000 }?.let { (text, _) ->
+                                    item(span = { GridItemSpan(maxLineSpan) }) {
+                                        Text(text, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth()
+                                            .background(ELStil.warnung1.copy(alpha = 0.18f), RoundedCornerShape(12.dp)).padding(16.dp))
+                                    }
+                                }
+                                if (aktiv != null) {
+                                    if (aktiv.teams.isEmpty()) {
+                                        item(span = { GridItemSpan(maxLineSpan) }) { Text("Noch keine Teams im Einsatz.", color = ELStil.vermerk) }
+                                    }
+                                    items(aktiv.teams, key = { it.teamId }) { team ->
+                                        TeamKarte(team, ansicht, jetzt, details = { gewaehltesTeam = team }) { a -> bereich.launch { betrieb.ausfuehren(a) } }
+                                    }
+                                }
+                                item(span = { GridItemSpan(maxLineSpan) }) {
+                                    Text(
+                                        if (zustand == TeamOrtung.Zustand.ORTET) "EL-Standort wird gesendet" else "EL-Standort aus",
+                                        style = MaterialTheme.typography.bodySmall, color = ELStil.vermerk,
+                                    )
+                                }
+                            }
+                        }
+                        if (breit && aktiv != null && karte != null) {
+                            // Leitstand: Teams | Karte | Funk
+                            Row(Modifier.fillMaxSize()) {
+                                teamListe(Modifier.width(340.dp).fillMaxHeight(), true)
+                                Box(Modifier.weight(1f).fillMaxHeight().padding(vertical = 10.dp).clip(RoundedCornerShape(ELStil.radius))) {
+                                    ELLagekarteScreen(karte, aktiv.teams, betrieb, aktiv, mitKopf = false)
+                                }
+                                Box(Modifier.width(330.dp).fillMaxHeight().padding(10.dp).clip(RoundedCornerShape(ELStil.radius))) {
+                                    ELFunkScreen(betrieb, aktiv.teams, aktiv, mitKopf = false)
+                                }
+                            }
+                        } else {
+                            teamListe(Modifier.fillMaxSize(), false)
+                        }
                     }
                 }
             }
-            val aktiv = lage?.takeIf { it.einsatz.aktiv }
-            if (aktiv != null) {
-                if (aktiv.teams.isEmpty()) {
-                    item(span = { GridItemSpan(maxLineSpan) }) {
-                        Text("Noch keine Teams im Einsatz.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (!breit) {
+                NavigationBar(containerColor = ELStil.platte) {
+                    ELBereich.entries.forEach { b ->
+                        NavigationBarItem(
+                            selected = bereichWahl == b, onClick = { bereichWahl = b },
+                            icon = { Icon(painterResource(b.symbol), contentDescription = null) }, label = { Text(b.titel) },
+                            colors = NavigationBarItemDefaults.colors(selectedIconColor = ELStil.aktion, selectedTextColor = ELStil.aktion,
+                                indicatorColor = ELStil.aktion.copy(alpha = 0.12f)),
+                        )
                     }
-                }
-                items(aktiv.teams, key = { it.teamId }) { team ->
-                    Box(Modifier.clickable { gewaehltesTeam = team }) { TeamKarte(team, ansicht, jetzt) }
-                }
-            }
-            item(span = { GridItemSpan(maxLineSpan) }) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        if (zustand == TeamOrtung.Zustand.ORTET) "EL-Standort wird gesendet" else "EL-Standort aus",
-                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Box(
-                        Modifier.size(8.dp).background(
-                            if (live) Color(0xFF2E9D4F) else if (verbindungsfehler) Color.Red else ORANGE, CircleShape,
-                        ),
-                    )
                 }
             }
         }
@@ -444,83 +469,102 @@ fun ELUebersichtScreen(
     }
 }
 
+/** Bereiche der Einsatzleitung, Reihenfolge nach Häufigkeit wie iOS */
+enum class ELBereich(val titel: String, val symbol: Int) {
+    LAGE("Lage", io.github.elemirus1996.einsatzspur.R.drawable.el_lage),
+    KARTE("Karte", io.github.elemirus1996.einsatzspur.R.drawable.el_karte),
+    FUNK("Funk", io.github.elemirus1996.einsatzspur.R.drawable.el_funk),
+    VERMISST("Vermisst", io.github.elemirus1996.einsatzspur.R.drawable.el_vermisst),
+}
+
+/** Roter Kopf der Lage wie iOS: Stichwort, Übung, Menü; Ort, Szenario, EL; Uhr und Einsatzdauer */
 @Composable
-private fun EinsatzKopf(lage: ELLage?, verbindungsfehler: Boolean) {
-    if (lage == null) {
-        Text(
-            if (verbindungsfehler) "Keine Verbindung. Ist WireGuard eingeschaltet?" else "Lade …",
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        return
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        val e = lage.einsatz
-        if (e.aktiv) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(e.text ?: "Einsatz", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                if (e.uebung) {
-                    Text(
-                        "ÜBUNG", color = Color.White, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold,
-                        modifier = Modifier.background(ORANGE, RoundedCornerShape(50)).padding(horizontal = 6.dp, vertical = 2.dp),
-                    )
+private fun EinsatzKopf(lage: ELLage?, verbindungsfehler: Boolean, jetzt: Long, starten: () -> Unit, beenden: () -> Unit, abmelden: () -> Unit) {
+    var menue by remember { mutableStateOf(false) }
+    Column(
+        Modifier.fillMaxWidth().background(ELStil.rot).windowInsetsPadding(WindowInsets.statusBars).padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        val e = lage?.einsatz
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                when {
+                    lage == null -> if (verbindungsfehler) "Keine Verbindung" else "Lade …"
+                    e?.aktiv == true -> e.stichwort?.takeIf { it.isNotBlank() } ?: "Einsatz"
+                    else -> "Kein Einsatz"
+                },
+                color = ELStil.aufRot, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.weight(1f, fill = false),
+            )
+            if (e?.uebung == true) ELChip("Übung", Color.White)
+            Spacer(Modifier.weight(1f))
+            Box {
+                TextButton(onClick = { menue = true }) { Text("•••", color = ELStil.aufRot, fontWeight = FontWeight.Bold) }
+                DropdownMenu(expanded = menue, onDismissRequest = { menue = false }) {
+                    if (e?.aktiv == true) DropdownMenuItem(text = { Text("Einsatz beenden …") }, onClick = { menue = false; beenden() })
+                    else if (lage != null) DropdownMenuItem(text = { Text("Einsatz oder Übung starten") }, onClick = { menue = false; starten() })
+                    DropdownMenuItem(text = { Text("Abmelden", color = MaterialTheme.colorScheme.error) }, onClick = { menue = false; abmelden() })
                 }
             }
-            val zeile = listOfNotNull(
-                e.szenario,
-                e.beginnMs?.let { "seit " + DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it)) },
-                e.einsatzleiter?.takeIf { it.isNotBlank() }?.let { "EL $it" },
-            ).joinToString(" · ")
-            if (zeile.isNotEmpty()) Text(zeile, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            lage.wetter?.let { w ->
-                val text = listOfNotNull(
-                    w.beschreibung, w.temperatur?.let { "%.0f °C".format(it) }, w.wind?.let { "Wind %.0f km/h".format(it) },
-                ).joinToString(" · ")
-                if (text.isNotEmpty()) Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Row(verticalAlignment = Alignment.Bottom) {
+            val zeile = when {
+                lage == null -> if (verbindungsfehler) "Ist WireGuard eingeschaltet?" else ""
+                e?.aktiv == true -> listOfNotNull(e.ort, e.szenario, e.einsatzleiter?.takeIf { it.isNotBlank() }?.let { "EL $it" }).joinToString(" · ")
+                else -> "Die Ortung der Einsatzleitung ist aus und startet, sobald ein Einsatz läuft."
             }
-        } else {
-            Text("Kein Einsatz aktiv", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text(
-                "Die Ortung der Einsatzleitung ist aus und startet, sobald ein Einsatz läuft.",
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Text(zeile, color = ELStil.aufRot.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            Column(horizontalAlignment = Alignment.End) {
+                Text(java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.GERMANY).format(Date(jetzt)), color = ELStil.aufRot,
+                    style = ELStil.ziffern, fontSize = 26.sp, fontWeight = FontWeight.SemiBold)
+                e?.beginnMs?.takeIf { e.aktiv }?.let { Text("Einsatz " + dauerText((jetzt - it) / 1000), color = ELStil.aufRot.copy(alpha = 0.8f),
+                    style = ELStil.ziffern, fontSize = 12.sp) }
+            }
+        }
+        lage?.wetter?.let { w ->
+            val text = listOfNotNull(w.temperatur?.let { "%.0f °C".format(it) }, w.beschreibung, w.wind?.let { "Wind %.0f km/h".format(it) }).joinToString(" · ")
+            if (text.isNotEmpty()) Text(text, color = ELStil.aufRot.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
         }
     }
 }
 
-/** Karte eines Teams in der Übersicht, wie iOS `ELTeamKarte`. */
+/** Karte eines Teams wie iOS `ELTeamKarte`: Name, Suchzeit, Personen, Balken bis Warnstufe 2, Geräte, Status-Chip und Knöpfe */
 @Composable
-private fun TeamKarte(team: ELLage.Team, ansicht: ELAnsicht, jetzt: Long) {
-    val hintergrund = when (team.warnstufe) {
-        2 -> Color.Red.copy(alpha = 0.15f)
-        1 -> ORANGE.copy(alpha = 0.15f)
-        else -> MaterialTheme.colorScheme.surfaceVariant
+private fun TeamKarte(team: ELLage.Team, ansicht: ELAnsicht, jetzt: Long, details: () -> Unit, ausfuehren: (ELAktion) -> Unit) {
+    val status = team.suche.status
+    val (statusText, statusFarbe) = when (status) {
+        TeamLage.SucheStatus.BEREIT -> "Bereit" to ELStil.bereit
+        TeamLage.SucheStatus.LAEUFT -> "Aktiv" to ELStil.aktiv
+        TeamLage.SucheStatus.KURZPAUSE -> "Pause" to ELStil.pause
+        TeamLage.SucheStatus.BEENDET -> "Beendet" to ELStil.pause
     }
-    Column(
-        Modifier.fillMaxWidth().background(hintergrund, RoundedCornerShape(14.dp)).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
+    val zeitFarbe = when (team.warnstufe) {
+        2 -> ELStil.warnung2
+        1 -> ELStil.warnung1
+        else -> if (status == TeamLage.SucheStatus.LAEUFT) ELStil.aktiv else ELStil.vermerk
+    }
+    val rand = when {
+        team.warnstufe >= 2 -> ELStil.warnung2
+        team.warnstufe == 1 -> ELStil.warnung1
+        status == TeamLage.SucheStatus.LAEUFT -> ELStil.aktiv
+        else -> null
+    }
+    Column(Modifier.clickable(onClick = details).elKarte(rand), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(team.teamName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            val (status, farbe) = when (team.suche.status) {
-                TeamLage.SucheStatus.BEREIT -> "Bereit" to MaterialTheme.colorScheme.onSurfaceVariant
-                TeamLage.SucheStatus.LAEUFT -> "Sucht" to Color(0xFF2E9D4F)
-                TeamLage.SucheStatus.KURZPAUSE -> "Kurzpause" to ORANGE
-                TeamLage.SucheStatus.BEENDET -> "Beendet" to MaterialTheme.colorScheme.onSurfaceVariant
+            Text(team.teamName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = ELStil.inschrift,
+                modifier = Modifier.weight(1f), maxLines = 1)
+            val dauer = ansicht.suchdauerSec(team, jetzt)
+            if (dauer != null && status != TeamLage.SucheStatus.BEREIT) {
+                Text(dauerText(dauer), style = ELStil.ziffern, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = zeitFarbe)
             }
-            Text(status, color = farbe, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
         }
-        val wer = listOfNotNull(team.dogName, team.hundefuehrerName).filter { it.isNotBlank() }.joinToString(" · ")
-        if (wer.isNotEmpty()) Text(wer, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        val wer = listOfNotNull(team.hundefuehrerName, team.dogName).filter { it.isNotBlank() }.joinToString(" · ")
+        if (wer.isNotEmpty()) Text(wer, color = ELStil.vermerk)
         val dauer = ansicht.suchdauerSec(team, jetzt)
-        if (dauer != null && team.suche.status != TeamLage.SucheStatus.BEREIT) {
-            Text(
-                "%d:%02d:%02d".format(dauer / 3600, dauer / 60 % 60, dauer % 60),
-                style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
-                color = when (team.warnstufe) {
-                    2 -> Color.Red
-                    1 -> ORANGE
-                    else -> MaterialTheme.colorScheme.onSurface
-                },
+        val w2 = team.warnung2Min
+        if (dauer != null && w2 != null && w2 > 0 && status != TeamLage.SucheStatus.BEREIT) {
+            androidx.compose.material3.LinearProgressIndicator(
+                progress = { (dauer / (w2 * 60f)).coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth(), color = zeitFarbe,
+                trackColor = ELStil.platteTief,
             )
         }
         val geraete = listOfNotNull(
@@ -528,17 +572,31 @@ private fun TeamKarte(team: ELLage.Team, ansicht: ELAnsicht, jetzt: Long) {
             team.halsband?.let { "Halsband " + geraetText(it, ansicht, jetzt, halsband = true) },
             team.handy?.let { "Handy " + geraetText(it, ansicht, jetzt, halsband = false) },
         ).joinToString(" · ")
-        if (geraete.isNotEmpty()) {
-            Text(geraete, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
-        }
-        // Schwacher Akku und Funkloch, damit es auffällt, ohne auf die Gerätezeile zu schauen
+        if (geraete.isNotEmpty()) Text(geraete, style = MaterialTheme.typography.bodySmall, color = ELStil.vermerk, maxLines = 2)
         val hinweise = OrtungsHinweise.texte(team, ansicht.alterSec(team.halsband?.zeitMs, jetzt), ansicht.alterSec(team.handy?.zeitMs, jetzt))
-        if (hinweise.isNotEmpty()) {
-            Text("⚠ " + hinweise.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = ORANGE, maxLines = 2)
-        }
+        if (hinweise.isNotEmpty()) Text("⚠ " + hinweise.joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = ELStil.warnung1, maxLines = 2)
         team.pauseErforderlichBisMs?.takeIf { it > jetzt }?.let {
-            Text("Pause bis " + DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it)), color = ORANGE, style = MaterialTheme.typography.bodySmall)
+            Text("Pause bis " + DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it)), color = ELStil.warnung1, style = MaterialTheme.typography.bodySmall)
         }
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ELChip(statusText, statusFarbe)
+            Spacer(Modifier.weight(1f))
+            when (status) {
+                TeamLage.SucheStatus.LAEUFT -> Taste("Pause") { ausfuehren(ELAktion.teamPause(team.teamId, team.teamName)) }
+                TeamLage.SucheStatus.KURZPAUSE -> Taste("Weiter", ELStil.aktiv) { ausfuehren(ELAktion.teamWeiter(team.teamId, team.teamName)) }
+                TeamLage.SucheStatus.BEREIT -> Taste("Start", ELStil.aktiv, onClick = details)
+                TeamLage.SucheStatus.BEENDET -> Unit
+            }
+            Taste("•••", onClick = details)
+        }
+    }
+}
+
+/** Bedienknopf an der Teamkarte, groß genug für Handschuhe */
+@Composable
+private fun Taste(text: String, farbe: Color = ELStil.inschrift, onClick: () -> Unit) {
+    TextButton(onClick = onClick, modifier = Modifier.heightIn(min = 48.dp).background(ELStil.platteTief, RoundedCornerShape(10.dp))) {
+        Text(text, color = farbe, fontWeight = FontWeight.SemiBold)
     }
 }
 
