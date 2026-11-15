@@ -55,7 +55,9 @@ final class ELBetrieb: ObservableObject {
                 let antwort = try await schnittstelle.ausfuehren(aktion)
                 hinweis = ("\(aktion.beschreibung) ✓", false, jetzt())
                 if aktion.pfad == "einsatz/beenden" {
-                    einsatzEnde = (try? JSONDecoder.server.decode(ELEinsatzEnde.self, from: antwort)) ?? ELEinsatzEnde()
+                    var ende = (try? JSONDecoder.server.decode(ELEinsatzEnde.self, from: antwort)) ?? ELEinsatzEnde()
+                    ende.berichtAbfrage = ELEinsatzEnde.abfrage(aus: aktion.inhalt)
+                    einsatzEnde = ende
                 }
                 etwasGetan = true
             } catch SchnittstellenFehler.beendet {
@@ -109,6 +111,33 @@ final class ELBetrieb: ObservableObject {
 
     func halsbaender() async -> ELHalsbaender? {
         try? await schnittstelle.halsbaender()
+    }
+
+    /// Bericht laden und als Datei ablegen (nur bis zum Schließen der Vorschau, siehe `berichtLoeschen`).
+    /// Fehlertext statt Datei, wenn es nicht geht.
+    func berichtLaden(_ ende: ELEinsatzEnde) async -> Result<URL, ELBerichtFehler> {
+        guard let pfad = ende.berichtPfad else { return .failure(.text("Kein Bericht vorhanden.")) }
+        do {
+            let daten = try await schnittstelle.bericht(pfad)
+            let ordner = FileManager.default.temporaryDirectory.appending(path: "Bericht", directoryHint: .isDirectory)
+            try? FileManager.default.removeItem(at: ordner)
+            try FileManager.default.createDirectory(at: ordner, withIntermediateDirectories: true)
+            let datei = ordner.appending(path: ELEinsatzEnde.dateiname(ende.einsatzNummer))
+            try daten.write(to: datei, options: [.atomic, .completeFileProtection])
+            return .success(datei)
+        } catch SchnittstellenFehler.beendet {
+            beiStop()
+            return .failure(.text("Abgemeldet."))
+        } catch SchnittstellenFehler.server(404) {
+            return .failure(.text("Der Server bietet den Bericht noch nicht an (ab Version 1.15.0). Er liegt im Archiv am Server."))
+        } catch {
+            return .failure(.text("Bericht konnte nicht geladen werden. Netz prüfen und erneut versuchen."))
+        }
+    }
+
+    /// Personenbezogene Daten nicht liegen lassen
+    func berichtLoeschen() {
+        try? FileManager.default.removeItem(at: FileManager.default.temporaryDirectory.appending(path: "Bericht", directoryHint: .isDirectory))
     }
 
     private func speichern() {

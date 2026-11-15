@@ -19,6 +19,13 @@ class TestELAktionen : ELAktionsSchnittstelle {
         return antwort
     }
     override suspend fun notizen(vor: String?) = ELNotizSeite(notizListe, false)
+    var berichtFehler: Exception? = null
+    val berichtPfade = mutableListOf<String>()
+    override suspend fun bericht(pfad: String): ByteArray {
+        berichtPfade += pfad
+        berichtFehler?.let { throw it }
+        return "%PDF".toByteArray()
+    }
     override suspend fun halsbaender() = ELHalsbaender.aus(JSONObject("""{ "frei": [ { "id": "HB-1", "name": "Halsband 1", "akku": 80 } ], "zuletzt": [ { "teamId": "t1", "halsbandId": "HB-1" } ] }"""))
 }
 
@@ -103,5 +110,30 @@ class ELBetriebTest {
         assertEquals("Nicht gefunden.", (runCatching { client(404, "") .ausfuehren(a) }.exceptionOrNull() as ELAktionAbgelehnt).text)
         assertEquals(SchnittstellenFehler.Beendet, runCatching { client(410, "").ausfuehren(a) }.exceptionOrNull())
         assertEquals(SchnittstellenFehler.Server(503), runCatching { client(503, "").ausfuehren(a) }.exceptionOrNull())
+    }
+
+    // Idee 6.2: Bericht nach dem Beenden öffnen und teilen
+    @Test fun beendenMerktAuswahlUndLaedtBericht() = runTest {
+        server.antwort = """{ "doppelt": false, "archivId": "a-1", "einsatzNummer": "2026/042", "pdf": { "erstellt": true, "fehler": null } }"""
+        val b = betrieb()
+        b.ausfuehren(ELAktion.einsatzBeenden("Uebung abgeschlossen", mitTracks = false, kartenart = "Topographic", teamIds = listOf("t1", "t2")))
+        val ende = b.einsatzEnde.value!!
+        assertEquals("einsatz/bericht/a-1?karte=Topographic&teams=t1,t2&tracks=0", ende.berichtPfad)
+
+        val ordner = kotlin.io.path.createTempDirectory("bericht").toFile()
+        val datei = b.berichtLaden(ende, ordner).getOrThrow()
+        assertEquals("einsatzbericht-2026-042.pdf", datei.name)
+        assertEquals("%PDF", datei.readText())
+        assertEquals(listOf("einsatz/bericht/a-1?karte=Topographic&teams=t1,t2&tracks=0"), server.berichtPfade)
+        b.berichtLoeschen(ordner)
+        assertFalse(datei.exists())
+    }
+
+    @Test fun berichtAlleTeamsUndAlterServer() = runTest {
+        assertEquals("karte=Streets", ELEinsatzEnde.abfrage(ELAktion.einsatzBeenden("x", mitTracks = true).inhalt))
+        assertEquals(null, ELEinsatzEnde().berichtPfad)
+        server.berichtFehler = SchnittstellenFehler.Server(404)
+        val fehler = betrieb().berichtLaden(ELEinsatzEnde(archivId = "a-1"), kotlin.io.path.createTempDirectory("bericht").toFile()).exceptionOrNull()
+        assertTrue((fehler as ELBerichtFehler).text.contains("Archiv"))
     }
 }

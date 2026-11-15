@@ -182,6 +182,13 @@ final class TestELAktionen: ELAktionsSchnittstelle, @unchecked Sendable {
     private(set) var ausgefuehrt: [ELAktion] = []
     var notizListe: [ELNotiz] = []
     var antwort = Data(#"{"doppelt":false}"#.utf8)
+    var berichtFehler: Error?
+    private(set) var berichtPfade: [String] = []
+    func bericht(_ pfad: String) async throws -> Data {
+        berichtPfade.append(pfad)
+        if let berichtFehler { throw berichtFehler }
+        return Data("%PDF".utf8)
+    }
     func ausfuehren(_ aktion: ELAktion) async throws -> Data {
         ausgefuehrt.append(aktion)
         if let fehler { throw fehler }
@@ -636,5 +643,40 @@ struct ELOrtungsHinweisTests {
         team.handy = nil
         team.suche.status = .laeuft
         #expect(ELOrtungsHinweis.texte(team: team, alterHalsband: nil, alterHandy: nil).isEmpty, "ohne Geräte kein Funkloch")
+    }
+}
+
+/// Idee 6.2: Bericht nach dem Beenden öffnen und teilen
+@MainActor
+struct ELBerichtTests {
+    let speicher = UserDefaults(suiteName: "elbericht-\(UUID().uuidString)")!
+    let server = TestELAktionen()
+
+    @Test func beendenMerktAuswahlFuerDenBericht() async throws {
+        server.antwort = Data(#"{ "doppelt": false, "archivId": "a-1", "einsatzNummer": "2026/042", "pdf": { "erstellt": true, "fehler": null } }"#.utf8)
+        let b = ELBetrieb(schnittstelle: server, speicher: speicher, beiStop: {})
+        await b.ausfuehren(.einsatzBeenden(ergebnis: "Uebung abgeschlossen", mitTracks: false, kartenart: "Topographic", teamIds: ["t1", "t2"]))
+        let ende = try #require(b.einsatzEnde)
+        #expect(ende.berichtPfad == "einsatz/bericht/a-1?karte=Topographic&teams=t1,t2&tracks=0")
+
+        let datei = try await b.berichtLaden(ende).get()
+        #expect(datei.lastPathComponent == "einsatzbericht-2026-042.pdf")
+        #expect(try Data(contentsOf: datei) == Data("%PDF".utf8))
+        #expect(server.berichtPfade == ["einsatz/bericht/a-1?karte=Topographic&teams=t1,t2&tracks=0"])
+        b.berichtLoeschen()
+        #expect(!FileManager.default.fileExists(atPath: datei.path))
+    }
+
+    @Test func alleTeamsMitTracksOhneZusatz() {
+        let aktion = ELAktion.einsatzBeenden(ergebnis: "x", mitTracks: true)
+        #expect(ELEinsatzEnde.abfrage(aus: aktion.inhalt) == "karte=Streets")
+        #expect(ELEinsatzEnde().berichtPfad == nil)
+    }
+
+    @Test func alterServerMeldetArchiv() async {
+        server.berichtFehler = SchnittstellenFehler.server(status: 404)
+        let b = ELBetrieb(schnittstelle: server, speicher: speicher, beiStop: {})
+        guard case .failure(.text(let text)) = await b.berichtLaden(ELEinsatzEnde(archivId: "a-1")) else { Issue.record("Fehler erwartet"); return }
+        #expect(text.contains("Archiv"))
     }
 }

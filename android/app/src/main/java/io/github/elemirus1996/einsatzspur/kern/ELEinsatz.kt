@@ -91,13 +91,27 @@ data class ELVorlage(
 }
 
 /** Antwort von `POST /einsatz/beenden`: Archiv-Eintrag und ob der PDF-Bericht erstellt wurde. */
-data class ELEinsatzEnde(val archivId: String? = null, val einsatzNummer: String? = null, val pdfErstellt: Boolean? = null, val pdfFehler: String? = null) {
+data class ELEinsatzEnde(
+    val archivId: String? = null,
+    val einsatzNummer: String? = null,
+    val pdfErstellt: Boolean? = null,
+    val pdfFehler: String? = null,
+    /** Auswahl beim Beenden (Karte, Teams, Tracks) als Abfrage für `GET /einsatz/bericht/{archivId}`, nicht vom Server */
+    val berichtAbfrage: String = "",
+) {
+    /** Pfad des Berichts mit derselben Auswahl wie beim Beenden; null ohne `archivId` */
+    val berichtPfad: String?
+        get() {
+            val id = archivId?.takeIf { it.isNotEmpty() }?.let { java.net.URLEncoder.encode(it, "UTF-8") } ?: return null
+            return if (berichtAbfrage.isEmpty()) "einsatz/bericht/$id" else "einsatz/bericht/$id?$berichtAbfrage"
+        }
+
     /** Hinweis für die Einsatzleitung nach dem Beenden */
     val meldung: String
         get() = listOfNotNull(
             einsatzNummer?.let { "Einsatz $it beendet und archiviert." } ?: "Einsatz beendet und archiviert.",
             when (pdfErstellt) {
-                true -> "Der Bericht (PDF) liegt im Archiv."
+                true -> "Der Bericht (PDF) liegt im Archiv und lässt sich hier öffnen und teilen."
                 false -> "Bericht (PDF) nicht erstellt: ${pdfFehler ?: "unbekannter Fehler"}. Im Monitor im Archiv neu erzeugen."
                 null -> null
             },
@@ -110,6 +124,23 @@ data class ELEinsatzEnde(val archivId: String? = null, val einsatzNummer: String
             fun kennung(name: String) = if (json.has(name) && !json.isNull(name)) json.get(name).toString() else null
             val pdf = json.optJSONObject("pdf")
             return ELEinsatzEnde(kennung("archivId"), kennung("einsatzNummer"), pdf?.optBoolean("erstellt", false), pdf?.textOderNull("fehler"))
+        }
+
+        /** Abfrage aus dem `pdf`-Teil der Aktion „Einsatz beenden“: `karte`, `teams`, `tracks=0` */
+        fun abfrage(inhalt: String): String {
+            val pdf = runCatching { JSONObject(inhalt).optJSONObject("pdf") }.getOrNull() ?: return ""
+            val teile = mutableListOf<String>()
+            pdf.textOderNull("kartenart")?.let { teile += "karte=$it" }
+            pdf.optJSONArray("teamIds")?.let { a -> (0 until a.length()).map { a.getString(it) } }
+                ?.takeIf { it.isNotEmpty() }?.let { teile += "teams=${it.joinToString(",")}" }
+            if (pdf.has("tracks") && !pdf.optBoolean("tracks", true)) teile += "tracks=0"
+            return teile.joinToString("&")
+        }
+
+        /** Dateiname wie beim Server, nur Buchstaben, Ziffern, `-` und `_` */
+        fun dateiname(nummer: String?): String {
+            val sauber = (nummer ?: "").map { if (it.isLetterOrDigit() || it == '-' || it == '_') it else '-' }.joinToString("")
+            return if (sauber.isEmpty()) "einsatzbericht.pdf" else "einsatzbericht-$sauber.pdf"
         }
 
         /** Zeitpunkt in UTC mit `Z`, ohne Sekundenbruchteile (z. B. `2026-10-31T17:45:00Z`) */

@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -441,6 +442,19 @@ class ELClient(
         ELNotizSeite.aus(anfrage(if (vor != null) "notizen?vor=${java.net.URLEncoder.encode(vor, "UTF-8")}&anzahl=50" else "notizen?anzahl=50", "GET", null))
 
     override suspend fun halsbaender(): ELHalsbaender = ELHalsbaender.aus(anfrage("halsbaender", "GET", null))
+
+    override suspend fun bericht(pfad: String): ByteArray {
+        val token = sitzung.token
+        val ergebnis = berichtAbrufen(url(pfad), token)
+        if (ergebnis.first != 410 || !zugang.neueresToken(token)) return ergebnis.datenOderFehler()
+        return berichtAbrufen(url(pfad), sitzung.token).datenOderFehler()
+    }
+
+    private fun Pair<Int, ByteArray?>.datenOderFehler(): ByteArray = when (first) {
+        200 -> second ?: throw SchnittstellenFehler.AntwortUngueltig
+        410 -> throw SchnittstellenFehler.Beendet
+        else -> throw SchnittstellenFehler.Server(first)
+    }
     override suspend fun vorlage(): ELVorlage = ELVorlage.aus(anfrage("einsatz/vorlage", "GET", null))
     override suspend fun vorOrt(): ELVorOrt = ELVorOrt.aus(anfrage("einsatz/vorort", "GET", null))
 
@@ -514,6 +528,25 @@ class ELClient(
         } catch (e: JSONException) {
             throw SchnittstellenFehler.AntwortUngueltig
         }
+    }
+}
+
+/** PDF abrufen (nur HTTPS, Token nur im Header); der Server rechnet Karten, daher längere Wartezeit. */
+internal suspend fun berichtAbrufen(adresse: String, token: String): Pair<Int, ByteArray?> = withContext(Dispatchers.IO) {
+    val url = URL(adresse)
+    if (url.protocol != "https") throw IOException("nur https")
+    val verbindung = url.openConnection() as HttpsURLConnection
+    try {
+        verbindung.connectTimeout = 20_000
+        verbindung.readTimeout = 120_000
+        verbindung.useCaches = false
+        verbindung.instanceFollowRedirects = false
+        verbindung.setRequestProperty("Accept", "application/pdf")
+        verbindung.setRequestProperty("Authorization", "Bearer $token")
+        val status = verbindung.responseCode
+        status to (if (status == 200) verbindung.inputStream.use { it.readBytes() } else null)
+    } finally {
+        verbindung.disconnect()
     }
 }
 

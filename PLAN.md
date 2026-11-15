@@ -238,6 +238,12 @@ Android:
 - [ ] iOS über Apple (APNs), Android über Google (Firebase Cloud Messaging); Mitteilungstexte knapp, ohne Namen von Vermissten oder Ortsangaben
 - [ ] Mitteilungen nur, solange ein Einsatz läuft; Abmelden in der App entfernt die Registrierung
 
+### Phase 3c – Ideen aus der Übergabe (15.11.2026)
+- [x] 6.2 Bericht teilen: nach dem Beenden „Bericht öffnen“ (iOS Vorschau mit Teilen, Android Öffnen/Teilen), Server `GET /einsatz/bericht/{archivId}` (Server #187)
+- [ ] 6.3 EL-Anmeldung per QR (Server zeigt QR mit interner Adresse, ohne Passwort)
+- [ ] 6.4 Suchgebiet einem Team zuweisen (EL-Aktion, Karte)
+- [ ] Punkt 9 Gestaltung: iOS-Reiter Vermisst/Karte/Funk im /el-Stil, Android angleichen
+
 ### Phase 4 – Test (TestFlight / interner Play-Test)
 - [ ] Übung mit 2–3 Teams und Einsatzleitung
 - [ ] Akku-Messung 1 h: Traccar (sparsam) gegen App
