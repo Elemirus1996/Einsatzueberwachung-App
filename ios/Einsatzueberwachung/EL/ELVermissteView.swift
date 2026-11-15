@@ -4,53 +4,172 @@ import SwiftUI
 struct ELVermissteView: View {
     @ObservedObject var vermisste: ELVermissteAnsicht
     @ObservedObject var betrieb: ELBetrieb
+    var lage: ELLage?
     @State private var neuesProfil = false
 
     var body: some View {
-        List {
-            if let stand = vermisste.stand {
-                Section {
-                    Picker("Szenario", selection: Binding(
-                        get: { ELSzenario(rawValue: stand.szenario ?? "") ?? .unbestimmt },
-                        set: { neu in Task { await betrieb.ausfuehren(.szenario(neu)); await vermisste.laden() } })) {
-                        ForEach(ELSzenario.allCases, id: \.self) { Text($0.anzeige).tag($0) }
-                    }
-                } footer: {
-                    Text(stand.mehrereErlaubt ? "In diesem Szenario sind mehrere Personen möglich." : "In diesem Szenario wird eine Person gesucht.")
-                }
-                Section("Vermisste Personen") {
-                    if stand.profile.isEmpty { Text("Noch kein Profil angelegt.").foregroundStyle(.secondary) }
-                    ForEach(stand.profile) { profil in
-                        NavigationLink {
-                            ELProfilView(original: profil, vermisste: vermisste, betrieb: betrieb)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(profil.vollerName ?? "Unbekannt").font(.headline)
-                                Text([profil.text("alter").isEmpty ? nil : "\(profil.text("alter")) Jahre",
-                                      profil.text("kleidung").isEmpty ? nil : profil.text("kleidung")]
-                                    .compactMap { $0 }.joined(separator: " · "))
-                                    .font(.subheadline).foregroundStyle(.secondary)
-                                if !profil.text("zuletztGesehenOrt").isEmpty {
-                                    Label(profil.text("zuletztGesehenOrt"), systemImage: "eye").font(.caption).foregroundStyle(.secondary)
-                                }
-                            }
+        VStack(spacing: 0) {
+            ELReiterKopf(titel: "Vermisst", lage: lage)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    if let stand = vermisste.stand {
+                        szenario(stand)
+                        ELAbschnittTitel(titel: "Gesuchte Personen", anzahl: stand.profile.count)
+                        if stand.profile.isEmpty {
+                            Text("Noch kein Profil angelegt.").foregroundStyle(ELStil.vermerk).elKarte()
                         }
-                    }
-                    if stand.mehrereErlaubt || stand.profile.isEmpty {
-                        Button { neuesProfil = true } label: { Label("Person hinzufügen", systemImage: "person.badge.plus") }
+                        ForEach(stand.profile) { profil in
+                            NavigationLink {
+                                ELProfilView(original: profil, vermisste: vermisste, betrieb: betrieb)
+                            } label: { ELSteckbrief(profil: profil) }
+                            .buttonStyle(.plain)
+                        }
+                        if stand.mehrereErlaubt || stand.profile.isEmpty {
+                            Button { neuesProfil = true } label: {
+                                Label("Person hinzufügen", systemImage: "person.badge.plus")
+                                    .font(.headline)
+                                    .frame(maxWidth: .infinity, minHeight: 48)
+                                    .foregroundStyle(ELStil.aktion)
+                                    .background(ELStil.aktion.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    } else if let fehler = vermisste.fehler {
+                        Text(fehler).foregroundStyle(ELStil.vermerk)
+                    } else {
+                        ProgressView().frame(maxWidth: .infinity)
                     }
                 }
-            } else if let fehler = vermisste.fehler {
-                Text(fehler).foregroundStyle(.secondary)
-            } else {
-                ProgressView()
+                .padding(16)
+                .frame(maxWidth: 800)
+                .frame(maxWidth: .infinity)
             }
+            .refreshable { await vermisste.laden() }
         }
-        .navigationTitle("Vermisste")
+        .background(ELStil.papier.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
         .task { await vermisste.laden() }
-        .refreshable { await vermisste.laden() }
         .sheet(isPresented: $neuesProfil) {
             NavigationStack { ELProfilView(original: ELVermisstenprofil(), vermisste: vermisste, betrieb: betrieb) }
+        }
+    }
+
+    private func szenario(_ stand: ELVermisste) -> some View {
+        HStack {
+            Label("Szenario", systemImage: "scope").foregroundStyle(ELStil.vermerk)
+            Spacer()
+            Picker("Szenario", selection: Binding(
+                get: { ELSzenario(rawValue: stand.szenario ?? "") ?? .unbestimmt },
+                set: { neu in Task { await betrieb.ausfuehren(.szenario(neu)); await vermisste.laden() } })) {
+                ForEach(ELSzenario.allCases, id: \.self) { Text($0.anzeige).tag($0) }
+            }
+            .tint(ELStil.aktion)
+        }
+        .elKarte()
+    }
+}
+
+/// Steckbrief einer vermissten Person: Name, Alter, Warnchips (Erkrankung, Medikamente, Mobilität), zuletzt gesehen, Checkliste
+struct ELSteckbrief: View {
+    let profil: ELVermisstenprofil
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Text(initialen)
+                    .font(.headline)
+                    .foregroundStyle(ELStil.aktion)
+                    .frame(width: 46, height: 46)
+                    .background(ELStil.aktion.opacity(0.12), in: Circle())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(profil.vollerName ?? "Unbekannt").font(.title3.bold()).foregroundStyle(ELStil.inschrift)
+                    if !unterzeile.isEmpty { Text(unterzeile).font(.subheadline).foregroundStyle(ELStil.vermerk) }
+                }
+                Spacer()
+                Image(systemName: "chevron.right").foregroundStyle(ELStil.randnotiz)
+            }
+            if !warnungen.isEmpty {
+                FlussLayout(abstand: 6) {
+                    ForEach(warnungen, id: \.text) { w in ELStempel(text: w.text, farbe: w.farbe) }
+                }
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                zeile("mappin.and.ellipse", profil.text("zuletztGesehenOrt"))
+                zeile("clock", profil.text("zuletztGesehenZeit"))
+                zeile("tshirt", profil.text("kleidung"))
+                zeile("person.text.rectangle", profil.text("beschreibung"))
+            }
+            if let liste = profil.checkliste, !liste.punkte.isEmpty {
+                let erledigt = liste.punkte.filter { $0.erledigt == true }.count
+                VStack(alignment: .leading, spacing: 5) {
+                    HStack {
+                        Text("Checkliste \(liste.name ?? "")").font(.subheadline)
+                        Spacer()
+                        Text("\(erledigt) / \(liste.punkte.count)").font(ELStil.mono(14, .semibold)).foregroundStyle(ELStil.aktiv)
+                    }
+                    ProgressView(value: Double(erledigt), total: Double(liste.punkte.count)).tint(ELStil.aktiv)
+                }
+            }
+        }
+        .elKarte(rand: ELStil.aktion)
+    }
+
+    @ViewBuilder
+    private func zeile(_ symbol: String, _ text: String) -> some View {
+        if !text.isEmpty {
+            Label { Text(text).foregroundStyle(ELStil.inschrift) } icon: { Image(systemName: symbol).foregroundStyle(ELStil.vermerk) }
+                .font(.subheadline)
+        }
+    }
+
+    private var initialen: String {
+        let teile = [profil.text("vorname"), profil.text("nachname")].compactMap { $0.first.map(String.init) }
+        return teile.isEmpty ? "?" : teile.joined()
+    }
+
+    private var unterzeile: String {
+        [profil.text("alter").isEmpty ? nil : "\(profil.text("alter")) Jahre", profil.text("besonderheiten").isEmpty ? nil : profil.text("besonderheiten")]
+            .compactMap { $0 }.joined(separator: " · ")
+    }
+
+    private var warnungen: [(text: String, farbe: Color)] {
+        var w: [(String, Color)] = []
+        if profil.auswahlen["suizidrisiko"] == "Ja" { w.append(("Suizidrisiko", ELStil.warnung2)) }
+        if profil.auswahlen["bewaffnet"] == "Ja" { w.append(("Bewaffnet", ELStil.warnung2)) }
+        for teil in profil.text("vorerkrankungen").split(separator: ",") { w.append((teil.trimmingCharacters(in: .whitespaces), ELStil.warnung1)) }
+        for teil in profil.text("medikamente").split(separator: ",") { w.append((teil.trimmingCharacters(in: .whitespaces), ELStil.warnung1)) }
+        if profil.auswahlen["orientierung"] == "Eingeschraenkt" { w.append(("Orientierung eingeschränkt", ELStil.warnung1)) }
+        switch profil.auswahlen["mobilitaet"] {
+        case "ZuFuss": w.append(("Zu Fuß", ELStil.pause))
+        case let m? where m != "Unbekannt": w.append((m, ELStil.pause))
+        default: break
+        }
+        return w.filter { !$0.0.isEmpty }.map { (text: $0.0, farbe: $0.1) }
+    }
+}
+
+/// Einfacher Zeilenumbruch für Chips
+struct FlussLayout: Layout {
+    var abstand: CGFloat = 6
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let breite = proposal.width ?? .infinity
+        var x: CGFloat = 0, y: CGFloat = 0, zeile: CGFloat = 0, maxX: CGFloat = 0
+        for s in subviews {
+            let g = s.sizeThatFits(.unspecified)
+            if x > 0 && x + g.width > breite { x = 0; y += zeile + abstand; zeile = 0 }
+            x += g.width + abstand; zeile = max(zeile, g.height); maxX = max(maxX, x)
+        }
+        return CGSize(width: min(maxX, breite), height: y + zeile)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var x = bounds.minX, y = bounds.minY, zeile: CGFloat = 0
+        for s in subviews {
+            let g = s.sizeThatFits(.unspecified)
+            if x > bounds.minX && x + g.width > bounds.maxX { x = bounds.minX; y += zeile + abstand; zeile = 0 }
+            s.place(at: CGPoint(x: x, y: y), proposal: .unspecified)
+            x += g.width + abstand; zeile = max(zeile, g.height)
         }
     }
 }

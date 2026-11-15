@@ -11,28 +11,42 @@ struct ELHauptView: View {
     let karte: ELKartenAnsicht
     let vermisste: ELVermissteAnsicht
     @State private var reiter = Reiter.lage
+    @State private var gelesenBis: String?
     @Environment(\.scenePhase) private var phase
+    @Environment(\.horizontalSizeClass) private var breite
+
+    /// Neue Funksprüche seit dem letzten Blick in den Funk (Zahl am Reiter)
+    private var neueFunksprueche: Int {
+        guard reiter != .funk else { return 0 }
+        let neue = betrieb.notizen.prefix { $0.id != gelesenBis }
+        return gelesenBis == nil ? 0 : neue.filter { $0.art == "funk" && !ELFunkView.vonLeitung($0) }.count
+    }
 
     enum Reiter: Hashable { case lage, vermisst, karte, funk }
 
     var body: some View {
+        // Reihenfolge nach Häufigkeit; iPad: Lage als Leitstand (Teams, Karte, Funk), Reiter als Seitenleiste
         TabView(selection: $reiter) {
             NavigationStack {
-                ELUebersichtView(ansicht: ansicht, ortung: ortung, betrieb: betrieb, zeigeFunk: { reiter = .funk })
+                ELUebersichtView(ansicht: ansicht, ortung: ortung, betrieb: betrieb, zeigeFunk: { reiter = .funk },
+                                 karte: breite == .regular ? karte : nil)
             }
             .tabItem { Label("Lage", systemImage: "dot.radiowaves.left.and.right") }
             .tag(Reiter.lage)
-            NavigationStack { ELVermissteView(vermisste: vermisste, betrieb: betrieb) }
-                .tabItem { Label("Vermisst", systemImage: "person.fill.questionmark") }
-                .tag(Reiter.vermisst)
-            NavigationStack { ELKarteView(karte: karte, teams: ansicht.lage?.teams ?? [], betrieb: betrieb) }
+            NavigationStack { ELKarteView(karte: karte, teams: ansicht.lage?.teams ?? [], betrieb: betrieb, lage: ansicht.lage) }
                 .tabItem { Label("Karte", systemImage: "map") }
                 .tag(Reiter.karte)
-            NavigationStack { ELFunkView(betrieb: betrieb, teams: ansicht.lage?.teams ?? []) }
-                .tabItem { Label("Funk", systemImage: "text.bubble") }
+            NavigationStack { ELFunkView(betrieb: betrieb, teams: ansicht.lage?.teams ?? [], lage: ansicht.lage) }
+                .tabItem { Label("Funk", systemImage: "bubble.left.and.bubble.right") }
                 .tag(Reiter.funk)
+                .badge(neueFunksprueche)
+            NavigationStack { ELVermissteView(vermisste: vermisste, betrieb: betrieb, lage: ansicht.lage) }
+                .tabItem { Label("Vermisst", systemImage: "person.fill.questionmark") }
+                .tag(Reiter.vermisst)
         }
+        .modifier(SeitenleisteAufIPad())
         .tint(ELStil.aktion)
+        .onChange(of: reiter) { _, neu in if neu == .funk { gelesenBis = betrieb.notizen.first?.id } }
         .onAppear {
             ansicht.beiWarnung = { stufe in
                 // Warnton je Einstellung; Stufe 2 lässt sich nicht abschalten
@@ -40,7 +54,7 @@ struct ELHauptView: View {
                 UINotificationFeedbackGenerator().notificationOccurred(stufe >= 2 ? .error : .warning)
             }
             ansicht.starten()
-            Task { await betrieb.notizenLaden() }
+            Task { await betrieb.notizenLaden(); gelesenBis = betrieb.notizen.first?.id }
         }
         .onDisappear { ansicht.anhalten() }
         .onChange(of: phase) { _, neu in
@@ -57,6 +71,8 @@ struct ELUebersichtView: View {
     @ObservedObject var ortung: TeamOrtung
     @ObservedObject var betrieb: ELBetrieb
     let zeigeFunk: () -> Void
+    /// iPad: Karte und Funk neben den Teams (Leitstand)
+    var karte: ELKartenAnsicht? = nil
     @State private var gewaehltesTeam: ELLage.Team?
     @State private var stoppTeam: ELLage.Team?
     @State private var startOffen = false
@@ -71,19 +87,23 @@ struct ELUebersichtView: View {
         TimelineView(.periodic(from: .now, by: 1)) { kontext in
             VStack(spacing: 0) {
                 kopfleiste(kontext.date)
-                funkLaufband
+                if karte == nil { funkLaufband }
                 if let lage = ansicht.lage, lage.einsatz.aktiv { statusleiste(lage) }
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 18) {
-                        hinweise(kontext.date)
-                        inhalt(kontext.date)
-                        fusszeile
+                if let karte, let lage = ansicht.lage, lage.einsatz.aktiv {
+                    // Leitstand: Teams | Karte | Funk
+                    HStack(spacing: 0) {
+                        teamSpalte(kontext.date).frame(width: 340)
+                        ELKarteView(karte: karte, teams: lage.teams, betrieb: betrieb, lage: lage, mitKopf: false)
+                            .clipShape(RoundedRectangle(cornerRadius: ELStil.radius))
+                            .padding(.vertical, 10)
+                        ELFunkView(betrieb: betrieb, teams: lage.teams, lage: lage, mitKopf: false)
+                            .frame(width: 330)
+                            .clipShape(RoundedRectangle(cornerRadius: ELStil.radius))
+                            .padding(10)
                     }
-                    .padding(16)
-                    .frame(maxWidth: 1100)
-                    .frame(maxWidth: .infinity)
+                } else {
+                    teamSpalte(kontext.date)
                 }
-                .refreshable { await ansicht.neuLaden() }
             }
             .background(ELStil.papier.ignoresSafeArea())
         }
@@ -140,6 +160,20 @@ struct ELUebersichtView: View {
         }
     }
 
+    private func teamSpalte(_ jetzt: Date) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                hinweise(jetzt)
+                inhalt(jetzt)
+                fusszeile
+            }
+            .padding(karte == nil ? 16 : 10)
+            .frame(maxWidth: 1100)
+            .frame(maxWidth: .infinity)
+        }
+        .refreshable { await ansicht.neuLaden() }
+    }
+
     // MARK: Kopfleiste
 
     private func kopfleiste(_ jetzt: Date) -> some View {
@@ -147,17 +181,13 @@ struct ELUebersichtView: View {
         return VStack(alignment: .leading, spacing: 10) {
             // Zeile 1: Stichwort als Stempel, Übung, Menü
             HStack(spacing: 8) {
-                Text((einsatz?.aktiv == true ? (einsatz?.stichwort.flatMap { $0.isEmpty ? nil : $0 } ?? "Einsatz") : "Kein Einsatz").uppercased())
-                    .font(ELStil.mono(13, .bold))
-                    .tracking(1.5)
+                Text(einsatz?.aktiv == true ? (einsatz?.stichwort.flatMap { $0.isEmpty ? nil : $0 } ?? "Einsatz") : "Kein Einsatz")
+                    .font(.title3.bold())
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
-                    .foregroundStyle(ELStil.signalRot)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 5)
-                    .overlay(RoundedRectangle(cornerRadius: 2).stroke(ELStil.signalRot, lineWidth: 1.5))
+                    .foregroundStyle(ELStil.aufAnthrazit)
                     .layoutPriority(1)
-                if einsatz?.uebung == true { ELStempel(text: "Übung", farbe: ELStil.warnung1, gefuellt: true) }
+                if einsatz?.uebung == true { ELStempel(text: "Übung", farbe: .white) }
                 Spacer(minLength: 4)
                 Menu {
                     if einsatz?.aktiv == true {
@@ -179,20 +209,20 @@ struct ELUebersichtView: View {
                 if let einsatz, einsatz.aktiv {
                     Text(kopfZeile(einsatz))
                         .font(.footnote)
-                        .foregroundStyle(ELStil.aufAnthrazit.opacity(0.7))
+                        .foregroundStyle(ELStil.aufAnthrazit.opacity(0.85))
                         .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 8)
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(jetzt, format: .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits).second(.twoDigits))
-                        .font(ELStil.mono(28, .bold))
+                        .font(ELStil.mono(26, .semibold))
                         .monospacedDigit()
                         .foregroundStyle(ELStil.aufAnthrazit)
                     if let beginn = einsatz?.beginn, einsatz?.aktiv == true {
-                        Text("EINSATZ " + TeamAnsichtView.dauer(max(0, jetzt.timeIntervalSince(beginn))))
-                            .font(ELStil.mono(11, .semibold))
-                            .foregroundStyle(ELStil.aufAnthrazit.opacity(0.6))
+                        Text("Einsatz " + TeamAnsichtView.dauer(max(0, jetzt.timeIntervalSince(beginn))))
+                            .font(ELStil.mono(12, .medium))
+                            .foregroundStyle(ELStil.aufAnthrazit.opacity(0.8))
                     }
                 }
                 .fixedSize()
@@ -219,24 +249,22 @@ struct ELUebersichtView: View {
         if let letzte = betrieb.notizen.first(where: { $0.art == "funk" || $0.art == "notiz" }) {
             Button(action: zeigeFunk) {
                 HStack(spacing: 10) {
-                    Text(letzte.art == "funk" ? "FUNK" : "NOTIZ")
-                        .font(ELStil.mono(11, .bold))
-                        .tracking(1.5)
-                        .foregroundStyle(ELStil.aufAnthrazit.opacity(0.55))
+                    Image(systemName: letzte.art == "funk" ? "bubble.left.fill" : "note.text")
+                        .foregroundStyle(ELStil.aktion)
                     Text(letzte.zeit, format: .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
-                        .font(ELStil.mono(12, .semibold))
-                        .foregroundStyle(ELStil.aktiv)
+                        .font(ELStil.mono(13, .semibold))
+                        .foregroundStyle(ELStil.vermerk)
                     if let von = letzte.von, !von.isEmpty {
-                        Text(von.uppercased()).font(ELStil.mono(12, .semibold)).foregroundStyle(ELStil.kreide).lineLimit(1)
+                        Text(von).font(.subheadline.weight(.semibold)).foregroundStyle(ELStil.inschrift).lineLimit(1)
                     }
-                    Text(letzte.text).font(.subheadline).foregroundStyle(ELStil.aufAnthrazit).lineLimit(1)
+                    Text(letzte.text).font(.subheadline).foregroundStyle(ELStil.vermerk).lineLimit(1)
                     Spacer(minLength: 0)
-                    Image(systemName: "chevron.right").font(.caption.bold()).foregroundStyle(ELStil.aufAnthrazit.opacity(0.5))
+                    Image(systemName: "chevron.right").font(.caption.bold()).foregroundStyle(ELStil.randnotiz)
                 }
                 .padding(.horizontal, 16)
-                .padding(.vertical, 9)
-                .background(ELStil.anthrazit.opacity(0.92))
-                .overlay(alignment: .top) { Rectangle().fill(ELStil.aufAnthrazit.opacity(0.08)).frame(height: 1) }
+                .padding(.vertical, 10)
+                .background(ELStil.platte)
+                .overlay(alignment: .bottom) { Rectangle().fill(ELStil.rahmen).frame(height: 1) }
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Letzter Funkspruch: \(letzte.text). Funk öffnen")
@@ -244,42 +272,25 @@ struct ELUebersichtView: View {
     }
 
     private func statusleiste(_ lage: ELLage) -> some View {
-        let aktiv = lage.teams.filter { $0.suche.status == .laeuft }.count
-        return VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Image(systemName: "dot.radiowaves.left.and.right")
-                Text("\(aktiv) \(aktiv == 1 ? "TEAM" : "TEAMS") AKTIV").tracking(1.5)
-                Spacer()
-                Circle()
-                    .fill(ansicht.live ? ELStil.aktiv : (ansicht.verbindungsfehler ? ELStil.signalRot : ELStil.warnung1))
-                    .frame(width: 8, height: 8)
-                Text(ansicht.live ? "LIVE" : (ansicht.verbindungsfehler ? "OFFLINE" : "VERBINDE"))
-                    .font(ELStil.mono(11, .semibold))
-            }
-            .font(ELStil.mono(13, .semibold))
-            .foregroundStyle(ELStil.vermerk)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(ELStil.platteTief)
+        VStack(spacing: 0) {
+            ELStatusChips(teams: lage.teams, live: ansicht.live)
             if let wetter = lage.wetter {
                 HStack(spacing: 16) {
                     if let t = wetter.temperatur {
                         Label { Text(String(format: "%.1f °C", t)) } icon: { Image(systemName: "thermometer.medium") }
                     }
-                    if let b = wetter.beschreibung, !b.isEmpty { Text(b.uppercased()) }
+                    if let b = wetter.beschreibung, !b.isEmpty { Text(b) }
                     if let w = wetter.wind {
                         Label { Text(String(format: "%.0f km/h", w)) } icon: { Image(systemName: "wind") }
                     }
                     Spacer(minLength: 0)
                 }
-                .font(ELStil.mono(12, .medium))
+                .font(.footnote)
                 .foregroundStyle(ELStil.vermerk)
                 .lineLimit(1)
                 .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(ELStil.platte)
+                .padding(.vertical, 6)
             }
-            Rectangle().fill(ELStil.rahmen).frame(height: 1)
         }
     }
 
@@ -325,9 +336,7 @@ struct ELUebersichtView: View {
                 gruppe("Beendet", lage.teams.filter { $0.suche.status == .beendet }, jetzt)
                 Button { beendenOffen = true } label: {
                     Label("Einsatz beenden", systemImage: "stop.circle")
-                        .font(ELStil.mono(14, .bold))
-                        .tracking(1.5)
-                        .textCase(.uppercase)
+                        .font(.headline)
                         .frame(maxWidth: .infinity, minHeight: 48)
                         .foregroundStyle(ELStil.aktion)
                         .background(ELStil.aktion.opacity(0.06), in: RoundedRectangle(cornerRadius: ELStil.radius))
@@ -352,9 +361,7 @@ struct ELUebersichtView: View {
                 .font(.subheadline).foregroundStyle(ELStil.vermerk)
             Button { startOffen = true } label: {
                 Label("Einsatz oder Übung starten", systemImage: "play.fill")
-                    .font(ELStil.mono(14, .bold))
-                    .tracking(1)
-                    .textCase(.uppercase)
+                    .font(.headline)
                     .frame(maxWidth: .infinity, minHeight: 50)
                     .foregroundStyle(ELStil.aufAnthrazit)
                     .background(ELStil.aktion, in: RoundedRectangle(cornerRadius: ELStil.radius))
@@ -385,7 +392,7 @@ struct ELUebersichtView: View {
     }
 
     private var spalten: [GridItem] {
-        breite == .regular ? [GridItem(.adaptive(minimum: 340), spacing: 12)] : [GridItem(.flexible())]
+        breite == .regular && karte == nil ? [GridItem(.adaptive(minimum: 340), spacing: 12)] : [GridItem(.flexible())]
     }
 
     private func ausfuehren(_ aktion: ELAktion) {
@@ -451,7 +458,7 @@ struct ELTeamKarte: View {
             geraete
             ortungsHinweise
             if let bis = team.pause?.erforderlichBis, bis > zeitpunkt {
-                Label { Text("PAUSE BIS ") + Text(bis, style: .time) } icon: { Image(systemName: "cup.and.saucer") }
+                Label { Text("Pause bis ") + Text(bis, style: .time) } icon: { Image(systemName: "cup.and.saucer") }
                     .font(ELStil.mono(11, .semibold)).foregroundStyle(ELStil.warnung1)
             }
             HStack(spacing: 8) {
@@ -463,7 +470,10 @@ struct ELTeamKarte: View {
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(hintergrund, in: RoundedRectangle(cornerRadius: ELStil.radius))
-        .overlay(RoundedRectangle(cornerRadius: ELStil.radius).stroke(randFarbe, lineWidth: team.suche.status == .laeuft ? 1.5 : 1))
+        .overlay { if team.suche.status == .laeuft || (team.warnstufe ?? 0) > 0 {
+            RoundedRectangle(cornerRadius: ELStil.radius).stroke(randFarbe, lineWidth: 1.5)
+        } }
+        .shadow(color: ELStil.schatten, radius: 4, y: 1)
         .contentShape(Rectangle())
         .onTapGesture(perform: details)
         .accessibilityElement(children: .contain)
@@ -527,14 +537,11 @@ struct ELTeamKarte: View {
         case .bereit, .beendet:
             Button(action: details) {
                 Label(team.suche.status == .bereit ? "Start" : "Aktionen", systemImage: team.suche.status == .bereit ? "play.fill" : "ellipsis")
-                    .font(ELStil.mono(13, .bold))
-                    .tracking(1.2)
-                    .textCase(.uppercase)
+                    .font(.subheadline.weight(.semibold))
                     .padding(.horizontal, 16)
                     .frame(minHeight: 48)
                     .foregroundStyle(team.suche.status == .bereit ? ELStil.aktiv : ELStil.inschrift)
-                    .background(ELStil.platteTief, in: RoundedRectangle(cornerRadius: 3))
-                    .overlay(RoundedRectangle(cornerRadius: 3).stroke(ELStil.rahmenStark, lineWidth: 1))
+                    .background(ELStil.platteTief, in: RoundedRectangle(cornerRadius: 10))
             }
             .buttonStyle(.plain)
         }
@@ -609,8 +616,8 @@ struct ELWarnbalken: View {
         VStack(spacing: 3) {
             GeometryReader { geo in
                 ZStack(alignment: .topLeading) {
-                    if let s1 = stufe1Min, s1 > 0 { marke("STUFE 1", anteil: Double(s1 * 60) / ende, breite: geo.size.width) }
-                    marke("STUFE 2", anteil: Double(stufe2Min * 60) / ende, breite: geo.size.width)
+                    if let s1 = stufe1Min, s1 > 0 { marke("Stufe 1", anteil: Double(s1 * 60) / ende, breite: geo.size.width) }
+                    marke("Stufe 2", anteil: Double(stufe2Min * 60) / ende, breite: geo.size.width)
                 }
             }
             .frame(height: 11)
@@ -633,7 +640,7 @@ struct ELWarnbalken: View {
     /// Beschriftung endet bündig über der Markierung
     private func marke(_ text: String, anteil: Double, breite: CGFloat) -> some View {
         Text(text)
-            .font(ELStil.mono(8.5, .semibold))
+            .font(ELStil.mono(10, .medium))
             .tracking(1)
             .foregroundStyle(ELStil.randnotiz)
             .fixedSize()
@@ -654,5 +661,13 @@ struct ELAblaufHinweis: View {
         if let text = verlaengerung.hinweis {
             Label(text, systemImage: "clock.badge.exclamationmark").foregroundStyle(ELStil.warnung1)
         }
+    }
+}
+
+/// iPad: Reiter als Seitenleiste links (ab iOS 18), iPhone: Reiter unten
+private struct SeitenleisteAufIPad: ViewModifier {
+    func body(content: Content) -> some View {
+        // Leiste oben als Standard, damit die Karte im Leitstand Platz hat; die Seitenleiste lässt sich einblenden
+        if #available(iOS 18, *) { content.tabViewStyle(.sidebarAdaptable).defaultAdaptableTabBarPlacement(.tabBar) } else { content }
     }
 }

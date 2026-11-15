@@ -1,74 +1,191 @@
 import SwiftUI
 
-/// Notizen und Funk (wie `/el`): Liste neueste zuerst, neue Einträge, Antworten auf Funksprüche.
+/// Funk und Notizen als Chat (Gestaltung Punkt 9): Teams links, Einsatzleitung rechts in Staffelrot, Status mittig,
+/// Notizen gelb. Neueste unten, Eingabe mit Team-Chips unten fest. Antworten und Löschen über langes Drücken.
 struct ELFunkView: View {
     @ObservedObject var betrieb: ELBetrieb
     let teams: [ELLage.Team]
+    var lage: ELLage?
+    /// Im iPad-Leitstand ohne eigenen Kopf
+    var mitKopf = true
     @State private var text = ""
     @State private var istFunk = true
     @State private var teamId: String?
     @State private var antwortAuf: ELNotiz?
+    @FocusState private var eingabeAktiv: Bool
 
     var body: some View {
-        List {
-            Section {
-                Picker("Art", selection: $istFunk) {
-                    Text("Funk").tag(true)
-                    Text("Notiz").tag(false)
-                }
-                .pickerStyle(.segmented)
-                if let antwortAuf {
-                    HStack {
-                        Text("Antwort auf: \(antwortAuf.text)").font(.caption).lineLimit(1)
-                        Spacer()
-                        Button("✕") { self.antwortAuf = nil }
+        VStack(spacing: 0) {
+            if mitKopf { ELReiterKopf(titel: "Funk", lage: lage) }
+            ScrollViewReader { leser in
+                ScrollView {
+                    LazyVStack(spacing: 8) {
+                        if betrieb.weitereNotizen, !betrieb.notizen.isEmpty {
+                            Button("Ältere laden") { Task { await betrieb.aeltereNotizenLaden() } }
+                                .font(.footnote)
+                                .padding(.top, 8)
+                        }
+                        ForEach(betrieb.notizen.reversed()) { notiz in
+                            eintrag(notiz).id(notiz.id)
+                        }
                     }
-                } else {
-                    Picker("Team", selection: $teamId) {
-                        Text("ohne Team").tag(String?.none)
-                        ForEach(teams) { Text($0.teamName).tag(Optional($0.teamId)) }
-                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
                 }
-                TextField(istFunk ? "Funkspruch" : "Notiz", text: $text, axis: .vertical)
-                Button("Eintragen") { Task { await eintragen() } }
-                    .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .defaultScrollAnchor(.bottom)
+                .onChange(of: betrieb.notizen.first?.id) { _, neu in
+                    if let neu { withAnimation { leser.scrollTo(neu, anchor: .bottom) } }
+                }
             }
-            Section("Verlauf") {
-                ForEach(betrieb.notizen) { notiz in
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text(artText(notiz.art)).font(.caption.bold()).foregroundStyle(artFarbe(notiz.art))
-                            if let team = teams.first(where: { $0.teamId == notiz.teamId }) {
-                                Text(team.teamName).font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Text(notiz.zeit, style: .time).font(.caption).foregroundStyle(.secondary)
-                        }
-                        Text(notiz.text)
-                        if let von = notiz.von { Text(von).font(.caption2).foregroundStyle(.secondary) }
-                        ForEach(notiz.antworten ?? []) { a in
-                            Text("↳ \(a.text)").font(.subheadline).padding(.leading, 12)
-                        }
-                    }
-                    .swipeActions {
-                        if notiz.art == "funk" {
-                            Button("Antworten") {
-                                antwortAuf = notiz
-                                istFunk = true
-                            }
-                            .tint(.blue)
-                        }
-                        if notiz.loeschbar == true {
-                            Button("Löschen", role: .destructive) { Task { await betrieb.ausfuehren(.notizLoeschen(notiz.id)) } }
-                        }
-                    }
-                    .onAppear { if notiz.id == betrieb.notizen.last?.id { Task { await betrieb.aeltereNotizenLaden() } } }
+            eingabe
+        }
+        .background(ELStil.papier.ignoresSafeArea())
+        .toolbar(.hidden, for: .navigationBar)
+        .task { await betrieb.notizenLaden() }
+    }
+
+    // MARK: Einträge
+
+    @ViewBuilder
+    private func eintrag(_ notiz: ELNotiz) -> some View {
+        switch notiz.art {
+        case "status", "system":
+            Text("\(notiz.von.map { "\($0): " } ?? "")\(notiz.text) · \(notiz.zeit.formatted(date: .omitted, time: .shortened))")
+                .font(.caption)
+                .foregroundStyle(ELStil.vermerk)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 4)
+                .background(ELStil.platteTief, in: Capsule())
+                .frame(maxWidth: .infinity)
+        case "funk":
+            blase(notiz, eigene: Self.vonLeitung(notiz))
+        default:
+            VStack(alignment: .leading, spacing: 3) {
+                Label("Notiz · \(notiz.zeit.formatted(date: .omitted, time: .shortened))", systemImage: "note.text")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ELStil.warnung1)
+                Text(notiz.text).foregroundStyle(ELStil.inschrift)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(ELStil.warnung1.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+            .contextMenu { menue(notiz) }
+        }
+    }
+
+    private func blase(_ notiz: ELNotiz, eigene: Bool) -> some View {
+        HStack {
+            if eigene { Spacer(minLength: 48) }
+            VStack(alignment: .leading, spacing: 3) {
+                Text("\(absender(notiz)) · \(notiz.zeit.formatted(date: .omitted, time: .shortened))")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(eigene ? ELStil.aktion : ELStil.vermerk)
+                Text(notiz.text).foregroundStyle(ELStil.inschrift)
+                ForEach(notiz.antworten ?? []) { a in
+                    Text("↳ \(a.text)").font(.subheadline).foregroundStyle(ELStil.vermerk)
                 }
+            }
+            .padding(10)
+            .background(eigene ? ELStil.aktion.opacity(0.13) : ELStil.platte,
+                        in: UnevenRoundedRectangle(topLeadingRadius: 14, bottomLeadingRadius: eigene ? 14 : 4,
+                                                   bottomTrailingRadius: eigene ? 4 : 14, topTrailingRadius: 14))
+            .shadow(color: eigene ? .clear : ELStil.schatten, radius: 2, y: 1)
+            .contextMenu { menue(notiz) }
+            if !eigene { Spacer(minLength: 48) }
+        }
+    }
+
+    @ViewBuilder
+    private func menue(_ notiz: ELNotiz) -> some View {
+        if notiz.art == "funk" {
+            Button { antwortAuf = notiz; istFunk = true; eingabeAktiv = true } label: { Label("Antworten", systemImage: "arrowshape.turn.up.left") }
+        }
+        if notiz.loeschbar == true {
+            Button(role: .destructive) { Task { await betrieb.ausfuehren(.notizLoeschen(notiz.id)) } } label: { Label("Löschen", systemImage: "trash") }
+        }
+    }
+
+    /// Eigene Einträge stehen rechts: von der Einsatzleitung oder löschbar (nur EL-Notizen sind löschbar)
+    static func vonLeitung(_ notiz: ELNotiz) -> Bool {
+        notiz.loeschbar == true || (notiz.von ?? "").localizedCaseInsensitiveContains("einsatzleitung")
+    }
+
+    private func absender(_ notiz: ELNotiz) -> String {
+        if let team = teams.first(where: { $0.teamId == notiz.teamId }), !Self.vonLeitung(notiz) { return team.teamName }
+        if Self.vonLeitung(notiz), let team = teams.first(where: { $0.teamId == notiz.teamId }) { return "An \(team.teamName)" }
+        return notiz.von ?? "Funk"
+    }
+
+    // MARK: Eingabe
+
+    private var eingabe: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let antwortAuf {
+                HStack {
+                    Label("Antwort auf: \(antwortAuf.text)", systemImage: "arrowshape.turn.up.left").font(.caption).lineLimit(1)
+                    Spacer()
+                    Button { self.antwortAuf = nil } label: { Image(systemName: "xmark.circle.fill") }
+                        .accessibilityLabel("Antwort abbrechen")
+                }
+                .foregroundStyle(ELStil.vermerk)
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        chip("Alle", gewaehlt: teamId == nil) { teamId = nil }
+                        ForEach(teams) { team in
+                            chip(team.teamName, gewaehlt: teamId == team.teamId) { teamId = team.teamId }
+                        }
+                    }
+                }
+            }
+            HStack(spacing: 8) {
+                Menu {
+                    Button { istFunk = true } label: { Label("Funkspruch", systemImage: "bubble.left") }
+                    Button { istFunk = false } label: { Label("Notiz", systemImage: "note.text") }
+                } label: {
+                    Image(systemName: istFunk ? "bubble.left.fill" : "note.text")
+                        .font(.system(size: 18))
+                        .foregroundStyle(istFunk ? ELStil.aktion : ELStil.warnung1)
+                        .frame(width: 40, height: 40)
+                        .background(ELStil.platteTief, in: Circle())
+                }
+                .accessibilityLabel(istFunk ? "Art: Funkspruch" : "Art: Notiz")
+                TextField(istFunk ? "Funkspruch" : "Notiz", text: $text, axis: .vertical)
+                    .lineLimit(1...4)
+                    .focused($eingabeAktiv)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background(ELStil.platteTief, in: RoundedRectangle(cornerRadius: 20))
+                Button { Task { await eintragen() } } label: {
+                    Image(systemName: "paperplane.fill")
+                        .font(.system(size: 17))
+                        .foregroundStyle(.white)
+                        .frame(width: 40, height: 40)
+                        .background(leer ? ELStil.randnotiz : ELStil.aktion, in: Circle())
+                }
+                .disabled(leer)
+                .accessibilityLabel("Senden")
             }
         }
-        .navigationTitle("Funk & Notizen")
-        .task { await betrieb.notizenLaden() }
-        .refreshable { await betrieb.notizenLaden() }
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 8)
+        .background(ELStil.platte)
+        .overlay(alignment: .top) { Rectangle().fill(ELStil.rahmen).frame(height: 1) }
+    }
+
+    private var leer: Bool { text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    private func chip(_ titel: String, gewaehlt: Bool, aktion: @escaping () -> Void) -> some View {
+        Button(action: aktion) {
+            Text(titel)
+                .font(.subheadline.weight(.medium))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .foregroundStyle(gewaehlt ? .white : ELStil.inschrift)
+                .background(gewaehlt ? ELStil.aktion : ELStil.platteTief, in: Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     private func eintragen() async {
@@ -81,23 +198,5 @@ struct ELFunkView: View {
         }
         antwortAuf = nil
         await betrieb.notizenLaden()
-    }
-
-    private func artText(_ art: String) -> String {
-        switch art {
-        case "funk": "Funk"
-        case "status": "Status"
-        case "system": "System"
-        default: "Notiz"
-        }
-    }
-
-    private func artFarbe(_ art: String) -> Color {
-        switch art {
-        case "funk": .blue
-        case "status": .green
-        case "system": .secondary
-        default: .orange
-        }
     }
 }

@@ -696,3 +696,20 @@ struct ELSuchgebietTests {
         #expect(weg.beschreibung == "Suchgebiet von Team Rex entfernt")
     }
 }
+
+/// Gestaltung Punkt 9: Funk als Chat, eigene Einträge rechts
+struct ELFunkChatTests {
+    private func notiz(von: String?, loeschbar: Bool?) throws -> ELNotiz {
+        var json: [String: Any] = ["id": "n1", "art": "funk", "text": "x", "zeit": "2026-11-15T14:00:00Z"]
+        if let von { json["von"] = von }
+        if let loeschbar { json["loeschbar"] = loeschbar }
+        return try JSONDecoder.server.decode(ELNotiz.self, from: JSONSerialization.data(withJSONObject: json))
+    }
+
+    @Test func eigeneEintraegeRechts() throws {
+        #expect(ELFunkView.vonLeitung(try notiz(von: "Einsatzleitung", loeschbar: nil)))
+        #expect(ELFunkView.vonLeitung(try notiz(von: "Tablet EL", loeschbar: true)))
+        #expect(!ELFunkView.vonLeitung(try notiz(von: "Team Rex", loeschbar: false)))
+        #expect(!ELFunkView.vonLeitung(try notiz(von: nil, loeschbar: nil)))
+    }
+}

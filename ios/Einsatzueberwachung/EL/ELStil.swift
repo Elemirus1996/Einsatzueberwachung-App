@@ -1,22 +1,23 @@
 import SwiftUI
 import UIKit
 
-/// Farben und Schrift der Einsatzleitung wie `/el` im Browser (Server `EinsatzLeitung.razor.css`, „Funkgerät“-Stil):
-/// Anthrazit-Kopfleiste, papierfarbene Fläche, gedämpfte Signalfarben, Monospace für Zeiten und Beschriftungen.
-/// Hell und dunkel wie im Server; die Akzentfarbe ist das Rot der Staffel (Vorgabe NRW).
+/// Farben und Schrift der Einsatzleitung (Gestaltung Punkt 9, Vorbild ruhiger Material-Stil):
+/// Kopfleiste in Staffelrot, hellgraue Fläche, weiße Karten mit runden Ecken, weiche Status-Chips,
+/// normale Schrift mit gleich breiten Ziffern für Zeiten. Hell und dunkel; Akzent ist das Rot der Staffel (Vorgabe NRW).
 enum ELStil {
-    static let anthrazit = Color(hell: 0x14181F, dunkel: 0x050810)
-    static let aufAnthrazit = Color(hell: 0xF0E9D8, dunkel: 0xE6DFCC)
-    static let papier = Color(hell: 0xE6E3DC, dunkel: 0x0A0D12)
-    static let platte = Color(hell: 0xFAF7F0, dunkel: 0x141A23)
-    static let platteTief = Color(hell: 0xEDE9DF, dunkel: 0x0F141C)
-    static let inschrift = Color(hell: 0x14181F, dunkel: 0xE6DFCC)
-    static let vermerk = Color(hell: 0x4A525E, dunkel: 0x98A0AD)
-    static let randnotiz = Color(hell: 0x7D8590, dunkel: 0x5A6470)
-    static let rahmen = Color(hell: 0x14181F, dunkel: 0xE8DCC3, deckkraftHell: 0.22, deckkraftDunkel: 0.10)
-    static let rahmenStark = Color(hell: 0x14181F, dunkel: 0xE8DCC3, deckkraftHell: 0.40, deckkraftDunkel: 0.20)
+    /// Kopfleiste (Name aus der /el-Zeit beibehalten): Staffelrot
+    static let anthrazit = Color(hell: 0xA32D2D, dunkel: 0x6E1F21)
+    static let aufAnthrazit = Color(hell: 0xFFFFFF, dunkel: 0xF5EEEE)
+    static let papier = Color(hell: 0xF2F2F4, dunkel: 0x000000)
+    static let platte = Color(hell: 0xFFFFFF, dunkel: 0x1C1C1E)
+    static let platteTief = Color(hell: 0xF2F2F4, dunkel: 0x2C2C2E)
+    static let inschrift = Color(hell: 0x1C1C1E, dunkel: 0xF2F2F4)
+    static let vermerk = Color(hell: 0x5C5C63, dunkel: 0xA5A5AD)
+    static let randnotiz = Color(hell: 0x8E8E93, dunkel: 0x6E6E75)
+    static let rahmen = Color(hell: 0x000000, dunkel: 0xFFFFFF, deckkraftHell: 0.08, deckkraftDunkel: 0.12)
+    static let rahmenStark = Color(hell: 0x000000, dunkel: 0xFFFFFF, deckkraftHell: 0.16, deckkraftDunkel: 0.22)
 
-    static let aktiv = Color(hell: 0x2D7A4D, dunkel: 0x5DC88A)
+    static let aktiv = Color(hell: 0x1E7A3C, dunkel: 0x5DC88A)
     static let pause = Color(hell: 0x5A6470, dunkel: 0x788292)
     static let bereit = Color(hell: 0x4E4A46, dunkel: 0xB9AC98)
     /// Aktionsfarbe: Staffelrot, wie `--funk-aktion`
@@ -26,48 +27,132 @@ enum ELStil {
     static let warnung2 = Color(hell: 0xE12431, dunkel: 0xFF5A63)
     static let kreide = Color(hell: 0xC8A850, dunkel: 0xE0D29A)
 
-    static let radius: CGFloat = 6
+    static let radius: CGFloat = 12
 
-    /// Monospace wie JetBrains Mono im Browser (auf iOS SF Mono)
+    /// Name aus der /el-Zeit: inzwischen normale Schrift mit gleich breiten Ziffern (Zeiten springen nicht)
     static func mono(_ groesse: CGFloat, _ gewicht: Font.Weight = .medium) -> Font {
-        .system(size: groesse, weight: gewicht, design: .monospaced)
+        .system(size: groesse, weight: gewicht).monospacedDigit()
     }
+
+    /// Leichter Schatten unter Karten
+    static let schatten = Color.black.opacity(0.07)
 }
 
-/// Überschrift eines Abschnitts: „AKTIV (2)“ in gesperrten Großbuchstaben mit Trennlinie
+/// Überschrift eines Abschnitts: „Aktiv 2“
 struct ELAbschnittTitel: View {
     let titel: String
     var anzahl: Int?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Text(titel.uppercased()).foregroundStyle(ELStil.vermerk)
-                if let anzahl { Text("(\(anzahl))").foregroundStyle(ELStil.randnotiz) }
+        HStack(spacing: 6) {
+            Text(titel).foregroundStyle(ELStil.inschrift)
+            if let anzahl {
+                Text("\(anzahl)")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(ELStil.vermerk)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 1)
+                    .background(ELStil.platteTief, in: Capsule())
             }
-            .font(ELStil.mono(13, .semibold))
-            .tracking(2.5)
-            Rectangle().fill(ELStil.rahmen).frame(height: 1)
         }
+        .font(.headline)
         .accessibilityElement(children: .combine)
     }
 }
 
-/// Umrandete Kennung wie „AKTIV“ oder „ÜBUNG“
+/// Weicher Status-Chip wie „Aktiv“ oder „Übung“ (Name aus der /el-Zeit)
 struct ELStempel: View {
     let text: String
     let farbe: Color
     var gefuellt = false
 
     var body: some View {
-        Text(text.uppercased())
-            .font(ELStil.mono(11, .bold))
-            .tracking(1.5)
-            .padding(.horizontal, 7)
+        // Alte Versalien („AKTIV“) als „Aktiv“, sonst unverändert
+        Text(text == text.uppercased() && text.count > 1 ? text.prefix(1) + text.dropFirst().lowercased() : text)
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 9)
             .padding(.vertical, 3)
-            .foregroundStyle(gefuellt ? ELStil.aufAnthrazit : farbe)
-            .background(gefuellt ? farbe : farbe.opacity(0.08), in: RoundedRectangle(cornerRadius: 2))
-            .overlay(RoundedRectangle(cornerRadius: 2).stroke(farbe.opacity(gefuellt ? 0 : 0.8), lineWidth: 1))
+            .foregroundStyle(gefuellt ? .white : farbe)
+            .background(gefuellt ? farbe : farbe.opacity(0.14), in: Capsule())
+    }
+}
+
+/// Status aller Teams als Chips, auf jedem Reiter gleich: „2 suchen · 1 Pause · 1 bereit“, Warnungen, Verbindung
+struct ELStatusChips: View {
+    let teams: [ELLage.Team]
+    var live: Bool? = nil
+
+    var body: some View {
+        let sucht = teams.filter { $0.suche.status == .laeuft }.count
+        let pause = teams.filter { $0.suche.status == .kurzpause }.count
+        let bereit = teams.filter { $0.suche.status == .bereit }.count
+        let warnung = teams.filter { ($0.warnstufe ?? 0) > 0 }
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ELStempel(text: "\(sucht) \(sucht == 1 ? "sucht" : "suchen")", farbe: ELStil.aktiv)
+                if pause > 0 { ELStempel(text: "\(pause) Pause", farbe: ELStil.pause) }
+                if bereit > 0 { ELStempel(text: "\(bereit) bereit", farbe: ELStil.bereit) }
+                ForEach(warnung) { team in
+                    Label(team.teamName, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 9)
+                        .padding(.vertical, 3)
+                        .foregroundStyle((team.warnstufe ?? 0) >= 2 ? ELStil.warnung2 : ELStil.warnung1)
+                        .background(((team.warnstufe ?? 0) >= 2 ? ELStil.warnung2 : ELStil.warnung1).opacity(0.14), in: Capsule())
+                }
+                if let live {
+                    Spacer(minLength: 4)
+                    Circle().fill(live ? ELStil.aktiv : ELStil.warnung1).frame(width: 8, height: 8)
+                        .accessibilityLabel(live ? "Live verbunden" : "Keine Live-Verbindung")
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+        }
+        .background(ELStil.platte)
+        .overlay(alignment: .bottom) { Rectangle().fill(ELStil.rahmen).frame(height: 1) }
+    }
+}
+
+/// Kopfleiste der übrigen Reiter: Titel und Uhr auf Staffelrot, darunter die Status-Chips
+struct ELReiterKopf: View {
+    let titel: String
+    let lage: ELLage?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            TimelineView(.periodic(from: .now, by: 1)) { kontext in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(titel).font(.title3.bold())
+                    if lage?.einsatz.uebung == true { ELStempel(text: "Übung", farbe: .white) }
+                    Spacer(minLength: 8)
+                    if let beginn = lage?.einsatz.beginn, lage?.einsatz.aktiv == true {
+                        Text(TeamAnsichtView.dauer(max(0, kontext.date.timeIntervalSince(beginn))))
+                            .font(ELStil.mono(13, .medium)).opacity(0.8)
+                    }
+                    Text(kontext.date, format: .dateTime.hour(.twoDigits(amPM: .omitted)).minute(.twoDigits))
+                        .font(ELStil.mono(17, .semibold))
+                }
+                .foregroundStyle(ELStil.aufAnthrazit)
+                .padding(.horizontal, 16)
+                .padding(.top, 6)
+                .padding(.bottom, 12)
+                .background(ELStil.anthrazit.ignoresSafeArea(edges: .top))
+            }
+            if let lage, lage.einsatz.aktiv { ELStatusChips(teams: lage.teams) }
+        }
+    }
+}
+
+/// Weiße Karte mit runden Ecken und leichtem Schatten
+extension View {
+    func elKarte(rand: Color? = nil, breite: CGFloat = 1.5) -> some View {
+        self
+            .padding(14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(ELStil.platte, in: RoundedRectangle(cornerRadius: ELStil.radius))
+            .overlay { if let rand { RoundedRectangle(cornerRadius: ELStil.radius).stroke(rand, lineWidth: breite) } }
+            .shadow(color: ELStil.schatten, radius: 4, y: 1)
     }
 }
 
@@ -84,8 +169,7 @@ struct ELTaste: View {
                 .font(.system(size: 17, weight: .semibold))
                 .foregroundStyle(farbe)
                 .frame(width: 52, height: 48)
-                .background(ELStil.platteTief, in: RoundedRectangle(cornerRadius: 3))
-                .overlay(RoundedRectangle(cornerRadius: 3).stroke(ELStil.rahmen, lineWidth: 1))
+                .background(ELStil.platteTief, in: RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(titel)
