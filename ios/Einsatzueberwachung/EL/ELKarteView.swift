@@ -7,6 +7,9 @@ struct ELKarteView: View {
     @ObservedObject var karte: ELKartenAnsicht
     let teams: [ELLage.Team]
     @ObservedObject var betrieb: ELBetrieb
+    var lage: ELLage?
+    /// Im iPad-Leitstand ohne eigenen Kopf
+    var mitKopf = true
     @State private var kamera: MapCameraPosition = .automatic
     @State private var gewaehlterPunkt: ELKarte.Punkt?
     @State private var gewaehltesGebiet: ELKarte.Suchgebiet?
@@ -39,9 +42,11 @@ struct ELKarteView: View {
                                         Text("\(Int(abdeckung.rounded())) %").font(.caption2)
                                     }
                                 }
-                                .foregroundStyle(.primary)
-                                .padding(4)
-                                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+                                .foregroundStyle(ELStil.inschrift)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(ELStil.platte, in: RoundedRectangle(cornerRadius: 10))
+                                .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
                             }
                             .accessibilityLabel("Suchgebiet \(gebiet.name ?? "") – Team zuweisen")
                         }
@@ -96,8 +101,10 @@ struct ELKarteView: View {
             .accessibilityLabel("Kartenart wechseln")
             .padding(12)
         }
-        .navigationTitle("Lagekarte")
-        .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if mitKopf { ELReiterKopf(titel: "Karte", lage: lage) }
+        }
+        .toolbar(.hidden, for: .navigationBar)
         .sheet(item: $gewaehlterPunkt) { punkt in
             ELPunktView(punkt: punkt, teams: teams, betrieb: betrieb)
                 .presentationDetents([.medium, .large])
