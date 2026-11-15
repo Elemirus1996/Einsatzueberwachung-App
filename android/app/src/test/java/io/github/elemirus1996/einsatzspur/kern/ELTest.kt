@@ -311,4 +311,14 @@ class ELTokenWechselTest {
         assertEquals(listOf<ELEreignis>(ELEreignis.Einsatz(true)), client.ereignisse().toList())
         assertEquals(listOf("alt", "neu"), tokens)
     }
+
+    @Test fun halsbandAkkuAlsStufe() {
+        assertEquals("Akku voll", HalsbandAkku.text(4))
+        assertEquals("Akku hoch", HalsbandAkku.text(3))
+        assertEquals("Akku mittel", HalsbandAkku.text(2))
+        assertEquals("Akku niedrig", HalsbandAkku.text(1))
+        assertNull(HalsbandAkku.text(0))
+        assertNull(HalsbandAkku.text(72))
+        assertNull(HalsbandAkku.text(null))
+    }
 }

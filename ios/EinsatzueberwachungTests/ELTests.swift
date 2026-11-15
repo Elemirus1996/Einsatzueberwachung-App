@@ -587,3 +587,15 @@ struct ELVermissteTests {
         #expect(ELAktion.szenario(.flaeche).inhalt == ["szenario": .text("Flaeche")])
     }
 }
+
+struct HalsbandAkkuTests {
+    @Test func stufeStattProzent() {
+        #expect(HalsbandAkku.text(4) == "Akku voll")
+        #expect(HalsbandAkku.text(3) == "Akku hoch")
+        #expect(HalsbandAkku.text(2) == "Akku mittel")
+        #expect(HalsbandAkku.text(1) == "Akku niedrig")
+        #expect(HalsbandAkku.text(0) == nil)
+        #expect(HalsbandAkku.text(72) == nil)
+        #expect(HalsbandAkku.text(nil) == nil)
+    }
+}

@@ -43,6 +43,7 @@ import io.github.elemirus1996.einsatzspur.kern.ELBetrieb
 import io.github.elemirus1996.einsatzspur.kern.ELHalsbaender
 import io.github.elemirus1996.einsatzspur.kern.ELLage
 import io.github.elemirus1996.einsatzspur.kern.ELNotiz
+import io.github.elemirus1996.einsatzspur.kern.HalsbandAkku
 import io.github.elemirus1996.einsatzspur.kern.TeamLage
 import kotlinx.coroutines.launch
 import java.text.DateFormat
@@ -123,7 +124,7 @@ fun ELTeamAktionenDialog(team: ELLage.Team, betrieb: ELBetrieb, schliessen: () -
                         Row(Modifier.fillMaxWidth().clickable { halsbaender = null; starten(h.id) }.padding(vertical = 10.dp)) {
                             Text(h.name ?: h.id, Modifier.weight(1f))
                             if (h.id == zuletzt) Text("zuletzt  ", style = MaterialTheme.typography.bodySmall)
-                            h.akku?.let { Text("$it %") }
+                            HalsbandAkku.text(h.akku)?.let { Text(it) }
                         }
                     }
                     TextButton(onClick = { halsbaender = null; starten(null) }) { Text("Ohne Halsband starten") }
