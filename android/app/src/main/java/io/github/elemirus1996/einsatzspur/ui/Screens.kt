@@ -48,6 +48,7 @@ import androidx.compose.ui.unit.dp
 import io.github.elemirus1996.einsatzspur.R
 import androidx.compose.ui.graphics.asImageBitmap
 import io.github.elemirus1996.einsatzspur.kern.AnmeldeFehler
+import io.github.elemirus1996.einsatzspur.kern.ELQRCode
 import io.github.elemirus1996.einsatzspur.kern.HeimatStaffel
 import io.github.elemirus1996.einsatzspur.kern.ServerAdresse
 import io.github.elemirus1996.einsatzspur.kern.TeamAnmeldung
@@ -197,7 +198,14 @@ fun AnmeldungScreen(
     }
 
     if (scannerOffen) {
-        QrScanner(gefunden = { scannerOffen = false; bestaetigen = it }, abbrechen = { scannerOffen = false })
+        QrScanner(gefunden = { text ->
+            val qr = TeamQRCode.aus(text)
+            when {
+                qr != null -> { scannerOffen = false; bestaetigen = qr; null }
+                ELQRCode.aus(text) != null -> "Das ist der Code für die Einsatzleitung. Dafür auf der Startseite „Einsatzleitung“ wählen."
+                else -> "Das ist kein Team-QR-Code des Einsatzes."
+            }
+        }, abbrechen = { scannerOffen = false })
         return
     }
 

@@ -37,9 +37,12 @@ import io.github.elemirus1996.einsatzspur.kern.QrAuswertung
 import io.github.elemirus1996.einsatzspur.kern.TeamQRCode
 import java.util.concurrent.Executors
 
-/** Kamera-Vorschau mit QR-Auswertung (CameraX + ZXing). Meldet nur Team-QR-Codes. */
+/**
+ * Kamera-Vorschau mit QR-Auswertung (CameraX + ZXing). [gefunden] prüft den Text: `null` = passender Code, der Scan endet;
+ * sonst ein Hinweis, der unten eingeblendet wird.
+ */
 @Composable
-fun QrScanner(gefunden: (TeamQRCode) -> Unit, abbrechen: () -> Unit) {
+fun QrScanner(gefunden: (String) -> String?, abbrechen: () -> Unit) {
     val context = LocalContext.current
     val lebenszyklus = LocalLifecycleOwner.current
     var erlaubt by remember {
@@ -66,17 +69,10 @@ fun QrScanner(gefunden: (TeamQRCode) -> Unit, abbrechen: () -> Unit) {
                             analyse.setAnalyzer(auswertung) { bild ->
                                 val ebene = bild.planes[0]
                                 val daten = ByteArray(ebene.buffer.remaining()).also { ebene.buffer.get(it) }
-                                val ergebnis = QrAuswertung.teamCode(daten, bild.width, bild.height, ebene.rowStride)
+                                val text = QrAuswertung.lesen(daten, bild.width, bild.height, ebene.rowStride)
                                 bild.close()
-                                ContextCompat.getMainExecutor(ctx).execute {
-                                    when (ergebnis) {
-                                        is QrAuswertung.Ergebnis.Team -> if (!fertig) {
-                                            fertig = true
-                                            gefunden(ergebnis.zugang)
-                                        }
-                                        QrAuswertung.Ergebnis.Fremd -> hinweis = "Das ist kein Team-QR-Code des Einsatzes."
-                                        QrAuswertung.Ergebnis.Nichts -> Unit
-                                    }
+                                if (text != null) ContextCompat.getMainExecutor(ctx).execute {
+                                    if (!fertig) gefunden(text)?.let { hinweis = it } ?: run { fertig = true }
                                 }
                             }
                             anbieter.unbindAll()

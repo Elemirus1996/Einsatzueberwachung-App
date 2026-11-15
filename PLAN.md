@@ -240,7 +240,7 @@ Android:
 
 ### Phase 3c – Ideen aus der Übergabe (15.11.2026)
 - [x] 6.2 Bericht teilen: nach dem Beenden „Bericht öffnen“ (iOS Vorschau mit Teilen, Android Öffnen/Teilen), Server `GET /einsatz/bericht/{archivId}` (Server #187)
-- [ ] 6.3 EL-Anmeldung per QR (Server zeigt QR mit interner Adresse, ohne Passwort)
+- [x] 6.3 EL-Anmeldung per QR: Scanner in der EL-Anmeldung übernimmt den Server aus `https://<intern>/el`, Passwort von Hand (Server #188)
 - [ ] 6.4 Suchgebiet einem Team zuweisen (EL-Aktion, Karte)
 - [ ] Punkt 9 Gestaltung: iOS-Reiter Vermisst/Karte/Funk im /el-Stil, Android angleichen
 

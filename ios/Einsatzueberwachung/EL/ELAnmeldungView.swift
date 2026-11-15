@@ -9,11 +9,30 @@ struct ELAnmeldungView: View {
     @State private var geraet = UIDevice.current.name
     @State private var laedt = false
     @State private var fehler: String?
+    @State private var scannerOffen = false
+    @State private var scanHinweis: String?
+    /// Server aus dem QR-Code der Einstellungen, zur Bestätigung angezeigt
+    @State private var ausQR: String?
 
     var body: some View {
         Form {
             if let hinweis = modell.elHinweis {
                 Section { Label(hinweis, systemImage: "exclamationmark.triangle").foregroundStyle(.orange) }
+            }
+            Section {
+                Button {
+                    scanHinweis = nil
+                    scannerOffen = true
+                } label: {
+                    Label("QR-Code aus den Einstellungen scannen", systemImage: "qrcode.viewfinder")
+                }
+                .disabled(!QRScannerView.verfuegbar)
+                if let ausQR {
+                    Label("Server aus dem QR-Code: \(ausQR)", systemImage: "checkmark.shield")
+                        .foregroundStyle(.green)
+                }
+            } footer: {
+                Text("Der Code steht im Monitor unter Einstellungen → System → „EL-App anmelden“. Er enthält nur die Adresse, das Passwort gibt man hier ein.")
             }
             Section {
                 TextField("Interne Adresse, z. B. einsatz.intern", text: $server)
@@ -37,6 +56,8 @@ struct ELAnmeldungView: View {
             }
         }
         .navigationTitle("Einsatzleitung")
+        .onChange(of: server) { _, neu in if neu != ausQR { ausQR = nil } }
+        .sheet(isPresented: $scannerOffen) { scanner }
         .onAppear {
             if server.isEmpty { server = modell.elServerAdresse }
             #if DEBUG
@@ -48,6 +69,39 @@ struct ELAnmeldungView: View {
             Button("OK") {}
         } message: {
             Text(fehler ?? "")
+        }
+    }
+
+    private var scanner: some View {
+        NavigationStack {
+            QRScannerView(gefunden: { text in
+                guard let qr = ELQRCode(text) else {
+                    scanHinweis = TeamQRCode(text) != nil
+                        ? "Das ist ein Team-Code. Für die Einsatzleitung den Code aus den Einstellungen scannen."
+                        : "Das ist kein QR-Code für die Einsatzleitung."
+                    return false
+                }
+                scannerOffen = false
+                server = qr.server.name
+                ausQR = qr.server.name
+                return true
+            })
+            .ignoresSafeArea()
+            .overlay(alignment: .bottom) {
+                if let scanHinweis {
+                    Text(scanHinweis)
+                        .padding()
+                        .background(.regularMaterial, in: Capsule())
+                        .padding(.bottom, 40)
+                }
+            }
+            .navigationTitle("QR-Code scannen")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Abbrechen") { scannerOffen = false }
+                }
+            }
         }
     }
 

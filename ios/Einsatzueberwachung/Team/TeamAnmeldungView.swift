@@ -87,11 +87,17 @@ struct TeamAnmeldungView: View {
     private var scanner: some View {
         NavigationStack {
             QRScannerView(
-                gefunden: { qr in
+                gefunden: { text in
+                    guard let qr = TeamQRCode(text) else {
+                        hinweis = ELQRCode(text) != nil
+                            ? "Das ist der Code für die Einsatzleitung. Dafür auf der Startseite „Einsatzleitung“ wählen."
+                            : "Das ist kein Team-QR-Code des Einsatzes."
+                        return false
+                    }
                     scannerOffen = false
                     serverBestaetigen = qr
-                },
-                fremderCode: { hinweis = "Das ist kein Team-QR-Code des Einsatzes." })
+                    return true
+                })
                 .ignoresSafeArea()
                 .overlay(alignment: .bottom) {
                     if let hinweis {

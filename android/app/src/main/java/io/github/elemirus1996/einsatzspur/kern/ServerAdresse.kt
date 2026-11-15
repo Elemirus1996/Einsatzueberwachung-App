@@ -26,6 +26,21 @@ value class ServerAdresse private constructor(val basis: String) {
     }
 }
 
+/**
+ * QR-Code für die Anmeldung der Einsatzleitung aus den Server-Einstellungen: `https://<interne Adresse>/el`,
+ * ohne Passwort (APP_API.md „native App“ Abschnitt 4), wie iOS `ELQRCode`. Nur der Server wird übernommen.
+ */
+data class ELQRCode(val server: ServerAdresse) {
+    companion object {
+        fun aus(text: String): ELQRCode? {
+            val server = ServerAdresse.aus(text) ?: return null
+            val uri = runCatching { URI(text.trim()) }.getOrNull() ?: return null
+            val teile = (uri.path ?: "").split('/').filter { it.isNotEmpty() }
+            return if (teile.size == 1 && teile[0].equals("el", ignoreCase = true)) ELQRCode(server) else null
+        }
+    }
+}
+
 /** Inhalt des bestehenden Team-QR-Codes: `https://<server>/team/login/<Code>` (ältere Form `…/team/login?code=<Code>`). */
 data class TeamQRCode(val server: ServerAdresse, val code: String) {
     /** Für den Keystore-Speicher (Team wechseln ohne neuen Scan). */
