@@ -136,4 +136,23 @@ class ELBetriebTest {
         val fehler = betrieb().berichtLaden(ELEinsatzEnde(archivId = "a-1"), kotlin.io.path.createTempDirectory("bericht").toFile()).exceptionOrNull()
         assertTrue((fehler as ELBerichtFehler).text.contains("Archiv"))
     }
+
+    // Idee 6.4: Suchgebiet einem Team zuweisen
+    @Test fun suchgebietZuweisenUndAufheben() {
+        val zu = ELAktion.suchgebiet("t1", "Team Rex", "g1", "Gebiet A")
+        assertEquals("teams/t1/suchgebiet", zu.pfad)
+        assertEquals("„Gebiet A“ an Team Rex", zu.beschreibung)
+        assertEquals("g1", zu.koerper().getString("suchgebietId"))
+        val weg = ELAktion.suchgebiet("t1", "Team Rex", null, "Gebiet A")
+        assertTrue(weg.koerper().isNull("suchgebietId"))
+        assertEquals("Suchgebiet von Team Rex entfernt", weg.beschreibung)
+    }
+
+    @Test fun gebietEnthaeltOrt() {
+        val g = ELKarte.Suchgebiet("g1", "A", null, listOf(Koordinate(49.0, 8.0), Koordinate(49.0, 8.1), Koordinate(49.1, 8.1), Koordinate(49.1, 8.0)),
+            null, null, false)
+        assertTrue(g.enthaelt(49.05, 8.05))
+        assertFalse(g.enthaelt(49.2, 8.05))
+        assertFalse(g.copy(punkte = g.punkte.take(2)).enthaelt(49.05, 8.05))
+    }
 }

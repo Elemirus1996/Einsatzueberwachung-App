@@ -33,7 +33,20 @@ data class ELKarte(val suchgebiete: List<Suchgebiet>, val positionen: List<ELPos
         val teamId: String?,
         val abdeckungProzent: Double?,
         val abgeschlossen: Boolean,
-    )
+    ) {
+        /** Liegt der Ort im Gebiet? (Strahlverfahren, für das Antippen auf der Karte) */
+        fun enthaelt(lat: Double, lng: Double): Boolean {
+            var innen = false
+            var j = punkte.size - 1
+            for (i in punkte.indices) {
+                val a = punkte[i]
+                val b = punkte[j]
+                if ((a.lat > lat) != (b.lat > lat) && lng < (b.lng - a.lng) * (lat - a.lat) / (b.lat - a.lat) + a.lng) innen = !innen
+                j = i
+            }
+            return punkte.size > 2 && innen
+        }
+    }
 
     companion object {
         fun aus(json: JSONObject): ELKarte = try {

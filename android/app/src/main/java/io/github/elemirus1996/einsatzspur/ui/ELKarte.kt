@@ -81,6 +81,8 @@ fun ELLagekarteScreen(karte: ELKartenAnsicht, teams: List<ELLage.Team>, betrieb:
     // Zählt Kamerabewegungen, damit die Beschriftungen mitwandern
     var kamera by remember { mutableIntStateOf(0) }
     var gewaehlterPunkt by remember { mutableStateOf<ELKarte.Punkt?>(null) }
+    var gewaehltesGebiet by remember { mutableStateOf<ELKarte.Suchgebiet?>(null) }
+    val bereich = rememberCoroutineScope()
     val (ansicht, m) = rememberMapView()
     BackHandler(onBack = zurueck)
 
@@ -115,8 +117,14 @@ fun ELLagekarteScreen(karte: ELKartenAnsicht, teams: List<ELLage.Team>, betrieb:
                 .map { (p, s) -> p to kotlin.math.hypot((s.x - tipp.x).toDouble(), (s.y - tipp.y).toDouble()) }
                 .filter { it.second <= 40 * ansicht.resources.displayMetrics.density }
                 .minByOrNull { it.second }?.first
-            if (treffer != null) gewaehlterPunkt = treffer
-            treffer != null
+            if (treffer != null) {
+                gewaehlterPunkt = treffer
+                return@OnMapClickListener true
+            }
+            // Sonst ein Suchgebiet → Team zuweisen (Idee 6.4); bei Überlappung das kleinste
+            val gebiet = daten?.suchgebiete.orEmpty().filter { it.enthaelt(ort.latitude, ort.longitude) }.minByOrNull { it.punkte.size }
+            if (gebiet != null) gewaehltesGebiet = gebiet
+            gebiet != null
         }
         k?.addOnMapClickListener(tippen)
         onDispose { k?.removeOnMapClickListener(tippen) }
@@ -188,7 +196,8 @@ fun ELLagekarteScreen(karte: ELKartenAnsicht, teams: List<ELLage.Team>, betrieb:
                 // Neu zeichnen, wenn die Karte bewegt wurde
                 if (k != null && stil != null) key(kamera) {
                     daten?.suchgebiete.orEmpty().filter { it.punkte.size > 2 }.forEach { g ->
-                        Beschriftung(k, mitte(g.punkte), gebietText(g), ueber = false)
+                        val team = teams.firstOrNull { it.teamId == g.teamId }?.teamName
+                        Beschriftung(k, mitte(g.punkte), listOfNotNull(gebietText(g), team).joinToString("\n"), ueber = false)
                     }
                     daten?.positionen.orEmpty().forEach { p ->
                         beschriftung(p, teams).takeIf { it.isNotEmpty() }?.let { Beschriftung(k, Koordinate(p.lat, p.lng), it, ueber = true) }
@@ -210,6 +219,9 @@ fun ELLagekarteScreen(karte: ELKartenAnsicht, teams: List<ELLage.Team>, betrieb:
                     modifier = Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = 40.dp),
                 ) { Text(if (art == Kartenart.TOPO) Kartenart.OSM.titel else Kartenart.TOPO.titel) }
                 gewaehlterPunkt?.let { PunktSendenDialog(it, teams, betrieb) { gewaehlterPunkt = null } }
+                gewaehltesGebiet?.let {
+                    SuchgebietDialog(it, teams, betrieb, geaendert = { bereich.launch { karte.karteNeuLaden() } }) { gewaehltesGebiet = null }
+                }
                 // Quellenangabe immer sichtbar (Nutzungsregeln OSM/OpenTopoMap)
                 Text(
                     art.quelle, Modifier.align(Alignment.BottomStart).background(Color(0xCCFFFFFF)).padding(horizontal = 4.dp),
@@ -242,6 +254,69 @@ private fun PunktSendenDialog(punkt: ELKarte.Punkt, teams: List<ELLage.Team>, be
                     }) { Text(team.teamName) }
                 }
                 Text("Das Team bekommt den Punkt als Ziel und startet damit seine Navigation.", style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = { TextButton(onClick = schliessen) { Text("Schließen") } },
+    )
+}
+
+/** Suchgebiet einem Team zuweisen oder die Zuweisung aufheben (`/teams/{teamId}/suchgebiet`), wie iOS `ELSuchgebietView`. */
+@Composable
+private fun SuchgebietDialog(
+    gebiet: ELKarte.Suchgebiet,
+    teams: List<ELLage.Team>,
+    betrieb: io.github.elemirus1996.einsatzspur.kern.ELBetrieb,
+    geaendert: () -> Unit,
+    schliessen: () -> Unit,
+) {
+    val bereich = rememberCoroutineScope()
+    val name = gebiet.name ?: "Suchgebiet"
+    val bisher = teams.firstOrNull { it.teamId == gebiet.teamId }
+    var wechselFrage by remember { mutableStateOf<ELLage.Team?>(null) }
+    fun senden(aktion: io.github.elemirus1996.einsatzspur.kern.ELAktion) {
+        bereich.launch {
+            betrieb.ausfuehren(aktion)
+            geaendert()
+        }
+        schliessen()
+    }
+    fun zuweisen(team: ELLage.Team) =
+        senden(io.github.elemirus1996.einsatzspur.kern.ELAktion.suchgebiet(team.teamId, team.teamName, gebiet.id, name))
+
+    wechselFrage?.let { team ->
+        AlertDialog(
+            onDismissRequest = { wechselFrage = null },
+            title = { Text("„$name“ gehört ${bisher?.teamName ?: "einem anderen Team"}") },
+            text = { Text("${bisher?.teamName ?: "Das andere Team"} hat danach kein Suchgebiet mehr.") },
+            confirmButton = { TextButton(onClick = { zuweisen(team) }) { Text("An ${team.teamName} geben") } },
+            dismissButton = { TextButton(onClick = { wechselFrage = null }) { Text("Abbrechen") } },
+        )
+        return
+    }
+    AlertDialog(
+        onDismissRequest = schliessen,
+        title = { Text(name) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("Team zuweisen", fontWeight = FontWeight.Bold)
+                if (teams.isEmpty()) Text("Noch keine Teams im Einsatz.")
+                teams.forEach { team ->
+                    val aktuell = team.teamId == gebiet.teamId
+                    val anderes = team.suchgebiet?.takeIf { it.id != gebiet.id }?.let { " (${it.name ?: "anderes Gebiet"})" } ?: ""
+                    TextButton(onClick = {
+                        when {
+                            aktuell -> schliessen()
+                            bisher != null -> wechselFrage = team
+                            else -> zuweisen(team)
+                        }
+                    }) { Text((if (aktuell) "✓ " else "") + team.teamName + anderes) }
+                }
+                if (bisher != null) {
+                    TextButton(onClick = {
+                        senden(io.github.elemirus1996.einsatzspur.kern.ELAktion.suchgebiet(bisher.teamId, bisher.teamName, null, name))
+                    }) { Text("Zuweisung von ${bisher.teamName} aufheben", color = Color(0xFFC62828)) }
+                }
+                Text("Ein Team hat höchstens ein Suchgebiet – ein bisheriges wird frei.", style = MaterialTheme.typography.bodySmall)
             }
         },
         confirmButton = { TextButton(onClick = schliessen) { Text("Schließen") } },

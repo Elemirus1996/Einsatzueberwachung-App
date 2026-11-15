@@ -680,3 +680,19 @@ struct ELBerichtTests {
         #expect(text.contains("Archiv"))
     }
 }
+
+/// Idee 6.4: Suchgebiet einem Team zuweisen
+struct ELSuchgebietTests {
+    @Test func zuweisenUndAufheben() throws {
+        let zu = ELAktion.suchgebiet("t1", name: "Team Rex", suchgebietId: "g1", gebietName: "Gebiet A")
+        #expect(zu.pfad == "teams/t1/suchgebiet")
+        #expect(zu.beschreibung == "„Gebiet A“ an Team Rex")
+        let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(zu.inhalt)) as? [String: Any]
+        #expect(json?["suchgebietId"] as? String == "g1")
+
+        let weg = ELAktion.suchgebiet("t1", name: "Team Rex", suchgebietId: nil, gebietName: "Gebiet A")
+        let wegJson = try JSONSerialization.jsonObject(with: JSONEncoder().encode(weg.inhalt)) as? [String: Any]
+        #expect(wegJson?["suchgebietId"] is NSNull)
+        #expect(weg.beschreibung == "Suchgebiet von Team Rex entfernt")
+    }
+}

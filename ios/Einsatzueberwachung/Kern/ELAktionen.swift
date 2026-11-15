@@ -31,6 +31,12 @@ struct ELAktion: Codable, Equatable, Identifiable, Sendable {
     static func ziel(_ teamId: String, name: String, punktId: String, punktName: String) -> ELAktion {
         neu("teams/\(teamId)/ziel", "Ziel „\(punktName)“ an \(name)", ["punktId": .text(punktId)])
     }
+    /// Suchgebiet zuweisen (Idee 6.4); `suchgebietId` nil = Zuweisung des Teams aufheben
+    static func suchgebiet(_ teamId: String, name: String, suchgebietId: String?, gebietName: String?) -> ELAktion {
+        neu("teams/\(teamId)/suchgebiet",
+            suchgebietId == nil ? "Suchgebiet von \(name) entfernt" : "„\(gebietName ?? "Suchgebiet")“ an \(name)",
+            ["suchgebietId": suchgebietId.map(ELWert.text) ?? .null])
+    }
     static func notiz(_ text: String, teamId: String?) -> ELAktion {
         neu("notizen", "Notiz", ["text": .text(text), "teamId": teamId.map(ELWert.text) ?? .null])
     }
