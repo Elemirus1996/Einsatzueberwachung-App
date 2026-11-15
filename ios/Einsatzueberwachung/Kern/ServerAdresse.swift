@@ -69,3 +69,18 @@ struct TeamQRCode: Codable, Equatable, Sendable {
         return ergebnis
     }
 }
+
+/// QR-Code für die Anmeldung der Einsatzleitung aus den Server-Einstellungen: `https://<interne Adresse>/el`,
+/// ohne Passwort (APP_API.md „native App“ Abschnitt 4). Nur der Server wird übernommen.
+struct ELQRCode: Equatable, Sendable {
+    let server: ServerAdresse
+
+    init?(_ text: String) {
+        guard let url = URL(string: text.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let server = ServerAdresse(url),
+              let teile = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              teile.path.split(separator: "/").map({ $0.lowercased() }) == ["el"]
+        else { return nil }
+        self.server = server
+    }
+}

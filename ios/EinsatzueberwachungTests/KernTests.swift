@@ -123,3 +123,19 @@ struct TeamWechselTests {
         #expect(bund.lesen(TeamQRCode.self, konto: Schluesselbund.kontoEinsatzZugang) == nil)
     }
 }
+
+/// Idee 6.3: QR-Code der Einsatzleitung aus den Server-Einstellungen
+struct ELQRCodeTests {
+    @Test func adresseMitElWirdServer() throws {
+        let qr = try #require(ELQRCode("https://Einsatz.Intern/el"))
+        #expect(qr.server.name == "einsatz.intern")
+        #expect(ELQRCode("https://10.10.0.1:8443/EL/?x=1")?.server.name == "10.10.0.1:8443")
+    }
+
+    @Test func andereCodesNicht() {
+        for text in ["http://einsatz.intern/el", "https://einsatz.intern/", "https://einsatz.intern/el/start",
+                     "https://einsatz.intern/team/login/ABC123", "https://nutzer:pw@einsatz.intern/el", "kein Link"] {
+            #expect(ELQRCode(text) == nil, "\(text)")
+        }
+    }
+}

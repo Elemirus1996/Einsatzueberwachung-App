@@ -85,4 +85,14 @@ class TeamWechselTest {
         assertNull(TeamQRCode.ausText("http://unsicher\nABC"))
         assertNull(TeamQRCode.ausText("kaputt"))
     }
+
+    // Idee 6.3: QR-Code der Einsatzleitung aus den Server-Einstellungen
+    @Test fun elQrCodeNurMitEl() {
+        assertEquals("einsatz.intern", ELQRCode.aus("https://Einsatz.Intern/el")?.server?.name)
+        assertEquals("10.10.0.1:8443", ELQRCode.aus("https://10.10.0.1:8443/EL/?x=1")?.server?.name)
+        for (text in listOf("http://einsatz.intern/el", "https://einsatz.intern/", "https://einsatz.intern/el/start",
+            "https://einsatz.intern/team/login/ABC123", "https://nutzer:pw@einsatz.intern/el", "kein Link")) {
+            assertEquals(text, null, ELQRCode.aus(text))
+        }
+    }
 }

@@ -1,10 +1,10 @@
 import SwiftUI
 import VisionKit
 
-/// QR-Scanner von Apple (VisionKit). Meldet nur Team-QR-Codes, alles andere wird übergangen.
+/// QR-Scanner von Apple (VisionKit). `gefunden` prüft den Text und gibt `true` zurück, wenn der Code passt (Team- bzw. EL-Code);
+/// dann endet der Scan. Andere Codes werden übergangen.
 struct QRScannerView: UIViewControllerRepresentable {
-    let gefunden: (TeamQRCode) -> Void
-    let fremderCode: () -> Void
+    let gefunden: @MainActor (String) -> Bool
 
     static var verfuegbar: Bool {
         DataScannerViewController.isSupported && DataScannerViewController.isAvailable
@@ -40,13 +40,11 @@ struct QRScannerView: UIViewControllerRepresentable {
             guard !fertig else { return }
             for item in items {
                 guard case .barcode(let code) = item, let text = code.payloadStringValue else { continue }
-                if let qr = TeamQRCode(text) {
+                if ansicht.gefunden(text) {
                     fertig = true
                     scanner.stopScanning()
-                    ansicht.gefunden(qr)
                     return
                 }
-                ansicht.fremderCode()
             }
         }
     }

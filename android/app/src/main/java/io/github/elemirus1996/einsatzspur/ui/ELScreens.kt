@@ -56,6 +56,8 @@ import androidx.compose.ui.unit.dp
 import io.github.elemirus1996.einsatzspur.kern.ELAnmeldeFehler
 import io.github.elemirus1996.einsatzspur.kern.ELAnsicht
 import io.github.elemirus1996.einsatzspur.kern.ELBerichtFehler
+import io.github.elemirus1996.einsatzspur.kern.ELQRCode
+import io.github.elemirus1996.einsatzspur.kern.TeamQRCode
 import io.github.elemirus1996.einsatzspur.kern.ELBetrieb
 import io.github.elemirus1996.einsatzspur.kern.ELKartenAnsicht
 import io.github.elemirus1996.einsatzspur.kern.ELLage
@@ -88,6 +90,21 @@ fun ELAnmeldungScreen(
     }
     var laedt by remember { mutableStateOf(false) }
     var fehler by remember { mutableStateOf<String?>(null) }
+    var scannerOffen by remember { mutableStateOf(false) }
+    // Server aus dem QR-Code der Einstellungen (Idee 6.3), zur Bestätigung angezeigt
+    var ausQR by remember { mutableStateOf<String?>(null) }
+
+    if (scannerOffen) {
+        QrScanner(gefunden = { text ->
+            val qr = ELQRCode.aus(text)
+            when {
+                qr != null -> { scannerOffen = false; server = qr.server.name; ausQR = qr.server.name; null }
+                TeamQRCode.aus(text) != null -> "Das ist ein Team-Code. Für die Einsatzleitung den Code aus den Einstellungen scannen."
+                else -> "Das ist kein QR-Code für die Einsatzleitung."
+            }
+        }, abbrechen = { scannerOffen = false })
+        return
+    }
 
     Surface(Modifier.fillMaxSize()) {
         Column(
@@ -96,8 +113,17 @@ fun ELAnmeldungScreen(
         ) {
             Text("Einsatzleitung", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             hinweis?.let { Text(it, color = ORANGE) }
+            OutlinedButton(onClick = { scannerOffen = true }, Modifier.fillMaxWidth(), enabled = !laedt) {
+                Text("QR-Code aus den Einstellungen scannen")
+            }
+            ausQR?.let { Text("Server aus dem QR-Code: $it", color = Color(0xFF2E9D4F)) }
+            Text(
+                "Der Code steht im Monitor unter Einstellungen → System → „EL-App anmelden“. Er enthält nur die Adresse, " +
+                    "das Passwort gibt man hier ein.",
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
             OutlinedTextField(
-                server, { server = it }, Modifier.fillMaxWidth(), singleLine = true,
+                server, { server = it; if (it != ausQR) ausQR = null }, Modifier.fillMaxWidth(), singleLine = true,
                 label = { Text("Interne Adresse, z. B. einsatz.intern") },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, autoCorrectEnabled = false),
             )
