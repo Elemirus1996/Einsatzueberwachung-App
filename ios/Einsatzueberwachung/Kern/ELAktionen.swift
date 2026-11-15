@@ -294,11 +294,34 @@ struct ELEinsatzEnde: Decodable, Equatable, Sendable {
     var archivId: String?
     var einsatzNummer: String?
     var pdf: Pdf?
+    /// Auswahl beim Beenden (Karte, Teams, Tracks) als Abfrage für `GET /einsatz/bericht/{archivId}`, nicht vom Server
+    var berichtAbfrage: String = ""
 
     init(archivId: String? = nil, einsatzNummer: String? = nil, pdf: Pdf? = nil) {
         self.archivId = archivId
         self.einsatzNummer = einsatzNummer
         self.pdf = pdf
+    }
+
+    /// Pfad des Berichts mit derselben Auswahl wie beim Beenden; nil ohne `archivId`
+    var berichtPfad: String? {
+        guard let archivId, !archivId.isEmpty,
+              let id = archivId.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-_")))
+        else { return nil }
+        return berichtAbfrage.isEmpty ? "einsatz/bericht/\(id)" : "einsatz/bericht/\(id)?\(berichtAbfrage)"
+    }
+
+    /// Abfrage aus dem `pdf`-Teil der Aktion „Einsatz beenden“: `karte`, `teams`, `tracks=0`
+    static func abfrage(aus inhalt: [String: ELWert]) -> String {
+        guard case .objekt(let pdf)? = inhalt["pdf"] else { return "" }
+        var teile: [String] = []
+        if case .text(let karte)? = pdf["kartenart"] { teile.append("karte=\(karte)") }
+        if case .liste(let ids)? = pdf["teamIds"] {
+            let liste = ids.compactMap { if case .text(let t) = $0 { t } else { nil } }
+            if !liste.isEmpty { teile.append("teams=\(liste.joined(separator: ","))") }
+        }
+        if case .wahr(false)? = pdf["tracks"] { teile.append("tracks=0") }
+        return teile.joined(separator: "&")
     }
 
     init(from decoder: Decoder) throws {
@@ -317,11 +340,17 @@ struct ELEinsatzEnde: Decodable, Equatable, Sendable {
 
     private enum Schluessel: String, CodingKey { case archivId, einsatzNummer, pdf }
 
+    /// Dateiname wie beim Server, nur Buchstaben, Ziffern, `-` und `_`
+    static func dateiname(_ nummer: String?) -> String {
+        let sauber = String((nummer ?? "").map { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" ? $0 : "-" })
+        return sauber.isEmpty ? "einsatzbericht.pdf" : "einsatzbericht-\(sauber).pdf"
+    }
+
     /// Hinweis für die Einsatzleitung nach dem Beenden
     var meldung: String {
         var teile = [einsatzNummer.map { "Einsatz \($0) beendet und archiviert." } ?? "Einsatz beendet und archiviert."]
         switch pdf {
-        case .some(let p) where p.erstellt: teile.append("Der Bericht (PDF) liegt im Archiv.")
+        case .some(let p) where p.erstellt: teile.append("Der Bericht (PDF) liegt im Archiv und lässt sich hier öffnen und teilen.")
         case .some(let p): teile.append("Bericht (PDF) nicht erstellt: \(p.fehler ?? "unbekannter Fehler"). Im Monitor im Archiv neu erzeugen.")
         case .none: break
         }
@@ -375,6 +404,10 @@ struct ELHalsbaender: Decodable, Equatable, Sendable {
     private enum Schluessel: String, CodingKey { case frei, halsbaender, zuletzt }
 }
 
+enum ELBerichtFehler: Error, Equatable {
+    case text(String)
+}
+
 /// Was die Aktionen der Einsatzleitung brauchen (testbar ohne Netz).
 protocol ELAktionsSchnittstelle: Sendable {
     /// Liefert den Körper der Antwort (z. B. `archivId` beim Beenden)
@@ -384,4 +417,10 @@ protocol ELAktionsSchnittstelle: Sendable {
     func halsbaender() async throws -> ELHalsbaender
     func ergebnisse() async throws -> [ELErgebnis]
     func vorOrt() async throws -> ELVorOrt
+    /// Bericht als PDF (`GET /einsatz/bericht/{archivId}`), Pfad aus `ELEinsatzEnde.berichtPfad`
+    func bericht(_ pfad: String) async throws -> Data
+}
+
+extension ELAktionsSchnittstelle {
+    func bericht(_ pfad: String) async throws -> Data { throw SchnittstellenFehler.server(status: 404) }
 }

@@ -301,6 +301,14 @@ extension URLSession {
         return URLSession(configuration: konfiguration)
     }()
 
+    /// Für den Einsatzbericht (PDF): Der Server rechnet erst die Karten, bevor das erste Byte kommt.
+    static let bericht: URLSession = {
+        let konfiguration = URLSessionConfiguration.ephemeral
+        konfiguration.timeoutIntervalForRequest = 120
+        konfiguration.waitsForConnectivity = false
+        return URLSession(configuration: konfiguration)
+    }()
+
     /// Für `/ereignisse`: Der Server schickt alle 20 s ein `: ping`, nach 60 s Stille gilt die Verbindung als tot.
     static let ereignisse: URLSession = {
         let konfiguration = URLSessionConfiguration.ephemeral

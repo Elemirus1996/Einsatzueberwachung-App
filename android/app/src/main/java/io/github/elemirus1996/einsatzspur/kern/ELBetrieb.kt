@@ -119,12 +119,16 @@ data class ELHalsbaender(val frei: List<Halsband>, val zuletzt: Map<String, Stri
     }
 }
 
+class ELBerichtFehler(val text: String) : Exception(text)
+
 /** Was die Aktionen der Einsatzleitung brauchen (testbar ohne Netz). */
 interface ELAktionsSchnittstelle {
     /** Liefert den Körper der Antwort (z. B. `archivId` beim Beenden) */
     suspend fun ausfuehren(aktion: ELAktion): String
     suspend fun notizen(vor: String?): ELNotizSeite
     suspend fun halsbaender(): ELHalsbaender
+    /** Bericht als PDF (`GET /einsatz/bericht/{archivId}`), Pfad aus [ELEinsatzEnde.berichtPfad] */
+    suspend fun bericht(pfad: String): ByteArray = throw SchnittstellenFehler.Server(404)
 }
 
 /** Aktionen, Notizen und Funk der Einsatzleitung mit Warteschlange fürs Funkloch, wie iOS `ELBetrieb`. */
@@ -181,7 +185,9 @@ class ELBetrieb(
                 try {
                     val antwort = schnittstelle.ausfuehren(aktion)
                     _hinweis.value = Hinweis("${aktion.beschreibung} ✓", false, jetzt())
-                    if (aktion.pfad == "einsatz/beenden") _einsatzEnde.value = ELEinsatzEnde.aus(antwort)
+                    if (aktion.pfad == "einsatz/beenden") {
+                        _einsatzEnde.value = ELEinsatzEnde.aus(antwort).copy(berichtAbfrage = ELEinsatzEnde.abfrage(aktion.inhalt))
+                    }
                     beiAntwort?.invoke(aktion, antwort)
                     etwasGetan = true
                 } catch (e: SchnittstellenFehler.Beendet) {
@@ -238,6 +244,34 @@ class ELBetrieb(
     /** Personal und Hunde für das Einsatzende; ohne Netz bzw. Server vor 1.14.1 null (dann Vorauswahl des Servers) */
     suspend fun vorOrt(): ELVorOrt? = einsatz?.let { e -> runCatching { e.vorOrt() }.getOrNull() }
     suspend fun ergebnisse(): List<ELErgebnis> = einsatz?.let { e -> runCatching { e.ergebnisse() }.getOrNull() } ?: emptyList()
+
+    /** Bericht laden und in [ordner] ablegen (nur bis zum nächsten Laden bzw. [berichtLoeschen]); Fehlertext statt Datei */
+    suspend fun berichtLaden(ende: ELEinsatzEnde, ordner: java.io.File): Result<java.io.File> {
+        val pfad = ende.berichtPfad ?: return Result.failure(ELBerichtFehler("Kein Bericht vorhanden."))
+        return try {
+            val daten = schnittstelle.bericht(pfad)
+            ordner.deleteRecursively()
+            ordner.mkdirs()
+            val datei = java.io.File(ordner, ELEinsatzEnde.dateiname(ende.einsatzNummer))
+            datei.writeBytes(daten)
+            Result.success(datei)
+        } catch (e: SchnittstellenFehler.Beendet) {
+            beiStop()
+            Result.failure(ELBerichtFehler("Abgemeldet."))
+        } catch (e: SchnittstellenFehler.Server) {
+            Result.failure(ELBerichtFehler(if (e.status == 404) "Der Server bietet den Bericht noch nicht an (ab Version 1.15.0). Er liegt im Archiv am Server."
+                else "Bericht konnte nicht geladen werden. Netz prüfen und erneut versuchen."))
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            Result.failure(ELBerichtFehler("Bericht konnte nicht geladen werden. Netz prüfen und erneut versuchen."))
+        }
+    }
+
+    /** Personenbezogene Daten nicht liegen lassen */
+    fun berichtLoeschen(ordner: java.io.File) {
+        ordner.deleteRecursively()
+    }
 
     fun einsatzEndeGelesen() {
         _einsatzEnde.value = null

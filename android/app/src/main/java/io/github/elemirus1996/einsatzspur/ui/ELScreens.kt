@@ -55,6 +55,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import io.github.elemirus1996.einsatzspur.kern.ELAnmeldeFehler
 import io.github.elemirus1996.einsatzspur.kern.ELAnsicht
+import io.github.elemirus1996.einsatzspur.kern.ELBerichtFehler
 import io.github.elemirus1996.einsatzspur.kern.ELBetrieb
 import io.github.elemirus1996.einsatzspur.kern.ELKartenAnsicht
 import io.github.elemirus1996.einsatzspur.kern.ELLage
@@ -158,6 +159,23 @@ fun ELAnmeldungScreen(
     }
 }
 
+/** PDF über den FileProvider an eine andere App geben: ansehen oder teilen (Mail, Messenger, Dateien) */
+private fun berichtStarten(context: android.content.Context, datei: java.io.File, teilen: Boolean) {
+    val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.dateien", datei)
+    val absicht = if (teilen) {
+        android.content.Intent(android.content.Intent.ACTION_SEND).setType("application/pdf")
+            .putExtra(android.content.Intent.EXTRA_STREAM, uri)
+    } else {
+        android.content.Intent(android.content.Intent.ACTION_VIEW).setDataAndType(uri, "application/pdf")
+    }
+    absicht.addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    try {
+        context.startActivity(android.content.Intent.createChooser(absicht, if (teilen) "Bericht teilen" else "Bericht öffnen"))
+    } catch (e: android.content.ActivityNotFoundException) {
+        android.widget.Toast.makeText(context, "Keine App für PDF gefunden.", android.widget.Toast.LENGTH_LONG).show()
+    }
+}
+
 private fun elFehlerText(e: Exception): String =
     (e as? ELAnmeldeFehler)?.meldung ?: "Der Server meldet einen Fehler. Bitte später erneut versuchen."
 
@@ -182,6 +200,13 @@ fun ELUebersichtScreen(
     var startOffen by remember { mutableStateOf(false) }
     var beendenOffen by remember { mutableStateOf(false) }
     var gewaehltesTeam by remember { mutableStateOf<ELLage.Team?>(null) }
+    // Bericht nach dem Beenden (Idee 6.2): liegt nur im Cache, bis „Fertig“
+    val context = LocalContext.current
+    val berichtOrdner = remember { java.io.File(context.cacheDir, "bericht") }
+    val berichtBereich = rememberCoroutineScope()
+    var berichtDatei by remember { mutableStateOf<java.io.File?>(null) }
+    var berichtFehler by remember { mutableStateOf<String?>(null) }
+    var berichtLaedt by remember { mutableStateOf(false) }
     val offen by betrieb.offen.collectAsState()
     val betriebHinweis by betrieb.hinweis.collectAsState()
     if (funkOffen) {
@@ -205,7 +230,6 @@ fun ELUebersichtScreen(
         ELLagekarteScreen(karte, ansicht.lage.collectAsState().value?.teams ?: emptyList(), betrieb, zurueck = { karteOffen = false })
         return
     }
-    val context = LocalContext.current
     val bereich = rememberCoroutineScope()
     val lage by ansicht.lage.collectAsState()
     val live by ansicht.live.collectAsState()
@@ -319,11 +343,62 @@ fun ELUebersichtScreen(
         }
     }
     betrieb.einsatzEnde.collectAsState().value?.let { ende ->
+        val mitBericht = ende.pdfErstellt == true && ende.berichtPfad != null
         AlertDialog(
             onDismissRequest = betrieb::einsatzEndeGelesen,
             title = { Text(if (ende.pdfErstellt == false) "Einsatz beendet, Bericht fehlt" else "Einsatz beendet") },
             text = { Text(ende.meldung) },
-            confirmButton = { TextButton(onClick = betrieb::einsatzEndeGelesen) { Text("OK") } },
+            confirmButton = {
+                if (mitBericht) {
+                    TextButton(onClick = {
+                        betrieb.einsatzEndeGelesen()
+                        berichtLaedt = true
+                        berichtBereich.launch {
+                            betrieb.berichtLaden(ende, berichtOrdner)
+                                .onSuccess { berichtDatei = it }
+                                .onFailure { berichtFehler = (it as? ELBerichtFehler)?.text ?: "Bericht konnte nicht geladen werden." }
+                            berichtLaedt = false
+                        }
+                    }) { Text("Bericht öffnen") }
+                } else {
+                    TextButton(onClick = betrieb::einsatzEndeGelesen) { Text("OK") }
+                }
+            },
+            dismissButton = if (mitBericht) ({ TextButton(onClick = betrieb::einsatzEndeGelesen) { Text("OK") } }) else null,
+        )
+    }
+    if (berichtLaedt) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Bericht") },
+            text = { Text("Bericht wird geladen …") },
+            confirmButton = {},
+        )
+    }
+    berichtFehler?.let { text ->
+        AlertDialog(
+            onDismissRequest = { berichtFehler = null },
+            title = { Text("Bericht") },
+            text = { Text(text) },
+            confirmButton = { TextButton(onClick = { berichtFehler = null }) { Text("OK") } },
+        )
+    }
+    berichtDatei?.let { datei ->
+        fun fertig() {
+            betrieb.berichtLoeschen(berichtOrdner)
+            berichtDatei = null
+        }
+        AlertDialog(
+            onDismissRequest = ::fertig,
+            title = { Text("Bericht") },
+            text = { Text(datei.name) },
+            confirmButton = {
+                Row {
+                    TextButton(onClick = { berichtStarten(context, datei, teilen = false) }) { Text("Öffnen") }
+                    TextButton(onClick = { berichtStarten(context, datei, teilen = true) }) { Text("Teilen") }
+                }
+            },
+            dismissButton = { TextButton(onClick = ::fertig) { Text("Fertig") } },
         )
     }
     gewaehltesTeam?.let { team -> ELTeamAktionenDialog(team, betrieb, schliessen = { gewaehltesTeam = null }) }

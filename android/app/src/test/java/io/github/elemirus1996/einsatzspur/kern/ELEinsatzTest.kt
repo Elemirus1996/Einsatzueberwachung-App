@@ -73,7 +73,7 @@ class ELEinsatzTest {
     @Test fun endeLesen() {
         val ok = ELEinsatzEnde.aus("""{ "archivId": 17, "einsatzNummer": "2026-031", "pdf": { "erstellt": true } }""")
         assertEquals("17", ok.archivId)
-        assertEquals("Einsatz 2026-031 beendet und archiviert. Der Bericht (PDF) liegt im Archiv.", ok.meldung)
+        assertEquals("Einsatz 2026-031 beendet und archiviert. Der Bericht (PDF) liegt im Archiv und lässt sich hier öffnen und teilen.", ok.meldung)
         val fehlt = ELEinsatzEnde.aus("""{ "archivId": "a1", "pdf": { "erstellt": false, "fehler": "Karte nicht geladen" } }""")
         assertTrue(fehlt.meldung.contains("nicht erstellt: Karte nicht geladen"))
         val kaputt = ELEinsatzEnde.aus("kein json")

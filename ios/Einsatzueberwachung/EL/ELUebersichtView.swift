@@ -1,4 +1,5 @@
 import AudioToolbox
+import QuickLook
 import SwiftUI
 
 /// Einsatzleitung mit Reitern unten wie `/el` im Browser: Lage, Vermisst, Karte, Funk.
@@ -61,6 +62,9 @@ struct ELUebersichtView: View {
     @State private var startOffen = false
     @State private var beendenOffen = false
     @State private var abmeldenFragen = false
+    @State private var berichtDatei: URL?
+    @State private var berichtFehler: String?
+    @State private var berichtLaedt = false
     @Environment(\.horizontalSizeClass) private var breite
 
     var body: some View {
@@ -104,9 +108,30 @@ struct ELUebersichtView: View {
         }
         .alert(betrieb.einsatzEnde?.pdf?.erstellt == false ? "Einsatz beendet, Bericht fehlt" : "Einsatz beendet",
                isPresented: Binding(get: { betrieb.einsatzEnde != nil }, set: { if !$0 { betrieb.einsatzEnde = nil } })) {
-            Button("OK") { betrieb.einsatzEnde = nil }
+            if let ende = betrieb.einsatzEnde, ende.pdf?.erstellt == true, ende.berichtPfad != nil {
+                Button("Bericht öffnen") {
+                    betrieb.einsatzEnde = nil
+                    berichtOeffnen(ende)
+                }
+            }
+            Button("OK", role: .cancel) { betrieb.einsatzEnde = nil }
         } message: {
             Text(betrieb.einsatzEnde?.meldung ?? "")
+        }
+        // Vorschau mit Teilen-Knopf; die Datei verschwindet beim Schließen wieder
+        .quickLookPreview($berichtDatei)
+        .onChange(of: berichtDatei) { _, neu in if neu == nil { betrieb.berichtLoeschen() } }
+        .overlay {
+            if berichtLaedt {
+                ProgressView("Bericht wird geladen …")
+                    .padding()
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+            }
+        }
+        .alert("Bericht", isPresented: Binding(get: { berichtFehler != nil }, set: { if !$0 { berichtFehler = nil } })) {
+            Button("OK", role: .cancel) { berichtFehler = nil }
+        } message: {
+            Text(berichtFehler ?? "")
         }
         .confirmationDialog("Als Einsatzleitung abmelden?", isPresented: $abmeldenFragen, titleVisibility: .visible) {
             Button("Abmelden", role: .destructive) { Task { await modell.elAbmelden() } }
@@ -375,6 +400,17 @@ struct ELUebersichtView: View {
         }
         .font(ELStil.mono(11))
         .foregroundStyle(ELStil.randnotiz)
+    }
+
+    private func berichtOeffnen(_ ende: ELEinsatzEnde) {
+        berichtLaedt = true
+        Task {
+            switch await betrieb.berichtLaden(ende) {
+            case .success(let datei): berichtDatei = datei
+            case .failure(.text(let text)): berichtFehler = text
+            }
+            berichtLaedt = false
+        }
     }
 }
 

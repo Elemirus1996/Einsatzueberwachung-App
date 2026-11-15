@@ -391,6 +391,13 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle,
 
     func halsbaender() async throws -> ELHalsbaender { try await anfrage("halsbaender", methode: "GET", inhalt: nil) }
 
+    func bericht(_ pfad: String) async throws -> Data {
+        let (daten, http) = try await roh(pfad, methode: "GET", inhalt: nil, ueber: .bericht)
+        if http.statusCode == 410 { throw SchnittstellenFehler.beendet }
+        guard http.statusCode == 200 else { throw SchnittstellenFehler.server(status: http.statusCode) }
+        return daten
+    }
+
     /// Neues Token ohne Passwort (#141). Das alte ist danach gesperrt; die Antwort ersetzt die Sitzung nicht selbst.
     func verlaengern(geraet: String?) async throws -> ELSitzung {
         struct Antwort: Decodable { var token: String; var expiresAt: Date; var verlaengerbarBis: Date? }
@@ -482,20 +489,21 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle,
     }
 
     /// Wie `rohEinmal`, aber 410 mit einem inzwischen ersetzten Token (#141) wird einmal mit dem neuen wiederholt.
-    private func roh(_ endpunkt: String, methode: String, inhalt: Data?) async throws -> (Data, HTTPURLResponse) {
+    private func roh(_ endpunkt: String, methode: String, inhalt: Data?, ueber: URLSession? = nil) async throws -> (Data, HTTPURLResponse) {
         let token = sitzung.token
-        let ergebnis = try await rohEinmal(endpunkt, methode: methode, inhalt: inhalt, token: token)
+        let ergebnis = try await rohEinmal(endpunkt, methode: methode, inhalt: inhalt, token: token, ueber: ueber)
         guard ergebnis.1.statusCode == 410, await zugang.neueresToken(als: token) else { return ergebnis }
-        return try await rohEinmal(endpunkt, methode: methode, inhalt: inhalt, token: sitzung.token)
+        return try await rohEinmal(endpunkt, methode: methode, inhalt: inhalt, token: sitzung.token, ueber: ueber)
     }
 
-    private func rohEinmal(_ endpunkt: String, methode: String, inhalt: Data?, token: String) async throws -> (Data, HTTPURLResponse) {
+    private func rohEinmal(_ endpunkt: String, methode: String, inhalt: Data?, token: String,
+                           ueber: URLSession? = nil) async throws -> (Data, HTTPURLResponse) {
         var request = request(endpunkt, methode: methode, token: token)
         if let inhalt {
             request.httpBody = inhalt
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
-        let (daten, antwort) = try await session.data(for: request)
+        let (daten, antwort) = try await (ueber ?? session).data(for: request)
         guard let http = antwort as? HTTPURLResponse else { throw SchnittstellenFehler.antwortUngueltig }
         return (daten, http)
     }
