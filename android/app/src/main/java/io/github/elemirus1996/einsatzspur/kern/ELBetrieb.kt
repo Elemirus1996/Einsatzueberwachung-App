@@ -235,6 +235,8 @@ class ELBetrieb(
     /** `null`, wenn die Liste nicht geladen werden konnte (Eingabe dann von Hand) */
     suspend fun vorlage(): ELVorlage? = einsatz?.let { e -> runCatching { e.vorlage() }.getOrNull() }
 
+    /** Personal und Hunde für das Einsatzende; ohne Netz bzw. Server vor 1.14.1 null (dann Vorauswahl des Servers) */
+    suspend fun vorOrt(): ELVorOrt? = einsatz?.let { e -> runCatching { e.vorOrt() }.getOrNull() }
     suspend fun ergebnisse(): List<ELErgebnis> = einsatz?.let { e -> runCatching { e.ergebnisse() }.getOrNull() } ?: emptyList()
 
     fun einsatzEndeGelesen() {

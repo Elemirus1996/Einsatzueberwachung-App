@@ -117,9 +117,25 @@ data class ELEinsatzEnde(val archivId: String? = null, val einsatzNummer: String
     }
 }
 
+/** Anwesenheit für das Einsatzende (`GET /einsatz/vorort`, Server 1.14.1), Vorauswahl = in einem Team eingeteilt */
+data class ELVorOrt(val personal: List<Eintrag> = emptyList(), val hunde: List<Eintrag> = emptyList()) {
+    data class Eintrag(val id: String, val name: String, val vorausgewaehlt: Boolean)
+
+    companion object {
+        fun aus(json: JSONObject): ELVorOrt = try {
+            fun liste(a: JSONArray?) = a?.let { (0 until it.length()).map { i -> it.getJSONObject(i) } }
+                ?.map { Eintrag(it.getString("id"), it.optString("name"), it.optBoolean("vorausgewaehlt", false)) } ?: emptyList()
+            ELVorOrt(liste(json.optJSONArray("personal")), liste(json.optJSONArray("hunde")))
+        } catch (e: JSONException) {
+            throw SchnittstellenFehler.AntwortUngueltig
+        }
+    }
+}
+
 interface ELEinsatzSchnittstelle {
     suspend fun vorlage(): ELVorlage
     suspend fun ergebnisse(): List<ELErgebnis>
+    suspend fun vorOrt(): ELVorOrt
 }
 
 fun ELAktion.Companion.einsatzStart(d: ELEinsatzStart): ELAktion {
@@ -139,11 +155,16 @@ fun ELAktion.Companion.einsatzBeenden(
     endzeitMs: Long? = null,
     bemerkungen: String? = null,
     mitPunkten: Boolean = false,
+    /** Wer vor Ort war (IDs aus `GET /einsatz/vorort`); null = Vorauswahl des Servers aus den Teams */
+    personalIds: List<String>? = null,
+    hundeIds: List<String>? = null,
 ): ELAktion {
     val pdf = JSONObject().put("tracks", mitTracks).put("kartenart", kartenart)
         .put("teamIds", teamIds?.let { JSONArray(it) } ?: JSONObject.NULL).put("punkte", mitPunkten)
     val inhalt = JSONObject().put("ergebnis", ergebnis).put("ressourcenGeprueft", true).put("pdf", pdf)
     endzeitMs?.let { inhalt.put("endzeit", ELEinsatzEnde.utc(it)) }
     bemerkungen?.trim()?.takeIf { it.isNotEmpty() }?.let { inhalt.put("bemerkungen", it) }
+    personalIds?.let { inhalt.put("personalIds", JSONArray(it)) }
+    hundeIds?.let { inhalt.put("hundeIds", JSONArray(it)) }
     return ELAktion.neu("einsatz/beenden", "Einsatz beenden", inhalt)
 }

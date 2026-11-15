@@ -80,4 +80,16 @@ class ELEinsatzTest {
         assertNull(kaputt.archivId)
         assertEquals("Einsatz beendet und archiviert.", kaputt.meldung)
     }
+
+    @Test fun beendenMitAnwesenheit() {
+        val ohne = ELAktion.einsatzBeenden("x", mitTracks = true).koerper()
+        assertFalse("ohne Liste = Vorauswahl des Servers", ohne.has("personalIds") || ohne.has("hundeIds"))
+        val mit = ELAktion.einsatzBeenden("x", mitTracks = true, personalIds = listOf("p1"), hundeIds = emptyList()).koerper()
+        assertEquals("p1", mit.getJSONArray("personalIds").getString(0))
+        assertEquals("leere Liste = niemand", 0, mit.getJSONArray("hundeIds").length())
+        val liste = ELVorOrt.aus(JSONObject("""{ "personal": [ { "id": "p1", "name": "Anna Berg", "vorausgewaehlt": true } ],
+            "hunde": [ { "id": "h1", "name": "Rex", "vorausgewaehlt": false } ] }"""))
+        assertEquals(ELVorOrt.Eintrag("p1", "Anna Berg", true), liste.personal.single())
+        assertFalse(liste.hunde.single().vorausgewaehlt)
+    }
 }

@@ -387,6 +387,8 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle,
 
     func vorlage() async throws -> ELVorlage { try await anfrage("einsatz/vorlage", methode: "GET", inhalt: nil) }
 
+    func vorOrt() async throws -> ELVorOrt { try await anfrage("einsatz/vorort", methode: "GET", inhalt: nil) }
+
     func halsbaender() async throws -> ELHalsbaender { try await anfrage("halsbaender", methode: "GET", inhalt: nil) }
 
     /// Neues Token ohne Passwort (#141). Das alte ist danach gesperrt; die Antwort ersetzt die Sitzung nicht selbst.
