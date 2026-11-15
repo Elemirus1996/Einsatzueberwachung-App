@@ -30,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -71,7 +72,15 @@ import org.maplibre.android.style.sources.GeoJsonSource
  * gestrichelt, Laufwege je Team, Halsbänder, Team-Handys, Einsatzleitung und ELW. Positionen bewegen sich live.
  */
 @Composable
-fun ELLagekarteScreen(karte: ELKartenAnsicht, teams: List<ELLage.Team>, betrieb: io.github.elemirus1996.einsatzspur.kern.ELBetrieb, zurueck: () -> Unit) {
+fun ELLagekarteScreen(
+    karte: ELKartenAnsicht,
+    teams: List<ELLage.Team>,
+    betrieb: io.github.elemirus1996.einsatzspur.kern.ELBetrieb,
+    lage: ELLage? = null,
+    /** Im Tablet-Leitstand ohne eigenen Kopf */
+    mitKopf: Boolean = true,
+    zurueck: (() -> Unit)? = null,
+) {
     val lebenszyklus = LocalLifecycleOwner.current
     val daten by karte.karte.collectAsState()
     val tracks by karte.tracks.collectAsState()
@@ -84,7 +93,7 @@ fun ELLagekarteScreen(karte: ELKartenAnsicht, teams: List<ELLage.Team>, betrieb:
     var gewaehltesGebiet by remember { mutableStateOf<ELKarte.Suchgebiet?>(null) }
     val bereich = rememberCoroutineScope()
     val (ansicht, m) = rememberMapView()
-    BackHandler(onBack = zurueck)
+    zurueck?.let { BackHandler(onBack = it) }
 
     // Abrufe nur, solange die Karte sichtbar ist
     DisposableEffect(lebenszyklus, karte) {
@@ -185,11 +194,8 @@ fun ELLagekarteScreen(karte: ELKartenAnsicht, teams: List<ELLage.Team>, betrieb:
     }
 
     Surface(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().safeDrawingPadding()) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 8.dp)) {
-                TextButton(onClick = zurueck) { Text("‹ Zurück") }
-                Text("Lagekarte", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            }
+        Column(Modifier.fillMaxSize()) {
+            if (mitKopf) ELReiterKopf("Karte", lage)
             Box(Modifier.fillMaxSize()) {
                 AndroidView({ ansicht }, Modifier.matchParentSize())
                 val k = m
@@ -337,8 +343,9 @@ private fun Beschriftung(karte: MapLibreMap, ort: Koordinate, text: String, uebe
                     p.place((punkt.x - p.width / 2f).toInt(), y.toInt())
                 }
             }
-            .background(Color(0xE6FFFFFF), RoundedCornerShape(6.dp))
-            .padding(horizontal = 4.dp, vertical = 2.dp),
+            .shadow(2.dp, RoundedCornerShape(10.dp))
+            .background(Color.White, RoundedCornerShape(10.dp))
+            .padding(horizontal = 8.dp, vertical = 4.dp),
     )
 }
 

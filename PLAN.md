@@ -243,7 +243,7 @@ Android:
 - [x] 6.3 EL-Anmeldung per QR: Scanner in der EL-Anmeldung übernimmt den Server aus `https://<intern>/el`, Passwort von Hand (Server #188)
 - [x] 6.4 Suchgebiet einem Team zuweisen: Gebiet auf der EL-Karte antippen, Team wählen oder Zuweisung aufheben, Rückfrage beim Wechsel (Server #189)
 - [x] Punkt 9 Gestaltung iOS (15.11.2026, Paul: Kopf in Staffelrot, Funk als Chat, Vorbild ruhiger Material-Stil): einheitlicher roter Kopf mit Status-Chips auf allen Reitern, weiße Karten, Funk als Chat, Vermisst als Steckbrief, iPad quer als Leitstand (Teams, Karte, Funk)
-- [ ] Punkt 9 Gestaltung Android angleichen (gleiche Bausteine, Tablet-Leitstand)
+- [x] Punkt 9 Gestaltung Android angleichen (gleiche Bausteine, Leiste unten bzw. Tablet links, Tablet-Leitstand); optisch noch auf einem Gerät prüfen
 
 ### Phase 4 – Test (TestFlight / interner Play-Test)
 - [ ] Übung mit 2–3 Teams und Einsatzleitung
