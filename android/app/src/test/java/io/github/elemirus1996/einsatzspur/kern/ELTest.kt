@@ -321,4 +321,19 @@ class ELTokenWechselTest {
         assertNull(HalsbandAkku.text(72))
         assertNull(HalsbandAkku.text(null))
     }
+
+    @Test fun ortungsHinweiseFunklochUndAkku() {
+        val basis = ELLage.aus(JSONObject(LAGE_JSON)).teams.first()
+        var team = basis.copy(suche = basis.suche.copy(status = TeamLage.SucheStatus.LAEUFT),
+            halsband = ELLage.Geraet("HB-7", null, null, 3), handy = ELLage.Geraet(null, null, null, 64))
+        assertTrue("ein Gerät meldet sich noch", OrtungsHinweise.texte(team, 30, 400).isEmpty())
+        assertEquals(listOf("Kein Signal seit 3 min"), OrtungsHinweise.texte(team, 200, 400))
+        assertEquals(listOf("Kein Signal"), OrtungsHinweise.texte(team, null, null))
+        team = team.copy(suche = team.suche.copy(status = TeamLage.SucheStatus.KURZPAUSE))
+        assertTrue("nur während der Suche", OrtungsHinweise.texte(team, 900, 900).isEmpty())
+        team = team.copy(halsband = team.halsband!!.copy(akku = 1), handy = team.handy!!.copy(akku = 12))
+        assertEquals(listOf("Halsband-Akku niedrig", "Handy-Akku 12 %"), OrtungsHinweise.texte(team, 5, 5))
+        team = team.copy(halsband = null, handy = null, suche = team.suche.copy(status = TeamLage.SucheStatus.LAEUFT))
+        assertTrue("ohne Geräte kein Funkloch", OrtungsHinweise.texte(team, null, null).isEmpty())
+    }
 }

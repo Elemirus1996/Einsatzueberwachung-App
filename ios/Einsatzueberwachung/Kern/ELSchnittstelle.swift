@@ -524,3 +524,24 @@ enum HalsbandAkku {
         }
     }
 }
+
+/// Hinweise auf der Teamkarte der Einsatzleitung: schwacher Akku und Funkloch (keine Position mehr während der Suche).
+enum ELOrtungsHinweis {
+    /// Ab so langer Stille aller Geräte eines suchenden Teams gilt es als Funkloch
+    static let funklochNach: TimeInterval = 180
+    static let handyAkkuNiedrig = 15
+
+    static func texte(team: ELLage.Team, alterHalsband: TimeInterval?, alterHandy: TimeInterval?) -> [String] {
+        var texte: [String] = []
+        if team.suche.status == .laeuft, team.halsband != nil || team.handy != nil {
+            let alter = [team.halsband.map { _ in alterHalsband ?? .infinity }, team.handy.map { _ in alterHandy ?? .infinity }]
+                .compactMap { $0 }
+            if let juengste = alter.min(), juengste >= funklochNach {
+                texte.append(juengste.isFinite ? "Kein Signal seit \(Int(juengste / 60)) min" : "Kein Signal")
+            }
+        }
+        if team.halsband?.akku == 1 { texte.append("Halsband-Akku niedrig") }
+        if let akku = team.handy?.akku, akku <= handyAkkuNiedrig { texte.append("Handy-Akku \(akku) %") }
+        return texte
+    }
+}

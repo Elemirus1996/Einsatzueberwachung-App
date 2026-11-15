@@ -615,3 +615,26 @@ struct HalsbandAkkuTests {
         #expect(HalsbandAkku.text(nil) == nil)
     }
 }
+
+@MainActor
+struct ELOrtungsHinweisTests {
+    @Test func funklochUndAkku() throws {
+        var team = try #require(try ELAnsichtTests.lage().teams.first)
+        team.suche.status = .laeuft
+        team.halsband = .init(id: "HB-7", name: nil, zeit: nil, akku: 3)
+        team.handy = .init(id: nil, name: nil, zeit: nil, akku: 64)
+        #expect(ELOrtungsHinweis.texte(team: team, alterHalsband: 30, alterHandy: 400).isEmpty, "ein Gerät meldet sich noch")
+        #expect(ELOrtungsHinweis.texte(team: team, alterHalsband: 200, alterHandy: 400) == ["Kein Signal seit 3 min"])
+        #expect(ELOrtungsHinweis.texte(team: team, alterHalsband: nil, alterHandy: nil) == ["Kein Signal"])
+        team.suche.status = .kurzpause
+        #expect(ELOrtungsHinweis.texte(team: team, alterHalsband: 900, alterHandy: 900).isEmpty, "nur während der Suche")
+
+        team.halsband?.akku = 1
+        team.handy?.akku = 12
+        #expect(ELOrtungsHinweis.texte(team: team, alterHalsband: 5, alterHandy: 5) == ["Halsband-Akku niedrig", "Handy-Akku 12 %"])
+        team.halsband = nil
+        team.handy = nil
+        team.suche.status = .laeuft
+        #expect(ELOrtungsHinweis.texte(team: team, alterHalsband: nil, alterHandy: nil).isEmpty, "ohne Geräte kein Funkloch")
+    }
+}
