@@ -147,7 +147,9 @@ private fun Eintrag(n: ELNotiz, teams: List<ELLage.Team>, antworten: (() -> Unit
     val druck = Modifier.combinedClickable(onClick = {}, onLongClick = { if (antworten != null || loeschen != null) menue = true })
     when (n.art) {
         "status", "system" -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Text("${n.von?.let { "$it: " } ?: ""}${n.text} · ${uhrzeit(n.zeitMs)}",
+            // Statusmeldungen der Teams bringen den Teamnamen schon mit („[Team Bravo] …“), dann kein zweites Mal davor
+            val vorsatz = n.von?.takeUnless { n.text.startsWith("[$it]") }?.let { "$it: " } ?: ""
+            Text("$vorsatz${n.text} · ${uhrzeit(n.zeitMs)}",
                 style = MaterialTheme.typography.bodySmall, color = ELStil.vermerk,
                 modifier = Modifier.background(ELStil.platteTief, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp))
         }
