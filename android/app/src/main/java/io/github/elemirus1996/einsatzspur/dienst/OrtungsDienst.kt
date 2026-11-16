@@ -83,7 +83,7 @@ class OrtungsDienst : Service() {
             this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Builder(this, KANAL)
-            .setSmallIcon(R.drawable.ic_launcher_monochrome)
+            .setSmallIcon(R.drawable.ic_mitteilung)
             .setContentTitle("EinsatzSpur")
             .setContentText(text)
             .setOngoing(true)

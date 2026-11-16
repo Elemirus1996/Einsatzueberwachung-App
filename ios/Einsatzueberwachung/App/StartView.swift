@@ -53,21 +53,20 @@ struct StartView: View {
 
     private var kopf: some View {
         VStack(spacing: 12) {
-            Group {
-                if let logo = heimat.logo {
-                    Image(uiImage: logo)
-                        .resizable()
-                        .scaledToFit()
-                } else {
-                    Image("AppSymbol")
-                        .resizable()
-                        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-                }
+            if let logo = heimat.logo {
+                Image(uiImage: logo)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 96, height: 96)
+                    .accessibilityHidden(true)
             }
-            .frame(width: 96, height: 96)
-            .accessibilityHidden(true)
-            Text("EinsatzSpur")
-                .font(.largeTitle.bold())
+            // Langes Logo mit Schriftzug, helle und dunkle Fassung im Asset-Katalog
+            Image("EinsatzSpurLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: 300)
+                .accessibilityLabel("EinsatzSpur")
+                .accessibilityAddTraits(.isHeader)
             if let staffel = heimat.eintrag?.staffel {
                 Text(staffel)
                     .font(.title3)
