@@ -7,11 +7,11 @@ import org.json.JSONObject
 import java.io.File
 
 /** Feste Kennung, Name und Logo-Fassung des Servers (APP_API.md Abschnitt 10, Server #121). */
-data class ServerInfo(val kennung: String, val staffel: String?, val logoVersion: String?) {
+data class ServerInfo(val kennung: String, val staffel: String?, val logoVersion: String?, val packlisteVersion: String? = null) {
     companion object {
         fun aus(json: JSONObject?): ServerInfo? {
             val kennung = json?.textOderNull("kennung") ?: return null
-            return ServerInfo(kennung, json.textOderNull("staffel"), json.textOderNull("logoVersion"))
+            return ServerInfo(kennung, json.textOderNull("staffel"), json.textOderNull("logoVersion"), json.textOderNull("packlisteVersion"))
         }
     }
 }

@@ -60,6 +60,7 @@ class MainActivity : ComponentActivity() {
                 val elHinweis by modell.elHinweis.collectAsState()
                 var elAnmeldungOffen by remember { mutableStateOf(elHinweis != null) }
                 var einstellungenOffen by remember { mutableStateOf(false) }
+                var packlisteOffen by remember { mutableStateOf(false) }
                 val datenschutzFrage by modell.datenschutzFrage.collectAsState()
                 val heimatFrage by modell.heimatFrage.collectAsState()
                 val ortung = team
@@ -68,7 +69,9 @@ class MainActivity : ComponentActivity() {
                 val elO = elOrtung
                 val elA = elAnsicht
                 val elB = elBetrieb
-                if (einstellungenOffen) {
+                if (packlisteOffen) {
+                    PacklisteScreen(modell.packliste, zurueck = { packlisteOffen = false })
+                } else if (einstellungenOffen) {
                     EinstellungenScreen(modell.heimat, modell.datenschutz.alle(), version(), modell.toene, zurueck = { einstellungenOffen = false })
                 } else if (elO != null && elA != null && elB != null) {
                     ELUebersichtScreen(elA, elO, elB, elKarte, elVermisste, elVerlaengerung, modell.toene, abmelden = {
@@ -118,6 +121,7 @@ class MainActivity : ComponentActivity() {
                             einsatzZugang, anmelden, zugangUngueltig = modell::zugangUngueltig, einsatzleitung = { elAnmeldungOffen = true },
                             vorAuswahl = vorAuswahl, datenschutzOffen = datenschutzFrage != null,
                             heimat = modell.heimat, einstellungen = { einstellungenOffen = true },
+                            packliste = modell.packliste, packlisteOeffnen = { packlisteOffen = true },
                         )
                     }
                 }

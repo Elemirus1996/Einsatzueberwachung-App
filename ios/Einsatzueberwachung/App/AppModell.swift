@@ -60,6 +60,7 @@ final class AppModell: ObservableObject {
     }
 
     let heimat = HeimatStaffel()
+    let packliste = Packliste()
     private let mitteiler: Mitteiler = LokaleMitteilungen()
     private var abmeldung = Abmeldung.server
 
@@ -68,6 +69,7 @@ final class AppModell: ObservableObject {
     private lazy var puffer = PositionsPuffer.standard()
 
     init() {
+        packliste.erinnerungPlanen()
         einsatzZugang = schluesselbund.lesen(TeamQRCode.self, konto: Schluesselbund.kontoEinsatzZugang)
         if let el = schluesselbund.lesen(ELSitzung.self, konto: Schluesselbund.kontoEL) {
             elStarten(el)
@@ -159,10 +161,26 @@ final class AppModell: ObservableObject {
         }
         heimat.uebernehmen(frage.info, name: frage.name)
         if let sitzung = teamSitzung {
-            Task { await heimat.aktualisieren(frage.info) { try await TeamClient(sitzung: sitzung).logo() } }
+            let client = TeamClient(sitzung: sitzung)
+            Task { await heimatAktualisieren(frage.info, logo: client.logo, packliste: client.packliste) }
         } else if let el = elSitzung {
-            Task { await heimat.aktualisieren(frage.info) { try await ELClient(sitzung: el).logo() } }
+            let client = ELClient(sitzung: el)
+            Task { await heimatAktualisieren(frage.info, logo: client.logo, packliste: client.packliste) }
         }
+    }
+
+    /// Name, Logo und Packliste der Heimatstaffel nachziehen; fremde Staffeln ändern nichts
+    private func heimatAktualisieren(_ info: ServerInfo, logo: () async throws -> Data?,
+                                     packliste laden: () async throws -> PacklisteVorlage?) async {
+        await heimat.aktualisieren(info, laden: logo)
+        guard heimat.istHeimat(info) else { return }
+        await packliste.aktualisieren(version: info.packlisteVersion, laden: laden)
+    }
+
+    /// Einstellungen: Heimatstaffel vergessen, ihre Packliste mit
+    func heimatEntfernen() {
+        heimat.entfernen()
+        packliste.vorlageEntfernen()
     }
 
     private func teamAnmelden(_ sitzung: TeamSitzung) {
@@ -228,7 +246,8 @@ final class AppModell: ObservableObject {
         if let info, heimat.sollFragen(info) {
             heimatFragen(info, name: info.staffel ?? server.name)
         } else if let info {
-            Task { await heimat.aktualisieren(info) { try await ELClient(sitzung: sitzung).logo() } }
+            let client = ELClient(sitzung: sitzung)
+            Task { await heimatAktualisieren(info, logo: client.logo, packliste: client.packliste) }
         }
         elStarten(sitzung)
     }
@@ -353,7 +372,7 @@ final class AppModell: ObservableObject {
             if let kennung = config.server?.kennung { teamKennung = kennung }
             datenschutzVersionPruefen(config.datenschutz?.version, kennung: teamKennung) { try await client.datenschutz() }
             if let server = config.server {
-                await heimat.aktualisieren(server) { try await client.logo() }
+                await heimatAktualisieren(server, logo: client.logo, packliste: client.packliste)
             }
         } catch SchnittstellenFehler.beendet {
             team.anwenden(.stop)

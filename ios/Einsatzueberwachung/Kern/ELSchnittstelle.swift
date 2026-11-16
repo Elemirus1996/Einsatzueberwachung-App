@@ -323,6 +323,15 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle,
         }
     }
 
+    /// Packliste der Staffel (Team-Rolle Abschnitt 14); `nil`, wenn keine hinterlegt ist (404)
+    func packliste() async throws -> PacklisteVorlage? {
+        do {
+            return try await anfrage("packliste", methode: "GET", inhalt: nil) as PacklisteVorlage
+        } catch SchnittstellenFehler.server(let status) where status == 404 {
+            return nil
+        }
+    }
+
     func logo() async throws -> Data? {
         let (daten, http) = try await roh("logo", methode: "GET", inhalt: nil)
         switch http.statusCode {

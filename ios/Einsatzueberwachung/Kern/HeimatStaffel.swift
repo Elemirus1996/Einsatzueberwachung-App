@@ -6,6 +6,8 @@ struct ServerInfo: Decodable, Equatable, Sendable {
     var kennung: String
     var staffel: String?
     var logoVersion: String?
+    /// Stand der Packliste der Staffel (Abschnitt 14); fehlt bei älteren Servern
+    var packlisteVersion: String?
 }
 
 /// Die eigene Staffel des Nutzers: Nur ihr Name und Logo erscheinen auf der Startseite.

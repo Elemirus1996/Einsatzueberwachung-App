@@ -57,6 +57,10 @@ class TeamClient(private val sitzung: TeamSitzung) : TeamSchnittstelle, TeamAnsi
     suspend fun datenschutz(): Datenschutz? =
         datenschutzAbrufen(sitzung.server.pfad("api/team-mobile/app/v1/datenschutz"), sitzung.token) { a, m, i, t -> http(a, m, i, t) }
 
+    /** Packliste der Staffel; 404 = keine (Abschnitt 14) */
+    suspend fun packliste(): PacklisteVorlage? =
+        packlisteAbrufen(sitzung.server.pfad("api/team-mobile/app/v1/packliste"), sitzung.token) { a, m, i, t -> http(a, m, i, t) }
+
     /** Logo der Staffel als PNG; 404 = keins (Abschnitt 10) */
     suspend fun logo(): ByteArray? = logoAbrufen(sitzung.server.pfad("api/team-mobile/app/v1/logo"), sitzung.token)
 
@@ -211,6 +215,16 @@ internal suspend fun datenschutzAbrufen(adresse: String, token: String, transpor
     val (status, text) = transport(adresse, "GET", null, token)
     return when (status) {
         in 200..299 -> runCatching { JSONObject(text) }.getOrNull()?.let(Datenschutz::aus) ?: throw SchnittstellenFehler.AntwortUngueltig
+        404 -> null
+        410 -> throw SchnittstellenFehler.Beendet
+        else -> throw SchnittstellenFehler.Server(status)
+    }
+}
+
+internal suspend fun packlisteAbrufen(adresse: String, token: String, transport: Transport): PacklisteVorlage? {
+    val (status, text) = transport(adresse, "GET", null, token)
+    return when (status) {
+        in 200..299 -> runCatching { JSONObject(text) }.getOrNull()?.let(PacklisteVorlage::aus) ?: throw SchnittstellenFehler.AntwortUngueltig
         404 -> null
         410 -> throw SchnittstellenFehler.Beendet
         else -> throw SchnittstellenFehler.Server(status)

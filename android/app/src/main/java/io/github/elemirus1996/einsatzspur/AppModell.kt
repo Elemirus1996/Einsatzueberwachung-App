@@ -1,5 +1,8 @@
 package io.github.elemirus1996.einsatzspur
 
+import io.github.elemirus1996.einsatzspur.kern.Packliste
+import io.github.elemirus1996.einsatzspur.kern.PacklisteErinnerung
+import io.github.elemirus1996.einsatzspur.kern.PacklisteVorlage
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -133,6 +136,8 @@ class AppModell(private val context: Context) {
     }
     val datenschutz = DatenschutzSpeicher(einstellungsAblage)
     val heimat = HeimatStaffel(einstellungsAblage, File(context.filesDir, "heimatstaffel-logo.png"))
+    /** Packliste der Heimatstaffel und eigene Punkte, nur auf dem Gerät (APP_API.md Team-Rolle Abschnitt 14) */
+    val packliste = Packliste(einstellungsAblage) { PacklisteErinnerung.planen(context, it) }
     /** Ton je Art von Meldung, Einstellung dieses Geräts (APP_API.md „Töne in den Apps“) */
     val toene = Toene(einstellungsAblage, ::tonAbspielen)
 
@@ -162,6 +167,9 @@ class AppModell(private val context: Context) {
     private var teamKennung: String? = null
 
     init {
+        packliste.erinnerungPlanen()
+        // Heimatstaffel in den Einstellungen entfernt: ihre Packliste mit
+        bereich.launch { heimat.eintrag.collect { if (it == null) packliste.vorlageEntfernen() } }
         schluesselbund.elSitzungLesen()?.let { elStarten(it) }
         schluesselbund.sitzungLesen()?.let {
             teamStarten(it)
@@ -295,9 +303,15 @@ class AppModell(private val context: Context) {
         val team = _sitzung.value
         val el = _elSitzung.value
         bereich.launch {
-            if (team != null) heimat.aktualisieren(info) { TeamClient(team).logo() }
-            else if (el != null) heimat.aktualisieren(info) { ELClient(ELZugang(el)).logo() }
+            if (team != null) TeamClient(team).let { heimatAktualisieren(info, it::logo, it::packliste) }
+            else if (el != null) ELClient(ELZugang(el)).let { heimatAktualisieren(info, it::logo, it::packliste) }
         }
+    }
+
+    /** Name, Logo und Packliste der Heimatstaffel nachziehen; fremde Staffeln ändern nichts */
+    private suspend fun heimatAktualisieren(info: ServerInfo, logo: suspend () -> ByteArray?, laden: suspend () -> PacklisteVorlage?) {
+        heimat.aktualisieren(info, logo)
+        if (heimat.istHeimat(info)) packliste.aktualisieren(info.packlisteVersion, laden)
     }
 
     // MARK: Einsatzleitung
@@ -314,7 +328,7 @@ class AppModell(private val context: Context) {
         if (info != null && heimat.sollFragen(info)) {
             heimatFragen(info, info.staffel ?: server.name)
         } else if (info != null) {
-            bereich.launch { heimat.aktualisieren(info) { ELClient(ELZugang(sitzung)).logo() } }
+            bereich.launch { ELClient(ELZugang(sitzung)).let { heimatAktualisieren(info, it::logo, it::packliste) } }
         }
         elStarten(sitzung)
     }
@@ -469,7 +483,7 @@ class AppModell(private val context: Context) {
                 team.anwenden(config.steuerung)
                 config.server?.let { info ->
                     teamKennung = info.kennung
-                    heimat.aktualisieren(info) { client.logo() }
+                    heimatAktualisieren(info, client::logo, client::packliste)
                 }
                 datenschutzVersionPruefen(config.datenschutzVersion, teamKennung) { client.datenschutz() }
             } catch (e: SchnittstellenFehler.Beendet) {

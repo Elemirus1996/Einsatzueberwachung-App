@@ -51,6 +51,26 @@ struct StartView: View {
         }
     }
 
+    /// Langes Logo mit Schriftzug füllt die Breite bis zum Einstellungen-Knopf, das Staffel-Logo steht darunter
+    private var kopfzeile: some View {
+        HStack(spacing: 12) {
+            Image("EinsatzSpurLogo")
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity, maxHeight: 72, alignment: .leading)
+                .accessibilityLabel("EinsatzSpur")
+                .accessibilityAddTraits(.isHeader)
+            Button { einstellungenOffen = true } label: {
+                Image(systemName: "gearshape")
+                    .font(.title2)
+                    .frame(width: 44, height: 44)
+                    .background(.quaternary, in: Circle())
+            }
+            .foregroundStyle(.primary)
+            .accessibilityLabel("Einstellungen")
+        }
+    }
+
     private var kopf: some View {
         VStack(spacing: 12) {
             if let logo = heimat.logo {
@@ -60,13 +80,6 @@ struct StartView: View {
                     .frame(width: 96, height: 96)
                     .accessibilityHidden(true)
             }
-            // Langes Logo mit Schriftzug, helle und dunkle Fassung im Asset-Katalog
-            Image("EinsatzSpurLogo")
-                .resizable()
-                .scaledToFit()
-                .frame(maxWidth: 300)
-                .accessibilityLabel("EinsatzSpur")
-                .accessibilityAddTraits(.isHeader)
             if let staffel = heimat.eintrag?.staffel {
                 Text(staffel)
                     .font(.title3)
@@ -78,6 +91,7 @@ struct StartView: View {
 
     private var rollenAuswahl: some View {
         VStack(spacing: 16) {
+            kopfzeile
             Spacer()
             kopf
             Spacer()
@@ -92,18 +106,40 @@ struct StartView: View {
             } label: {
                 RollenKnopf(titel: "Einsatzleitung", text: "Nur im VPN der Staffel", symbol: "lock.shield")
             }
+            NavigationLink {
+                PacklisteView(liste: modell.packliste)
+            } label: {
+                PacklisteKnopf(liste: modell.packliste)
+            }
             Spacer()
         }
         // iPad: Knöpfe nicht über die ganze Breite ziehen
         .frame(maxWidth: 560)
         .frame(maxWidth: .infinity)
         .padding()
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { einstellungenOffen = true } label: { Image(systemName: "gearshape") }
-                    .accessibilityLabel("Einstellungen")
+        .toolbar(.hidden, for: .navigationBar)
+    }
+}
+
+/// Kleiner als die Rollen-Knöpfe: Packliste mit Stand „3 von 7“
+private struct PacklisteKnopf: View {
+    @ObservedObject var liste: Packliste
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "checklist").frame(width: 44)
+            Text("Packliste").font(.headline)
+            Spacer()
+            if liste.anzahl > 0 {
+                Text("\(liste.anzahlErledigt) von \(liste.anzahl)").foregroundStyle(.secondary).monospacedDigit()
             }
+            Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
         }
+        .padding(.horizontal)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity)
+        .background(.quaternary.opacity(0.6), in: RoundedRectangle(cornerRadius: 16))
+        .foregroundStyle(.primary)
     }
 }
 

@@ -404,6 +404,9 @@ class ELClient(
     /** Ganze Erklärung zum Nachlesen bzw. bei neuer Version; 404 = keine hinterlegt (#148) */
     suspend fun datenschutz(): Datenschutz? = datenschutzAbrufen(url("datenschutz"), sitzung.token, transport)
 
+    /** Packliste der Staffel; 404 = keine (Team-Rolle Abschnitt 14) */
+    suspend fun packliste(): PacklisteVorlage? = packlisteAbrufen(url("packliste"), sitzung.token, transport)
+
     /** Logo der Staffel als PNG; 404 = keins */
     suspend fun logo(): ByteArray? = logoAbrufen(url("logo"), sitzung.token)
 

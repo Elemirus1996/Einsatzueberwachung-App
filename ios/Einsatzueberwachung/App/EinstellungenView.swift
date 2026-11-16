@@ -71,7 +71,7 @@ struct EinstellungenView: View {
                 }
             }
             .confirmationDialog("Heimatstaffel entfernen?", isPresented: $entfernenFragen, titleVisibility: .visible) {
-                Button("Entfernen", role: .destructive) { heimat.entfernen() }
+                Button("Entfernen", role: .destructive) { modell.heimatEntfernen() }
             } message: {
                 Text("Bei der nächsten Anmeldung fragt die App erneut.")
             }
