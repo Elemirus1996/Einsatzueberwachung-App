@@ -50,7 +50,9 @@ struct ELFunkView: View {
     private func eintrag(_ notiz: ELNotiz) -> some View {
         switch notiz.art {
         case "status", "system":
-            Text("\(notiz.von.map { "\($0): " } ?? "")\(notiz.text) · \(notiz.zeit.formatted(date: .omitted, time: .shortened))")
+            // Statusmeldungen der Teams bringen den Teamnamen schon mit („[Team Bravo] …“), dann kein zweites Mal davor
+            let vorsatz = notiz.von.flatMap { notiz.text.hasPrefix("[\($0)]") ? nil : "\($0): " } ?? ""
+            Text("\(vorsatz)\(notiz.text) · \(notiz.zeit.formatted(date: .omitted, time: .shortened))")
                 .font(.caption)
                 .foregroundStyle(ELStil.vermerk)
                 .padding(.horizontal, 10)
