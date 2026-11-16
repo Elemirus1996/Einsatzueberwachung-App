@@ -138,4 +138,14 @@ struct ELQRCodeTests {
             #expect(ELQRCode(text) == nil, "\(text)")
         }
     }
+
+    /// Board el-qr-ip: Das Zertifikat gilt nur für den Namen, IP-Adressen lehnt die EL-Anmeldung ab
+    @Test func ipAdresseErkannt() throws {
+        for text in ["https://10.10.0.1", "https://10.10.0.1:8443/el", "https://[fd00::1]/el"] {
+            #expect(try #require(ServerAdresse(URL(string: text)!)).istIpAdresse, "\(text)")
+        }
+        for text in ["https://el.dein-einsatz.mywire.org", "https://einsatz.intern:8443", "https://10.10.0.1.nip.io", "https://300.1.1.1"] {
+            #expect(try #require(ServerAdresse(URL(string: text)!)).istIpAdresse == false, "\(text)")
+        }
+    }
 }

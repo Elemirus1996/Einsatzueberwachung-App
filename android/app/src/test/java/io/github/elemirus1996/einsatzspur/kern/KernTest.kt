@@ -2,6 +2,7 @@ package io.github.elemirus1996.einsatzspur.kern
 
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -93,6 +94,16 @@ class TeamWechselTest {
         for (text in listOf("http://einsatz.intern/el", "https://einsatz.intern/", "https://einsatz.intern/el/start",
             "https://einsatz.intern/team/login/ABC123", "https://nutzer:pw@einsatz.intern/el", "kein Link")) {
             assertEquals(text, null, ELQRCode.aus(text))
+        }
+    }
+
+    // Board el-qr-ip: Das Zertifikat gilt nur für den Namen, IP-Adressen lehnt die EL-Anmeldung ab
+    @Test fun ipAdresseErkannt() {
+        for (text in listOf("https://10.10.0.1", "https://10.10.0.1:8443/el", "https://[fd00::1]/el")) {
+            assertTrue(text, ServerAdresse.aus(text)!!.istIpAdresse)
+        }
+        for (text in listOf("https://el.dein-einsatz.mywire.org", "https://einsatz.intern:8443", "https://10.10.0.1.nip.io")) {
+            assertFalse(text, ServerAdresse.aus(text)!!.istIpAdresse)
         }
     }
 }

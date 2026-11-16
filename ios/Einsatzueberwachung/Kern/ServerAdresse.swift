@@ -29,6 +29,17 @@ struct ServerAdresse: Codable, Hashable, Sendable {
     func pfad(_ pfad: String) -> URL {
         url.appending(path: pfad)
     }
+
+    /// IPv4- oder IPv6-Adresse statt Name. Das Zertifikat des Servers gilt nur für den Namen; mit der IP-Adresse
+    /// scheitert die Verbindung (Fehler -1202), darum lehnt die EL-Anmeldung sie vorher ab (APP_API „native App“).
+    var istIpAdresse: Bool {
+        guard let host = url.host(percentEncoded: false) else { return false }
+        if host.contains(":") { return true }
+        let teile = host.split(separator: ".", omittingEmptySubsequences: false)
+        return teile.count == 4 && teile.allSatisfy { !$0.isEmpty && $0.count <= 3 && $0.allSatisfy(\.isNumber) && Int($0)! <= 255 }
+    }
+
+    static let ipAdresseHinweis = "Bitte den Namen der internen Adresse eintragen, nicht die IP-Adresse. Das Zertifikat des Servers gilt nur für den Namen."
 }
 
 /// Inhalt des bestehenden Team-QR-Codes: `https://<server>/team/login/<Anmelde-Code>`
