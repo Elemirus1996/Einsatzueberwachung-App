@@ -1,5 +1,10 @@
 package io.github.elemirus1996.einsatzspur.ui
 
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Row
+import io.github.elemirus1996.einsatzspur.kern.Packliste
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -78,6 +83,8 @@ fun StartScreen(
     datenschutzOffen: Boolean,
     heimat: HeimatStaffel,
     einstellungen: () -> Unit,
+    packliste: Packliste,
+    packlisteOeffnen: () -> Unit,
 ) {
     var anmeldungOffen by remember { mutableStateOf(false) }
     val heimatEintrag by heimat.eintrag.collectAsState()
@@ -88,11 +95,25 @@ fun StartScreen(
                 vorAuswahl = vorAuswahl, datenschutzOffen = datenschutzOffen)
             return@Surface
         }
-        Box(Modifier.fillMaxSize().safeDrawingPadding()) {
-            TextButton(onClick = einstellungen, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) { Text("Einstellungen") }
+        Column(Modifier.fillMaxSize().safeDrawingPadding()) {
+        // Langes Logo mit Schriftzug füllt die Breite bis zum Einstellungen-Knopf, das Staffel-Logo steht darunter
+        Row(
+            Modifier.fillMaxWidth().padding(start = 24.dp, end = 8.dp, top = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Image(
+                painterResource(R.drawable.logo_einsatzspur),
+                contentDescription = "EinsatzSpur",
+                Modifier.weight(1f).height(64.dp),
+                contentScale = ContentScale.Fit,
+                alignment = Alignment.CenterStart,
+            )
+            IconButton(onClick = einstellungen) {
+                Icon(painterResource(R.drawable.ic_einstellungen), contentDescription = "Einstellungen")
+            }
         }
         Column(
-            Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),
+            Modifier.fillMaxWidth().weight(1f).padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
         ) {
@@ -100,19 +121,13 @@ fun StartScreen(
             if (logoBild != null) {
                 Image(logoBild.asImageBitmap(), contentDescription = null, Modifier.size(96.dp))
             }
-            // Langes Logo mit Schriftzug, helle und dunkle Fassung (drawable-night)
-            Image(
-                painterResource(R.drawable.logo_einsatzspur),
-                contentDescription = "EinsatzSpur",
-                Modifier.widthIn(max = 300.dp).fillMaxWidth(),
-                contentScale = ContentScale.Fit,
-            )
             heimatEintrag?.let {
                 Text(it.staffel, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.height(32.dp))
             Rollenknopf("Team", "QR-Code aus dem Einsatz scannen", aktiv = true) { anmeldungOffen = true }
             Rollenknopf("Einsatzleitung", "Nur im VPN der Staffel, mit Staffel-Passwort", aktiv = true, aktion = einsatzleitung)
+            PacklisteKnopf(packliste, packlisteOeffnen)
             val context = androidx.compose.ui.platform.LocalContext.current
             var lizenzen by remember { mutableStateOf<String?>(null) }
             TextButton(onClick = { lizenzen = context.assets.open("lizenzen.txt").bufferedReader().use { it.readText() } }) {
@@ -126,6 +141,7 @@ fun StartScreen(
                     confirmButton = { TextButton(onClick = { lizenzen = null }) { Text("OK") } },
                 )
             }
+        }
         }
     }
 }

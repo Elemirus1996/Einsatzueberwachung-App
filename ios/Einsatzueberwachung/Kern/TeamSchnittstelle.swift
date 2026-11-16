@@ -90,6 +90,15 @@ extension TeamClient: TeamAnsichtSchnittstelle {
         }
     }
 
+    /// Packliste der Staffel (Abschnitt 14); `nil`, wenn keine hinterlegt ist (404)
+    func packliste() async throws -> PacklisteVorlage? {
+        do {
+            return try await anfrage("packliste", methode: "GET", inhalt: nil) as PacklisteVorlage
+        } catch SchnittstellenFehler.server(let status) where status == 404 {
+            return nil
+        }
+    }
+
     func tracks(seit: Int64?) async throws -> TeamTracks {
         try await anfrage("tracks", methode: "GET", inhalt: nil,
                           query: seit.map { [URLQueryItem(name: "seit", value: String($0))] } ?? [])
