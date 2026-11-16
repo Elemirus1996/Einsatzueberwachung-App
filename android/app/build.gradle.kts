@@ -11,6 +11,41 @@ val testSignierung = Properties().apply {
     if (datei.exists()) datei.inputStream().use { load(it) }
 }
 
+// Nur Debug-Build: Netzwerkregel für den lokalen Testserver im Emulator (localhost:7163 per adb reverse).
+// Liegt ~/.einsatzspur/dev-zertifikat.pem vor (öffentlicher Teil des .NET-Entwicklerzertifikats), vertraut der
+// Debug-Build zusätzlich diesem Zertifikat (debug-overrides). Ohne Datei gilt dieselbe Regel wie im Release.
+// Die Dateien entstehen im Build-Ordner, das Zertifikat kommt nie ins Repo.
+val devZertifikat = File(System.getProperty("user.home"), ".einsatzspur/dev-zertifikat.pem")
+val debugNetzwerkRes = layout.buildDirectory.dir("generated/debugNetzwerk/res").get().asFile
+run {
+    File(debugNetzwerkRes, "xml").mkdirs()
+    val raw = File(debugNetzwerkRes, "raw/dev_zertifikat.pem")
+    val overrides = if (devZertifikat.exists()) {
+        raw.parentFile.mkdirs()
+        devZertifikat.copyTo(raw, overwrite = true)
+        """
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="@raw/dev_zertifikat" />
+        </trust-anchors>
+    </debug-overrides>"""
+    } else {
+        raw.delete()
+        ""
+    }
+    File(debugNetzwerkRes, "xml/network_security_config.xml").writeText(
+        """<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>$overrides
+</network-security-config>
+"""
+    )
+}
+
 android {
     namespace = "io.github.elemirus1996.einsatzspur"
     compileSdk = 37
@@ -44,6 +79,10 @@ android {
             // Ohne Testschlüssel bleibt die Release-APK unsigniert (nicht installierbar)
             signingConfig = signingConfigs.findByName("test")
         }
+    }
+
+    sourceSets {
+        getByName("debug").res.srcDir(debugNetzwerkRes)
     }
 
     compileOptions {
