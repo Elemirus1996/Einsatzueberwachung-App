@@ -75,6 +75,11 @@ struct ELAnmeldungView: View {
     private var scanner: some View {
         NavigationStack {
             QRScannerView(gefunden: { text in
+                if let qr = ELQRCode(text), qr.server.istIpAdresse {
+                    // Code eines älteren Servers, über die IP-Adresse geöffnet
+                    scanHinweis = "Der Code enthält eine IP-Adresse. Die Einstellungen am Server über den Namen öffnen und neu scannen."
+                    return false
+                }
                 guard let qr = ELQRCode(text) else {
                     scanHinweis = TeamQRCode(text) != nil
                         ? "Das ist ein Team-Code. Für die Einsatzleitung den Code aus den Einstellungen scannen."
@@ -116,6 +121,10 @@ struct ELAnmeldungView: View {
         }
         guard let url = URL(string: text), let adresse = ServerAdresse(url) else {
             fehler = "Die Adresse ist ungültig."
+            return
+        }
+        guard !adresse.istIpAdresse else {
+            fehler = ServerAdresse.ipAdresseHinweis
             return
         }
         laedt = true

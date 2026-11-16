@@ -122,6 +122,8 @@ fun ELAnmeldungScreen(
         QrScanner(gefunden = { text ->
             val qr = ELQRCode.aus(text)
             when {
+                // Code eines älteren Servers, über die IP-Adresse geöffnet
+                qr != null && qr.server.istIpAdresse -> "Der Code enthält eine IP-Adresse. Die Einstellungen am Server über den Namen öffnen und neu scannen."
                 qr != null -> { scannerOffen = false; server = qr.server.name; ausQR = qr.server.name; null }
                 TeamQRCode.aus(text) != null -> "Das ist ein Team-Code. Für die Einsatzleitung den Code aus den Einstellungen scannen."
                 else -> "Das ist kein QR-Code für die Einsatzleitung."
@@ -179,6 +181,10 @@ fun ELAnmeldungScreen(
                         val adresse = ServerAdresse.aus(text)
                         if (adresse == null) {
                             fehler = "Die Adresse ist ungültig."
+                            return@Button
+                        }
+                        if (adresse.istIpAdresse) {
+                            fehler = ServerAdresse.IP_ADRESSE_HINWEIS
                             return@Button
                         }
                         laedt = true

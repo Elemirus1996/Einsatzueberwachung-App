@@ -14,7 +14,19 @@ value class ServerAdresse private constructor(val basis: String) {
     /** Ausdrücklich angegebener Port, sonst `null` (443) */
     val port: Int? get() = basis.substringAfter("://").substringAfter(':', "").toIntOrNull()
 
+    /**
+     * IPv4- oder IPv6-Adresse statt Name, wie iOS `istIpAdresse`. Das Zertifikat des Servers gilt nur für den Namen;
+     * mit der IP-Adresse scheitert die Verbindung, darum lehnt die EL-Anmeldung sie vorher ab (APP_API „native App“).
+     */
+    val istIpAdresse: Boolean get() {
+        if (name.startsWith("[")) return true
+        val teile = name.substringBefore(':').split('.')
+        return teile.size == 4 && teile.all { t -> t.isNotEmpty() && t.length <= 3 && t.all(Char::isDigit) && t.toInt() <= 255 }
+    }
+
     companion object {
+        const val IP_ADRESSE_HINWEIS = "Bitte den Namen der internen Adresse eintragen, nicht die IP-Adresse. Das Zertifikat des Servers gilt nur für den Namen."
+
         fun aus(text: String): ServerAdresse? {
             val uri = runCatching { URI(text.trim()) }.getOrNull() ?: return null
             if (!uri.scheme.equals("https", ignoreCase = true)) return null
