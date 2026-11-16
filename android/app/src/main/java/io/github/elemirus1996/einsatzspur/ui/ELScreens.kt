@@ -74,6 +74,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.elemirus1996.einsatzspur.kern.ELAnmeldeFehler
 import io.github.elemirus1996.einsatzspur.kern.ELAnsicht
@@ -84,6 +85,7 @@ import io.github.elemirus1996.einsatzspur.kern.ELBetrieb
 import io.github.elemirus1996.einsatzspur.kern.ELKartenAnsicht
 import io.github.elemirus1996.einsatzspur.kern.ELLage
 import io.github.elemirus1996.einsatzspur.kern.ELVerlaengerung
+import io.github.elemirus1996.einsatzspur.kern.ELSzenario
 import io.github.elemirus1996.einsatzspur.kern.ELVermissteAnsicht
 import io.github.elemirus1996.einsatzspur.kern.HalsbandAkku
 import io.github.elemirus1996.einsatzspur.kern.OrtungsHinweise
@@ -487,16 +489,19 @@ private fun EinsatzKopf(lage: ELLage?, verbindungsfehler: Boolean, jetzt: Long, 
     ) {
         val e = lage?.einsatz
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(
-                when {
-                    lage == null -> if (verbindungsfehler) "Keine Verbindung" else "Lade …"
-                    e?.aktiv == true -> e.stichwort?.takeIf { it.isNotBlank() } ?: "Einsatz"
-                    else -> "Kein Einsatz"
-                },
-                color = ELStil.aufRot, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, modifier = Modifier.weight(1f, fill = false),
-            )
-            if (e?.uebung == true) ELChip("Übung", Color.White)
-            Spacer(Modifier.weight(1f))
+            // Titel und Übung-Chip teilen sich den Platz links, der Titel kürzt mit „…“
+            Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    when {
+                        lage == null -> if (verbindungsfehler) "Keine Verbindung" else "Lade …"
+                        e?.aktiv == true -> e.stichwort?.takeIf { it.isNotBlank() } ?: "Einsatz"
+                        else -> "Kein Einsatz"
+                    },
+                    color = ELStil.aufRot, fontSize = 20.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    softWrap = false, modifier = Modifier.weight(1f, fill = false),
+                )
+                if (e?.uebung == true) ELChip("Übung", Color.White)
+            }
             Box {
                 TextButton(onClick = { menue = true }) { Text("•••", color = ELStil.aufRot, fontWeight = FontWeight.Bold) }
                 DropdownMenu(expanded = menue, onDismissRequest = { menue = false }) {
@@ -509,7 +514,7 @@ private fun EinsatzKopf(lage: ELLage?, verbindungsfehler: Boolean, jetzt: Long, 
         Row(verticalAlignment = Alignment.Bottom) {
             val zeile = when {
                 lage == null -> if (verbindungsfehler) "Ist WireGuard eingeschaltet?" else ""
-                e?.aktiv == true -> listOfNotNull(e.ort, e.szenario, e.einsatzleiter?.takeIf { it.isNotBlank() }?.let { "EL $it" }).joinToString(" · ")
+                e?.aktiv == true -> listOfNotNull(e.ort, e.szenario?.let { w -> ELSzenario.entries.firstOrNull { it.wert == w }?.anzeige ?: w }, e.einsatzleiter?.takeIf { it.isNotBlank() }?.let { "EL $it" }).joinToString(" · ")
                 else -> "Die Ortung der Einsatzleitung ist aus und startet, sobald ein Einsatz läuft."
             }
             Text(zeile, color = ELStil.aufRot.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
