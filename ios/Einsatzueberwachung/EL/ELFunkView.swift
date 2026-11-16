@@ -48,6 +48,15 @@ struct ELFunkView: View {
 
     @ViewBuilder
     private func eintrag(_ notiz: ELNotiz) -> some View {
+        if let meldung = Self.teamMeldung(notiz) {
+            teamBlase(notiz, meldung: meldung)
+        } else {
+            protokollEintrag(notiz)
+        }
+    }
+
+    @ViewBuilder
+    private func protokollEintrag(_ notiz: ELNotiz) -> some View {
         switch notiz.art {
         case "status", "system":
             // Statusmeldungen der Teams bringen den Teamnamen schon mit („[Team Bravo] …“), dann kein zweites Mal davor
@@ -75,14 +84,37 @@ struct ELFunkView: View {
         }
     }
 
+    /// Statusmeldung eines Teams (Knopf in der Team-App, Punkt gesetzt) als Blase links; „Funkkontakt benötigt“ hervorgehoben
+    private func teamBlase(_ notiz: ELNotiz, meldung: String) -> some View {
+        let dringend = Self.dringend(meldung)
+        let farbe = dringend ? ELStil.warnung2 : ELStil.vermerk
+        return HStack {
+            VStack(alignment: .leading, spacing: 3) {
+                Label("\(notiz.von ?? "Team") · \(notiz.zeit.formatted(date: .omitted, time: .shortened))",
+                      systemImage: dringend ? "antenna.radiowaves.left.and.right" : "figure.walk")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(farbe)
+                Text(meldung).foregroundStyle(ELStil.inschrift)
+            }
+            .padding(10)
+            .background(dringend ? ELStil.warnung2.opacity(0.12) : ELStil.platte,
+                        in: UnevenRoundedRectangle(topLeadingRadius: 14, bottomLeadingRadius: 4, bottomTrailingRadius: 14, topTrailingRadius: 14))
+            .overlay(UnevenRoundedRectangle(topLeadingRadius: 14, bottomLeadingRadius: 4, bottomTrailingRadius: 14, topTrailingRadius: 14)
+                .stroke(dringend ? ELStil.warnung2.opacity(0.5) : .clear))
+            .shadow(color: dringend ? .clear : ELStil.schatten, radius: 2, y: 1)
+            Spacer(minLength: 48)
+        }
+    }
+
     private func blase(_ notiz: ELNotiz, eigene: Bool) -> some View {
-        HStack {
+        let an = eigene ? Self.anTeam(notiz.text, teams: teams.map(\.teamName)) : nil
+        return HStack {
             if eigene { Spacer(minLength: 48) }
             VStack(alignment: .leading, spacing: 3) {
-                Text("\(absender(notiz)) · \(notiz.zeit.formatted(date: .omitted, time: .shortened))")
+                Text("\(an.map { "An \($0.team)" } ?? absender(notiz)) · \(notiz.zeit.formatted(date: .omitted, time: .shortened))")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(eigene ? ELStil.aktion : ELStil.vermerk)
-                Text(notiz.text).foregroundStyle(ELStil.inschrift)
+                Text(an?.text ?? notiz.text).foregroundStyle(ELStil.inschrift)
                 ForEach(notiz.antworten ?? []) { a in
                     Text("↳ \(a.text)").font(.subheadline).foregroundStyle(ELStil.vermerk)
                 }
@@ -105,6 +137,27 @@ struct ELFunkView: View {
         if notiz.loeschbar == true {
             Button(role: .destructive) { Task { await betrieb.ausfuehren(.notizLoeschen(notiz.id)) } } label: { Label("Löschen", systemImage: "trash") }
         }
+    }
+
+    /// Meldung eines Teams ohne den Namen in Klammern, sonst nil. Der Server schreibt sie als „[Team Bravo] im Suchgebiet eingetroffen“
+    /// (art status, mit teamId). Was die App selbst protokolliert („… (App)“) und Timer-Einträge bleiben Protokollzeilen.
+    nonisolated static func teamMeldung(_ notiz: ELNotiz) -> String? {
+        guard notiz.art == "status", notiz.teamId != nil, let von = notiz.von, notiz.text.hasPrefix("[\(von)] ") else { return nil }
+        let meldung = String(notiz.text.dropFirst(von.count + 3))
+        return meldung.hasSuffix("(App)") || meldung.isEmpty ? nil : meldung.prefix(1).uppercased() + meldung.dropFirst()
+    }
+
+    /// Meldungen, auf die die Einsatzleitung reagieren muss
+    nonisolated static func dringend(_ meldung: String) -> Bool {
+        meldung.hasPrefix("Funkkontakt")
+    }
+
+    /// Funkspruch der Einsatzleitung an ein Team: der Server stellt „@Team Bravo “ voran
+    nonisolated static func anTeam(_ text: String, teams: [String]) -> (team: String, text: String)? {
+        for team in teams.sorted(by: { $0.count > $1.count }) where text.hasPrefix("@\(team) ") {
+            return (team, String(text.dropFirst(team.count + 2)))
+        }
+        return nil
     }
 
     /// Eigene Einträge stehen rechts: von der Einsatzleitung oder löschbar (nur EL-Notizen sind löschbar)
