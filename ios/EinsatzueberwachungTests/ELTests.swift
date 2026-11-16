@@ -712,4 +712,29 @@ struct ELFunkChatTests {
         #expect(!ELFunkView.vonLeitung(try notiz(von: "Team Rex", loeschbar: false)))
         #expect(!ELFunkView.vonLeitung(try notiz(von: nil, loeschbar: nil)))
     }
+
+    private func status(_ text: String, von: String? = "Team Bravo", teamId: String? = "t1") throws -> ELNotiz {
+        var json: [String: Any] = ["id": "n2", "art": "status", "text": text, "zeit": "2026-11-16T20:03:00Z"]
+        if let von { json["von"] = von }
+        if let teamId { json["teamId"] = teamId }
+        return try JSONDecoder.server.decode(ELNotiz.self, from: JSONSerialization.data(withJSONObject: json))
+    }
+
+    @Test func teamMeldungenAlsBlase() throws {
+        #expect(ELFunkView.teamMeldung(try status("[Team Bravo] im Suchgebiet eingetroffen")) == "Im Suchgebiet eingetroffen")
+        #expect(ELFunkView.teamMeldung(try status("[Team Bravo] Funkkontakt benötigt")) == "Funkkontakt benötigt")
+        #expect(ELFunkView.dringend("Funkkontakt benötigt"))
+        #expect(!ELFunkView.dringend("im Suchgebiet eingetroffen"))
+        // Protokoll bleibt Zeile
+        #expect(ELFunkView.teamMeldung(try status("[Team Bravo] hat die Suche gestartet (App)")) == nil)
+        #expect(ELFunkView.teamMeldung(try status("Timer gestartet")) == nil)
+        #expect(ELFunkView.teamMeldung(try status("[Team Bravo] im Suchgebiet eingetroffen", teamId: nil)) == nil)
+    }
+
+    @Test func funkAnTeamOhneVorsatz() {
+        let an = ELFunkView.anTeam("@Team Bravo Bravo, bitte melden", teams: ["Team Alpha", "Team Bravo"])
+        #expect(an?.team == "Team Bravo")
+        #expect(an?.text == "Bravo, bitte melden")
+        #expect(ELFunkView.anTeam("Alle Teams: Sammelpunkt", teams: ["Team Bravo"]) == nil)
+    }
 }

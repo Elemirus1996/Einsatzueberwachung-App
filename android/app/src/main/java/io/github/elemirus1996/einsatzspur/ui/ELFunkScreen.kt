@@ -3,6 +3,7 @@ package io.github.elemirus1996.einsatzspur.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -138,6 +139,23 @@ fun ELFunkScreen(betrieb: ELBetrieb, teams: List<ELLage.Team>, lage: ELLage? = n
 /** Eigene Einträge stehen rechts: von der Einsatzleitung oder löschbar (nur EL-Notizen sind löschbar), wie iOS */
 internal fun vonLeitung(n: ELNotiz): Boolean = n.loeschbar || (n.von ?: "").contains("einsatzleitung", ignoreCase = true)
 
+/**
+ * Meldung eines Teams ohne den Namen in Klammern, sonst null. Der Server schreibt sie als „[Team Bravo] im Suchgebiet eingetroffen“
+ * (art status, mit teamId). Was die App selbst protokolliert („… (App)“) und Timer-Einträge bleiben Protokollzeilen. Wie iOS.
+ */
+internal fun teamMeldung(n: ELNotiz): String? {
+    val von = n.von ?: return null
+    if (n.art != "status" || n.teamId == null || !n.text.startsWith("[$von] ")) return null
+    return n.text.drop(von.length + 3).takeUnless { it.isEmpty() || it.endsWith("(App)") }?.replaceFirstChar { it.uppercase() }
+}
+
+/** Meldungen, auf die die Einsatzleitung reagieren muss */
+internal fun dringend(meldung: String): Boolean = meldung.startsWith("Funkkontakt")
+
+/** Funkspruch der Einsatzleitung an ein Team: der Server stellt „@Team Bravo “ voran */
+internal fun anTeam(text: String, teams: List<String>): Pair<String, String>? =
+    teams.sortedByDescending { it.length }.firstOrNull { text.startsWith("@$it ") }?.let { it to text.drop(it.length + 2) }
+
 private fun uhrzeit(ms: Long): String = DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(ms))
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -145,6 +163,26 @@ private fun uhrzeit(ms: Long): String = DateFormat.getTimeInstance(DateFormat.SH
 private fun Eintrag(n: ELNotiz, teams: List<ELLage.Team>, antworten: (() -> Unit)?, loeschen: (() -> Unit)?) {
     var menue by remember { mutableStateOf(false) }
     val druck = Modifier.combinedClickable(onClick = {}, onLongClick = { if (antworten != null || loeschen != null) menue = true })
+    val meldung = teamMeldung(n)
+    if (meldung != null) {
+        // Statusmeldung eines Teams als Blase links, „Funkkontakt benötigt“ hervorgehoben
+        val dringend = dringend(meldung)
+        val farbe = if (dringend) ELStil.warnung2 else ELStil.vermerk
+        val form = RoundedCornerShape(14.dp, 14.dp, 14.dp, 4.dp)
+        Row(Modifier.fillMaxWidth()) {
+            Column(
+                Modifier.widthIn(max = 300.dp)
+                    .background(if (dringend) ELStil.warnung2.copy(alpha = 0.12f) else ELStil.platte, form)
+                    .then(if (dringend) Modifier.border(1.dp, ELStil.warnung2.copy(alpha = 0.5f), form) else Modifier)
+                    .padding(10.dp),
+            ) {
+                Text("${n.von} · ${uhrzeit(n.zeitMs)}", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold, color = farbe)
+                Text(meldung, color = ELStil.inschrift)
+            }
+            Spacer(Modifier.weight(1f))
+        }
+        return
+    }
     when (n.art) {
         "status", "system" -> Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             // Statusmeldungen der Teams bringen den Teamnamen schon mit („[Team Bravo] …“), dann kein zweites Mal davor
@@ -156,7 +194,9 @@ private fun Eintrag(n: ELNotiz, teams: List<ELLage.Team>, antworten: (() -> Unit
         "funk" -> {
             val eigene = vonLeitung(n)
             val team = teams.firstOrNull { it.teamId == n.teamId }?.teamName
+            val an = if (eigene) anTeam(n.text, teams.map { it.teamName }) else null
             val absender = when {
+                an != null -> "An ${an.first}"
                 eigene && team != null -> "An $team"
                 !eigene && team != null -> team
                 else -> n.von ?: "Funk"
@@ -172,7 +212,7 @@ private fun Eintrag(n: ELNotiz, teams: List<ELLage.Team>, antworten: (() -> Unit
                     ) {
                         Text("$absender · ${uhrzeit(n.zeitMs)}", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold,
                             color = if (eigene) ELStil.aktion else ELStil.vermerk)
-                        Text(n.text, color = ELStil.inschrift)
+                        Text(an?.second ?: n.text, color = ELStil.inschrift)
                         n.antworten.forEach { Text("↳ ${it.text}", style = MaterialTheme.typography.bodyMedium, color = ELStil.vermerk) }
                     }
                     Menue(menue, { menue = false }, antworten, loeschen)
