@@ -1,0 +1,22 @@
+{
+  "images" : [
+    {
+      "filename" : "EinsatzSpurLogo-hell.png",
+      "idiom" : "universal"
+    },
+    {
+      "appearances" : [
+        {
+          "appearance" : "luminosity",
+          "value" : "dark"
+        }
+      ],
+      "filename" : "EinsatzSpurLogo-dunkel.png",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

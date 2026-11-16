@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
@@ -97,15 +99,14 @@ fun StartScreen(
             val logoBild = heimatLogo?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) }
             if (logoBild != null) {
                 Image(logoBild.asImageBitmap(), contentDescription = null, Modifier.size(96.dp))
-            } else {
-                Box(
-                    Modifier.size(96.dp).clip(RoundedCornerShape(22.dp)).background(Color(0xFF1D2A3A)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Image(painterResource(R.drawable.ic_launcher_foreground), contentDescription = null, Modifier.size(140.dp))
-                }
             }
-            Text("EinsatzSpur", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+            // Langes Logo mit Schriftzug, helle und dunkle Fassung (drawable-night)
+            Image(
+                painterResource(R.drawable.logo_einsatzspur),
+                contentDescription = "EinsatzSpur",
+                Modifier.widthIn(max = 300.dp).fillMaxWidth(),
+                contentScale = ContentScale.Fit,
+            )
             heimatEintrag?.let {
                 Text(it.staffel, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

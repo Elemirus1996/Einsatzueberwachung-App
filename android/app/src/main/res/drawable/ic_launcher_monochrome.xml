@@ -1,21 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- EinsatzSpur, einfarbige Ebene für Designfarben (Android 13). Motiv auf 80 % verkleinert, liegt in der Schutzzone (Kreis 66 dp). -->
+<!-- EinsatzSpur, einfarbige Ebene für Designfarben (Android 13). Erzeugt aus docs/marke/android-foreground.svg (Viewport 512). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
-    <group android:translateX="14" android:translateY="12.4" android:scaleX="0.8" android:scaleY="0.8">
-        <group android:rotation="-25" android:pivotX="27" android:pivotY="36">
-            <path android:fillColor="#FFFFFFFF" android:pathData="M20.5,36 a6.5,8.5 0 1,0 13.0,0 a6.5,8.5 0 1,0 -13.0,0 z" />
-        </group>
-        <group android:rotation="-8" android:pivotX="40" android:pivotY="24">
-            <path android:fillColor="#FFFFFFFF" android:pathData="M33.5,24 a6.5,9 0 1,0 13.0,0 a6.5,9 0 1,0 -13.0,0 z" />
-        </group>
-        <group android:rotation="8" android:pivotX="60" android:pivotY="24">
-            <path android:fillColor="#FFFFFFFF" android:pathData="M53.5,24 a6.5,9 0 1,0 13.0,0 a6.5,9 0 1,0 -13.0,0 z" />
-        </group>
-        <group android:rotation="25" android:pivotX="73" android:pivotY="36">
-            <path android:fillColor="#FFFFFFFF" android:pathData="M66.5,36 a6.5,8.5 0 1,0 13.0,0 a6.5,8.5 0 1,0 -13.0,0 z" />
-        </group>
-        <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd" android:pathData="M50,88 C44,78 31,69 31,56 A19,19 0 0,1 69,56 C69,69 56,78 50,88 Z M43,56 A7,7 0 1,0 57,56 A7,7 0 1,0 43,56 Z" />
+    android:viewportWidth="512" android:viewportHeight="512">
+    <!-- Motiv auf 66 % verkleinert, liegt in der Schutzzone (Kreis 66 dp) -->
+    <group android:translateX="87" android:translateY="87" android:scaleX="0.66" android:scaleY="0.66">
+        <path android:strokeColor="#FFFFFFFF" android:strokeAlpha="0.5" android:strokeWidth="16" android:pathData="M446.00,256.00 A190,190 0 0,1 441.81,295.71 M434.65,320.68 A190,190 0 0,1 417.19,356.59 M401.96,377.63 A190,190 0 0,1 373.32,405.45 M351.84,420.06 A190,190 0 0,1 315.44,436.46 M290.26,442.89 A190,190 0 0,1 250.45,445.92 M224.60,443.39 A190,190 0 0,1 186.13,432.69 M162.68,421.50 A190,190 0 0,1 130.16,398.35 M111.91,379.85 A190,190 0 0,1 89.21,347.01 M78.36,323.40 A190,190 0 0,1 68.19,284.79 M66.02,258.90 A190,190 0 0,1 69.61,219.14 M76.38,194.06 A190,190 0 0,1 93.29,157.89 M108.20,136.61 A190,190 0 0,1 136.41,108.36 M157.67,93.42 A190,190 0 0,1 193.81,76.46 M218.89,69.66 A190,190 0 0,1 258.65,66.02 M284.54,68.16 A190,190 0 0,1 323.16,78.27 M346.78,89.09 A190,190 0 0,1 379.66,111.75 M398.18,129.96 A190,190 0 0,1 421.38,162.46 M432.59,185.89 A190,190 0 0,1 443.34,224.34 M445.91,250.20 A190,190 0 0,1 446.00,256.00" />
+            <group android:pivotX="300" android:pivotY="246" android:scaleX="1.02" android:scaleY="1.02" android:translateX="-44" android:translateY="16">
+                <path android:fillColor="#FFFFFFFF" android:pathData="M300,236 C352,236 404,292 404,336 C404,372 372,384 344,378 C322,374 312,366 300,366 C288,366 278,374 256,378 C228,384 196,372 196,336 C196,292 248,236 300,236 Z" />
+                <group android:rotation="-28" android:pivotX="206" android:pivotY="196">
+                    <path android:fillColor="#FFFFFFFF" android:pathData="M172,196 a34,44 0 1,0 68,0 a34,44 0 1,0 -68,0 z" />
+                </group>
+                <group android:rotation="-8" android:pivotX="264" android:pivotY="140">
+                    <path android:fillColor="#FFFFFFFF" android:pathData="M228,140 a36,48 0 1,0 72,0 a36,48 0 1,0 -72,0 z" />
+                </group>
+                <group android:rotation="8" android:pivotX="336" android:pivotY="140">
+                    <path android:fillColor="#FFFFFFFF" android:pathData="M300,140 a36,48 0 1,0 72,0 a36,48 0 1,0 -72,0 z" />
+                </group>
+                <group android:rotation="28" android:pivotX="394" android:pivotY="196">
+                    <path android:fillColor="#FFFFFFFF" android:pathData="M360,196 a34,44 0 1,0 68,0 a34,44 0 1,0 -68,0 z" />
+                </group>
+            </group>
     </group>
 </vector>

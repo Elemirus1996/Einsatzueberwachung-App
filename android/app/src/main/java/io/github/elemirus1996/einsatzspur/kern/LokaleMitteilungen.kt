@@ -27,7 +27,7 @@ class LokaleMitteilungen(private val context: Context, private val imVordergrund
         })
         val oeffnen = PendingIntent.getActivity(context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         manager.notify(nummer++, NotificationCompat.Builder(context, KANAL)
-            .setSmallIcon(R.drawable.ic_launcher_monochrome)
+            .setSmallIcon(R.drawable.ic_mitteilung)
             .setContentTitle(meldung.titel)
             .apply { meldung.text?.let { setContentText(it).setStyle(NotificationCompat.BigTextStyle().bigText(it)) } }
             .setAutoCancel(true)
