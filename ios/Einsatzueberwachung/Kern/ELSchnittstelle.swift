@@ -11,6 +11,8 @@ struct ELSitzung: Codable, Equatable, Sendable {
     var verlaengerbarBis: Date?
     /// Feste Server-Kennung aus der Anmeldung (für die Bestätigung der Datenschutzerklärung, #148)
     var kennung: String?
+    /// Gewählte Person (`POST /ich`, Server 1.17.0); nil = noch nicht gewählt
+    var personId: String?
 }
 
 /// Hält das aktuelle Token der Einsatzleitung für alle Teile (Lage, Live, Aktionen, Ortung).
@@ -64,6 +66,8 @@ struct ELLage: Decodable, Equatable, Sendable {
         var beginn: Date?
         var einsatzleiter: String?
         var fuehrungsassistent: String?
+        /// Server 1.17.0: `Polizei` · `Feuerwehr` · `Rettungsdienst` · `AndereStaffel`, nil = nicht gewählt
+        var alarmiertDurch: String?
     }
 
     struct Team: Decodable, Equatable, Identifiable, Sendable {
@@ -87,6 +91,8 @@ struct ELLage: Decodable, Equatable, Sendable {
         var dogName: String?
         var hundefuehrerName: String?
         var helfer: [String]?
+        /// „Eingesetzt als“ (Server 1.17.0), nur Anzeige; ändern im Monitor oder beim Einsatzende
+        var einsatzart: String?
         var suche: TeamLage.Suche
         var warnstufe: Int?
         var warnung1Min: Int?
@@ -113,6 +119,11 @@ struct ELLage: Decodable, Equatable, Sendable {
     var wetter: Wetter?
     /// Nur `version` (#148)
     var datenschutz: Datenschutz?
+    /// Wer die App bedient und welche Rolle daraus folgt (Server 1.17.0, Abschnitt 4a); nil = älterer Server
+    var ich: ELIch?
+
+    /// Steuern erlaubt: Einsatzleiter, Führungsassistent, älterer Server oder Token ohne Person
+    var darfSteuern: Bool { ich?.rolle != ELRolle.lesen.rawValue }
 }
 
 /// Live-Ereignisse der Einsatzleitung (Abschnitt 8).
@@ -350,7 +361,7 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle,
         case 200..<300: return daten
         case 410: throw SchnittstellenFehler.beendet
         // 400 falsche Eingabe, 404 unbekanntes Team bzw. Notiz, 409 nicht erlaubt (auch: kein Einsatz läuft)
-        case 400, 404, 409:
+        case 400, 403, 404, 409:
             let text = ((try? JSONSerialization.jsonObject(with: daten)) as? [String: Any])?["error"] as? String
             throw ELAktionsFehler.abgelehnt(text ?? (http.statusCode == 404 ? "Nicht gefunden." : "Nicht möglich."))
         default: throw SchnittstellenFehler.server(status: http.statusCode)
@@ -417,10 +428,40 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle,
         case 200..<300:
             guard let a = try? JSONDecoder.server.decode(Antwort.self, from: daten) else { throw SchnittstellenFehler.antwortUngueltig }
             return ELSitzung(server: alt.server, token: a.token, expiresAt: a.expiresAt, geraet: alt.geraet,
-                             verlaengerbarBis: a.verlaengerbarBis, kennung: alt.kennung)
+                             verlaengerbarBis: a.verlaengerbarBis, kennung: alt.kennung, personId: alt.personId)
         case 409:
             let text = ((try? JSONSerialization.jsonObject(with: daten)) as? [String: Any])?["error"] as? String
             throw ELVerlaengerFehler.nichtMoeglich(text ?? "Verlängern nicht möglich.")
+        case 410: throw SchnittstellenFehler.beendet
+        default: throw SchnittstellenFehler.server(status: http.statusCode)
+        }
+    }
+
+    func abschluss() async throws -> ELAbschluss { try await anfrage("einsatz/abschluss", methode: "GET", inhalt: nil) }
+
+    /// Aktive Personen aus den Stammdaten für „Wer bin ich“ (Abschnitt 4a)
+    func personen() async throws -> [ELPerson] {
+        struct Antwort: Decodable { var personen: [ELPerson] }
+        let a: Antwort = try await anfrage("personen", methode: "GET", inhalt: nil)
+        return a.personen
+    }
+
+    /// Person wählen: neues Token mit Person (gleicher Ablauf), das alte ist danach gesperrt
+    func ich(personId: String) async throws -> (sitzung: ELSitzung, ich: ELIch) {
+        struct Anmeldung: Decodable { var token: String; var expiresAt: Date; var verlaengerbarBis: Date? }
+        struct Antwort: Decodable { var anmeldung: Anmeldung; var ich: ELIch }
+        let alt = sitzung
+        let inhalt = try JSONEncoder().encode(["personId": personId])
+        let (daten, http) = try await rohEinmal("ich", methode: "POST", inhalt: inhalt, token: alt.token)
+        switch http.statusCode {
+        case 200..<300:
+            guard let a = try? JSONDecoder.server.decode(Antwort.self, from: daten) else { throw SchnittstellenFehler.antwortUngueltig }
+            return (ELSitzung(server: alt.server, token: a.anmeldung.token, expiresAt: a.anmeldung.expiresAt, geraet: alt.geraet,
+                              verlaengerbarBis: a.anmeldung.verlaengerbarBis ?? alt.verlaengerbarBis, kennung: alt.kennung, personId: personId),
+                    a.ich)
+        case 400:
+            let text = ((try? JSONSerialization.jsonObject(with: daten)) as? [String: Any])?["error"] as? String
+            throw ELAktionsFehler.abgelehnt(text ?? "Person nicht gefunden.")
         case 410: throw SchnittstellenFehler.beendet
         default: throw SchnittstellenFehler.server(status: http.statusCode)
         }

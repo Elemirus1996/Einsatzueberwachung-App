@@ -46,6 +46,7 @@ struct ELHauptView: View {
         }
         .modifier(SeitenleisteAufIPad())
         .tint(ELStil.aktion)
+        .environment(\.elDarfSteuern, ansicht.lage?.darfSteuern ?? true)
         .onChange(of: reiter) { _, neu in if neu == .funk { gelesenBis = betrieb.notizen.first?.id } }
         .onAppear {
             ansicht.beiWarnung = { stufe in
@@ -83,6 +84,9 @@ struct ELUebersichtView: View {
     @State private var berichtLaedt = false
     @Environment(\.horizontalSizeClass) private var breite
 
+    /// Rolle `lesen` (APP_API EL Abschnitt 4a): nur ansehen; der Server lehnt Aktionen ohnehin mit 403 ab
+    private var darfSteuern: Bool { ansicht.lage?.darfSteuern ?? true }
+
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { kontext in
             VStack(spacing: 0) {
@@ -109,7 +113,7 @@ struct ELUebersichtView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $startOffen) {
-            ELEinsatzStartView(betrieb: betrieb, eigenePosition: ortung.letztePosition)
+            ELEinsatzStartView(betrieb: betrieb, eigenePosition: ortung.letztePosition, eigenerName: ansicht.lage?.ich?.name)
         }
         .sheet(isPresented: $beendenOffen) {
             if let lage = ansicht.lage { ELEinsatzBeendenView(betrieb: betrieb, lage: lage) }
@@ -191,9 +195,17 @@ struct ELUebersichtView: View {
                 Spacer(minLength: 4)
                 Menu {
                     if einsatz?.aktiv == true {
-                        Button { beendenOffen = true } label: { Label("Einsatz beenden …", systemImage: "stop.circle") }
+                        if darfSteuern {
+                            Button { beendenOffen = true } label: { Label("Einsatz beenden …", systemImage: "stop.circle") }
+                        }
                     } else if ansicht.lage != nil {
                         Button { startOffen = true } label: { Label("Einsatz oder Übung starten", systemImage: "play.circle") }
+                    }
+                    Button { modell.vorne = .start } label: { Label("Startseite", systemImage: "house") }
+                    if ansicht.lage?.ich != nil {
+                        Button { Task { await modell.elPersonFragen(auchWennGewaehlt: true) } } label: {
+                            Label("Person wechseln", systemImage: "person.crop.circle")
+                        }
                     }
                     Button(role: .destructive) { abmeldenFragen = true } label: { Label("Abmelden", systemImage: "rectangle.portrait.and.arrow.right") }
                 } label: {
@@ -232,6 +244,20 @@ struct ELUebersichtView: View {
         .padding(.top, 6)
         .padding(.bottom, 12)
         .background(ELStil.anthrazit.ignoresSafeArea(edges: .top))
+        .overlay(alignment: .bottomLeading) { rollenZeile }
+    }
+
+    /// „Anna Berg · Einsatzleiter“ unten in der Kopfleiste, damit immer klar ist, in welcher Rolle man ist
+    @ViewBuilder
+    private var rollenZeile: some View {
+        if let ich = ansicht.lage?.ich, let rolle = ich.rollenWert {
+            Text([ich.name, rolle.anzeige].compactMap { $0 }.joined(separator: " · "))
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(rolle == .lesen ? Color.orange : ELStil.aufAnthrazit.opacity(0.7))
+                .padding(.horizontal, 16)
+                .padding(.bottom, 1)
+                .accessibilityLabel("Angemeldet als \(ich.name ?? "") , Rolle \(rolle.anzeige)")
+        }
     }
 
     private func kopfZeile(_ einsatz: ELLage.Einsatz) -> String {
@@ -334,16 +360,18 @@ struct ELUebersichtView: View {
                 gruppe("Pause", lage.teams.filter { $0.suche.status == .kurzpause }, jetzt)
                 gruppe("Bereit", lage.teams.filter { $0.suche.status == .bereit }, jetzt)
                 gruppe("Beendet", lage.teams.filter { $0.suche.status == .beendet }, jetzt)
-                Button { beendenOffen = true } label: {
-                    Label("Einsatz beenden", systemImage: "stop.circle")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                        .foregroundStyle(ELStil.aktion)
-                        .background(ELStil.aktion.opacity(0.06), in: RoundedRectangle(cornerRadius: ELStil.radius))
-                        .overlay(RoundedRectangle(cornerRadius: ELStil.radius).stroke(ELStil.aktion.opacity(0.6), lineWidth: 1))
+                if darfSteuern {
+                    Button { beendenOffen = true } label: {
+                        Label("Einsatz beenden", systemImage: "stop.circle")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .foregroundStyle(ELStil.aktion)
+                            .background(ELStil.aktion.opacity(0.06), in: RoundedRectangle(cornerRadius: ELStil.radius))
+                            .overlay(RoundedRectangle(cornerRadius: ELStil.radius).stroke(ELStil.aktion.opacity(0.6), lineWidth: 1))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 4)
                 }
-                .buttonStyle(.plain)
-                .padding(.top, 4)
             } else {
                 keinEinsatz
             }
@@ -385,6 +413,7 @@ struct ELUebersichtView: View {
                                     pause: { ausfuehren(.teamPause(team.teamId, name: team.teamName)) },
                                     weiter: { ausfuehren(.teamWeiter(team.teamId, name: team.teamName)) },
                                     stopp: { stoppTeam = team })
+                            .disabled(!darfSteuern)
                     }
                 }
             }
@@ -483,10 +512,13 @@ struct ELTeamKarte: View {
     private var personen: some View {
         let hf = team.hundefuehrerName.flatMap { $0.isEmpty ? nil : $0 }
         let hund = team.dogName.flatMap { $0.isEmpty ? nil : $0 }
-        if hf != nil || hund != nil {
+        let art = ELEinsatzart.anzeige(team.einsatzart)
+        if hf != nil || hund != nil || art != nil {
             HStack(spacing: 14) {
                 if let hf { Label(hf, systemImage: "person.fill") }
                 if let hund { Label(hund, systemImage: "pawprint.fill") }
+                // „Eingesetzt als“ (Monitor bzw. Einsatzende), nur Anzeige
+                if let art { Label(art, systemImage: "scope") }
             }
             .font(.subheadline.weight(.medium))
             .foregroundStyle(ELStil.vermerk)

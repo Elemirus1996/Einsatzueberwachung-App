@@ -104,6 +104,11 @@ final class ELBetrieb: ObservableObject {
         try? await schnittstelle.vorlage()
     }
 
+    /// Abschlussangaben für das Einsatzende; ohne Netz bzw. Server vor 1.17.0 nil (dann Beenden wie bisher)
+    func abschluss() async -> ELAbschluss? {
+        try? await schnittstelle.abschluss()
+    }
+
     /// Personal und Hunde für das Einsatzende; ohne Netz bzw. Server vor 1.14.1 nil (dann Vorauswahl des Servers)
     func vorOrt() async -> ELVorOrt? {
         try? await schnittstelle.vorOrt()

@@ -17,11 +17,13 @@
 		1C98753FDBCCAA574B6AFDF9 /* TeamAnsichtView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFBE4E8B3659C84DE022CA21 /* TeamAnsichtView.swift */; };
 		1D4A891BC4480DB916DAA093 /* ELKarte.swift in Sources */ = {isa = PBXBuildFile; fileRef = F0208DBE8A1D6C6A176561A4 /* ELKarte.swift */; };
 		1D85C57C6B2C8932F9BC62A4 /* OrtungsQuelle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB3AF33B59FBD33F2C44B2E5 /* OrtungsQuelle.swift */; };
+		1E043014CF0EC77207630DFB /* ELAbschlussView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F0A7AD89F044AE8F49C5CA6 /* ELAbschlussView.swift */; };
 		2064ACE5E9E739227189057E /* ELStil.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBC65D1BBDBDDD9EB7D870F8 /* ELStil.swift */; };
 		25088563BF21334DE18AC65C /* TeamAnmeldungView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C59E8CF5D165989F439B72BD /* TeamAnmeldungView.swift */; };
 		2BC72B5D65654CD40240362A /* ELAnsicht.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FB7278E7BA2FD11AC8308A2 /* ELAnsicht.swift */; };
 		2CE2CBDF74B1E03F805333FA /* TeamSchnittstelle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 602266F6E27237F5A6F9575F /* TeamSchnittstelle.swift */; };
 		2D47A3B7AAAEEDEA83923B8C /* TeamLage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F2569C9D22B3E5711A81F0 /* TeamLage.swift */; };
+		33BD011FFFB2004676673DF4 /* Polizeibericht.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41904EB8A29355D6E70E6533 /* Polizeibericht.swift */; };
 		4167F7A0E20AC5962CED7931 /* EinmalOrtung.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474936C6E865656679546095 /* EinmalOrtung.swift */; };
 		47806CDB947BFF78B4392CF0 /* PositionsPuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5AB257A4D6CC10859BDCE63 /* PositionsPuffer.swift */; };
 		515B5D3C7DD9A320E1E7361A /* EinstellungenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4796A57686D309891516479C /* EinstellungenView.swift */; };
@@ -35,6 +37,7 @@
 		7BA6D9BA34CD555221A6CE44 /* ELVermisste.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4001B68B182590449211F7D6 /* ELVermisste.swift */; };
 		803B4AE407AAFC1F22809B0B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 01EEA4C26487F0027FEABEF9 /* Assets.xcassets */; };
 		80FFF55887CED67964C53D62 /* ELAktionen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C14AEB1CFCD5BFB520E66C48 /* ELAktionen.swift */; };
+		854F0D772042C98639794051 /* ELPersonWahlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A435AB7E7BF64A834F52EBCB /* ELPersonWahlView.swift */; };
 		8D7BC3821334E2D60C7A796D /* Schluesselbund.swift in Sources */ = {isa = PBXBuildFile; fileRef = 179F8BB87D6F40D69F2E2A8D /* Schluesselbund.swift */; };
 		8E2266F5BED14D0B86E1087C /* ELVerlaengerungTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D2AC73FC5048EC687F22B01D /* ELVerlaengerungTests.swift */; };
 		9624F08F2E148F47A2EE4D15 /* ELSchnittstelle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 119EF115046BB0FA7AF52B80 /* ELSchnittstelle.swift */; };
@@ -81,11 +84,13 @@
 		4001B68B182590449211F7D6 /* ELVermisste.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELVermisste.swift; sourceTree = "<group>"; };
 		4089086BDE8D3D9E95172A19 /* NaviZiel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NaviZiel.swift; sourceTree = "<group>"; };
 		40C766A51FD148218A0B29EE /* HeimatStaffel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeimatStaffel.swift; sourceTree = "<group>"; };
+		41904EB8A29355D6E70E6533 /* Polizeibericht.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Polizeibericht.swift; sourceTree = "<group>"; };
 		42542B191DD57AAC94CE0EC0 /* TeamAnsicht.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamAnsicht.swift; sourceTree = "<group>"; };
 		44827FCB24819A3D28B7C44C /* Datenschutz.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Datenschutz.swift; sourceTree = "<group>"; };
 		474936C6E865656679546095 /* EinmalOrtung.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EinmalOrtung.swift; sourceTree = "<group>"; };
 		4796A57686D309891516479C /* EinstellungenView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EinstellungenView.swift; sourceTree = "<group>"; };
 		4C49A3C66952DBE5E6E35822 /* HeimatStaffelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeimatStaffelTests.swift; sourceTree = "<group>"; };
+		4F0A7AD89F044AE8F49C5CA6 /* ELAbschlussView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELAbschlussView.swift; sourceTree = "<group>"; };
 		4F9D34CFE0FCDBCA194CC8C5 /* ELVermissteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELVermissteView.swift; sourceTree = "<group>"; };
 		56F9B9620977557546AA87ED /* ServerAdresse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerAdresse.swift; sourceTree = "<group>"; };
 		575246DBD3CA52F8FBF0DC6E /* PacklisteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacklisteView.swift; sourceTree = "<group>"; };
@@ -99,6 +104,7 @@
 		86F2569C9D22B3E5711A81F0 /* TeamLage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamLage.swift; sourceTree = "<group>"; };
 		8FB7278E7BA2FD11AC8308A2 /* ELAnsicht.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELAnsicht.swift; sourceTree = "<group>"; };
 		90922EA3579F26D42494A74A /* KernTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KernTests.swift; sourceTree = "<group>"; };
+		A435AB7E7BF64A834F52EBCB /* ELPersonWahlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELPersonWahlView.swift; sourceTree = "<group>"; };
 		AB3AF33B59FBD33F2C44B2E5 /* OrtungsQuelle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrtungsQuelle.swift; sourceTree = "<group>"; };
 		AE6CD954D36A7DA1A88F846D /* Packliste.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Packliste.swift; sourceTree = "<group>"; };
 		B2F3419961231647750EF748 /* EinsatzApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EinsatzApp.swift; sourceTree = "<group>"; };
@@ -152,12 +158,14 @@
 		834DB554F73F6630E5723A54 /* EL */ = {
 			isa = PBXGroup;
 			children = (
+				4F0A7AD89F044AE8F49C5CA6 /* ELAbschlussView.swift */,
 				1B3C11402C4425DA07624D1A /* ELAnmeldungView.swift */,
 				8FB7278E7BA2FD11AC8308A2 /* ELAnsicht.swift */,
 				BEB08B86E4BDD277798024C9 /* ELBetrieb.swift */,
 				C68F35498C530D450622E54F /* ELEinsatzView.swift */,
 				0FB762FAB78F2F6881565789 /* ELFunkView.swift */,
 				7D3EA6E63ED7CA80DD21B3F7 /* ELKarteView.swift */,
+				A435AB7E7BF64A834F52EBCB /* ELPersonWahlView.swift */,
 				CBC65D1BBDBDDD9EB7D870F8 /* ELStil.swift */,
 				7EB5A1859E50907176417C9E /* ELTeamAktionenView.swift */,
 				DC1B71859AD992E6E951AFDE /* ELUebersichtView.swift */,
@@ -221,6 +229,7 @@
 				F8C0A9707EAB2B06820D5174 /* LageMeldungen.swift */,
 				AB3AF33B59FBD33F2C44B2E5 /* OrtungsQuelle.swift */,
 				AE6CD954D36A7DA1A88F846D /* Packliste.swift */,
+				41904EB8A29355D6E70E6533 /* Polizeibericht.swift */,
 				C5AB257A4D6CC10859BDCE63 /* PositionsPuffer.swift */,
 				179F8BB87D6F40D69F2E2A8D /* Schluesselbund.swift */,
 				56F9B9620977557546AA87ED /* ServerAdresse.swift */,
@@ -347,6 +356,7 @@
 				08DFB2CA7502DC3325DBE06D /* AppModell.swift in Sources */,
 				EF47C06EC634E9BFE7F37E96 /* Datenschutz.swift in Sources */,
 				BA767C7EFFB7828D27A626E8 /* DatenschutzView.swift in Sources */,
+				1E043014CF0EC77207630DFB /* ELAbschlussView.swift in Sources */,
 				80FFF55887CED67964C53D62 /* ELAktionen.swift in Sources */,
 				BF3D49BB7ADFB0B1D6B7C8BD /* ELAnmeldungView.swift in Sources */,
 				2BC72B5D65654CD40240362A /* ELAnsicht.swift in Sources */,
@@ -355,6 +365,7 @@
 				A9DC701BEE2AD18A751D5621 /* ELFunkView.swift in Sources */,
 				1D4A891BC4480DB916DAA093 /* ELKarte.swift in Sources */,
 				73BA9307343CE5FBC967B675 /* ELKarteView.swift in Sources */,
+				854F0D772042C98639794051 /* ELPersonWahlView.swift in Sources */,
 				9624F08F2E148F47A2EE4D15 /* ELSchnittstelle.swift in Sources */,
 				2064ACE5E9E739227189057E /* ELStil.swift in Sources */,
 				0195198E4DE054DEE6B9DE77 /* ELTeamAktionenView.swift in Sources */,
@@ -371,6 +382,7 @@
 				1D85C57C6B2C8932F9BC62A4 /* OrtungsQuelle.swift in Sources */,
 				B6480D220EB7A44D359EADBB /* Packliste.swift in Sources */,
 				110CCD7390F9910FE7F1B4A5 /* PacklisteView.swift in Sources */,
+				33BD011FFFB2004676673DF4 /* Polizeibericht.swift in Sources */,
 				47806CDB947BFF78B4392CF0 /* PositionsPuffer.swift in Sources */,
 				C0D161ED59E066250EC86B7A /* QRScannerView.swift in Sources */,
 				8D7BC3821334E2D60C7A796D /* Schluesselbund.swift in Sources */,

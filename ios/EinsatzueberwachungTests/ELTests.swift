@@ -403,6 +403,8 @@ struct ELEinsatzTests {
         d.ort = "Testwald"
         #expect(!d.vollstaendig, "Szenario Unbestimmt reicht nicht")
         d.szenario = .mantrailer
+        #expect(!d.vollstaendig, "Alarmiert durch ist Pflicht (Server 1.17.0)")
+        d.alarmiertDurch = .polizei
         #expect(d.vollstaendig)
         d.ort = "  "
         #expect(!d.vollstaendig, "ohne Ort und ohne Alarm")
@@ -410,6 +412,69 @@ struct ELEinsatzTests {
         #expect(d.vollstaendig, "Ort kommt aus dem Divera-Alarm")
         d.szenario = .unbestimmt
         #expect(!d.vollstaendig, "Szenario auch mit Alarm Pflicht (Server prüft es immer)")
+    }
+
+    @Test func startSendetAlarmiertDurchUndMelder() {
+        var d = ELEinsatzStart()
+        d.alarmiertDurch = .andereStaffel
+        d.melder = " RHS Nord "
+        let a = ELAktion.einsatzStart(d)
+        #expect(a.inhalt["alarmiertDurch"] == .text("AndereStaffel"))
+        #expect(a.inhalt["melder"] == .text("RHS Nord"))
+    }
+
+    @Test func abschlussFehlendUndJson() throws {
+        let json = """
+        {"uebung":false,"alarmiertDurch":"Polizei","keinePolizei":false,"vorgangsnummer":"","melder":"PI Nord",
+         "polizei":{"name":"","dienstnummer":"","telefon":""},
+         "fund":{"zeit":null,"lat":null,"lng":null,"ort":"","uebergabeAn":"","teamId":null,
+                 "vorschlag":{"lat":49.3,"lng":8.4,"zeit":"2026-11-17T10:00:00Z","teamId":"t1"}},
+         "teams":[{"teamId":"t1","teamName":"Team Rex","einsatzart":null,"erlaubt":["Flaeche","Mantrailer"]}],
+         "trails":[{"sucheId":"s1","teamId":"t1","teamName":"Team Rex","abbruchgrund":"","geruchsartikel":""}],
+         "abbruchgruende":["Spur verloren"],"fehlend":["vorgangsnummer","polizei","teams","trails"]}
+        """
+        let a = try JSONDecoder.server.decode(ELAbschluss.self, from: Data(json.utf8))
+        var e = ELAbschlussEingabe(a)
+        #expect(a.teams?.first?.wahl == [.flaeche, .mantrailer])
+        #expect(e.fehlend(abschluss: a, fund: true) == ["Vorgangsnummer der Polizei", "Polizeikontakt", "Fundzeit und Fundort",
+                                                        "„Eingesetzt als“ je Team", "Abbruchgrund und Geruchsartikel je Trail"])
+        e.keinePolizei = true
+        e.vorschlagUebernehmen(a.fund!.vorschlag!)
+        e.einsatzart["t1"] = .mantrailer
+        e.abbruchgrund["s1"] = "Spur verloren"
+        e.geruchsartikel["s1"] = "Schal"
+        #expect(e.fehlend(abschluss: a, fund: true).isEmpty)
+        #expect(e.fundTeamId == "t1")
+
+        guard case .objekt(let o) = e.json(abschluss: a, fund: true), case .objekt(let fund)? = o["fund"] else {
+            Issue.record("abschluss kein Objekt"); return
+        }
+        #expect(o["keinePolizei"] == .wahr(true))
+        #expect(o["alarmiertDurch"] == .text("Polizei"))
+        #expect(fund["lat"] == .zahl(49.3))
+        #expect(fund["zeit"] == .text("2026-11-17T10:00:00Z"))
+        #expect(o["teams"] == .liste([.objekt(["teamId": .text("t1"), "einsatzart": .text("Mantrailer")])]))
+        // Übung: nie Polizei, nie Art
+        e = ELAbschlussEingabe(a)
+        e.uebung = true
+        e.alarmiertDurch = nil
+        #expect(!e.fehlend(abschluss: a, fund: false).contains("Alarmiert durch"))
+        #expect(!e.polizeiGefragt)
+    }
+
+    @Test func berichtAbfrageMitAbschnitten() {
+        let a = ELAktion.einsatzBeenden(ergebnis: "x", mitTracks: false, abschnitte: ["teams", "funk"])
+        #expect(ELEinsatzEnde.abfrage(aus: a.inhalt).contains("abschnitte=teams,funk"))
+    }
+
+    @Test func rolleAusLage() throws {
+        let lage = try JSONDecoder.server.decode(ELLage.self, from: Data("""
+        {"einsatz":{"aktiv":true},"teams":[],"ich":{"personId":"p1","name":"Carla","rolle":"lesen"}}
+        """.utf8))
+        #expect(!lage.darfSteuern)
+        #expect(lage.ich?.rollenWert == .lesen)
+        let alt = try JSONDecoder.server.decode(ELLage.self, from: Data(#"{"einsatz":{"aktiv":true},"teams":[]}"#.utf8))
+        #expect(alt.darfSteuern, "älterer Server ohne ich: volle Rechte wie bisher")
     }
 
     @Test func startMitDiveraLaesstLeereFelderWeg() throws {

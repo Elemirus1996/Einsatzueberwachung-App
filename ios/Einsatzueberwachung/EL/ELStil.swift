@@ -193,3 +193,13 @@ private extension UIColor {
                   blue: CGFloat(hex & 0xFF) / 255, alpha: alpha)
     }
 }
+
+/// Darf die Einsatzleitung auf diesem Handy steuern (Rolle nicht `lesen`, APP_API EL Abschnitt 4a)
+private struct ELDarfSteuernKey: EnvironmentKey { static let defaultValue = true }
+
+extension EnvironmentValues {
+    var elDarfSteuern: Bool {
+        get { self[ELDarfSteuernKey.self] }
+        set { self[ELDarfSteuernKey.self] = newValue }
+    }
+}

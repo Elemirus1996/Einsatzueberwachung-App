@@ -4,6 +4,7 @@ import SwiftUI
 /// Lagekarte der Einsatzleitung (wie die Karte in `/el`): Suchgebiete mit Abdeckung, Laufwege je Team,
 /// Halsbänder, Team-Handys, Einsatzleitung und ELW. Positionen bewegen sich live.
 struct ELKarteView: View {
+    @Environment(\.elDarfSteuern) private var darfSteuern
     @ObservedObject var karte: ELKartenAnsicht
     let teams: [ELLage.Team]
     @ObservedObject var betrieb: ELBetrieb
@@ -107,12 +108,14 @@ struct ELKarteView: View {
         .toolbar(.hidden, for: .navigationBar)
         .sheet(item: $gewaehlterPunkt) { punkt in
             ELPunktView(punkt: punkt, teams: teams, betrieb: betrieb)
+                .disabled(!darfSteuern)
                 .presentationDetents([.medium, .large])
         }
         .sheet(item: $gewaehltesGebiet) { gebiet in
             ELSuchgebietView(gebiet: gebiet, teams: teams, betrieb: betrieb) {
                 Task { await karte.karteNeuLaden() }
             }
+            .disabled(!darfSteuern)
             .presentationDetents([.medium, .large])
         }
         .onAppear { karte.starten() }

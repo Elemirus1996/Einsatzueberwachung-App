@@ -11,13 +11,16 @@ struct StartView: View {
 
     var body: some View {
         Group {
-            if let ansicht = modell.elAnsicht, let ortung = modell.elOrtung, let betrieb = modell.elBetrieb,
+            if zeigtEL, let personen = modell.elPersonen {
+                // Erst „Wer bin ich“, dann die Lage (APP_API EL Abschnitt 4a)
+                ELPersonWahlView(personen: personen)
+            } else if zeigtEL, let ansicht = modell.elAnsicht, let ortung = modell.elOrtung, let betrieb = modell.elBetrieb,
                let karte = modell.elKarte, let vermisste = modell.elVermisste {
                 // Einsatzleitung mit eigenen Reitern, jeder mit eigenem Navigationsstapel
                 ELHauptView(ansicht: ansicht, ortung: ortung, betrieb: betrieb, karte: karte, vermisste: vermisste)
             } else {
                 NavigationStack {
-                    if let team = modell.team, let ansicht = modell.teamAnsicht, let sitzung = modell.teamSitzung {
+                    if zeigtTeam, let team = modell.team, let ansicht = modell.teamAnsicht, let sitzung = modell.teamSitzung {
                         TeamAnsichtView(ortung: team, ansicht: ansicht, sitzung: sitzung)
                     } else if let wahl = modell.teamWahl {
                         TeamAnmeldungView(vorgabe: wahl)
@@ -33,7 +36,7 @@ struct StartView: View {
             }
         }
         // Nach An- oder Abmeldung neu aufbauen, damit keine Anmeldeseite auf dem Stapel liegen bleibt
-        .id("\(modell.team == nil)-\(modell.teamWahl == nil)-\(modell.elSitzung == nil)")
+        .id("\(modell.team == nil)-\(modell.teamWahl == nil)-\(modell.elSitzung == nil)-\(modell.vorne)")
         // #148: zuerst Datenschutz, dann Heimatstaffel
         .sheet(item: Binding(get: { modell.datenschutzFrage }, set: { _ in })) { frage in
             DatenschutzAbfrageView(frage: frage)
@@ -49,6 +52,15 @@ struct StartView: View {
             EinstellungenView(heimat: heimat)
                 .environmentObject(modell)
         }
+    }
+
+    /// Vorne ist die Einsatzleitung: gewählt oder automatisch (EL vor Team vor Startseite)
+    private var zeigtEL: Bool {
+        modell.elAnsicht != nil && (modell.vorne == .el || modell.vorne == .automatisch)
+    }
+
+    private var zeigtTeam: Bool {
+        modell.team != nil && (modell.vorne == .team || modell.vorne == .automatisch || (modell.vorne == .el && modell.elAnsicht == nil))
     }
 
     /// Langes Logo mit Schriftzug füllt die Breite bis zum Einstellungen-Knopf, das Staffel-Logo steht darunter
@@ -89,22 +101,44 @@ struct StartView: View {
         }
     }
 
+    /// „Angemeldet als Anna Berg · Nur lesen“
+    private var elStatus: String {
+        let ich = modell.elAnsicht?.lage?.ich
+        var teile = ["Angemeldet"]
+        if let name = ich?.name { teile.append(name) }
+        if let rolle = ich?.rollenWert { teile.append(rolle.anzeige) }
+        return teile.joined(separator: " · ") + " · öffnen"
+    }
+
     private var rollenAuswahl: some View {
         VStack(spacing: 16) {
             kopfzeile
             Spacer()
             kopf
             Spacer()
-            NavigationLink {
-                // Läuft der Einsatz noch (Code gespeichert), direkt zur Teamauswahl
-                TeamAnmeldungView(vorgabe: modell.einsatzZugang)
-            } label: {
-                RollenKnopf(titel: "Team", text: "QR-Code aus dem Einsatz scannen", symbol: "qrcode.viewfinder")
+            if modell.team != nil {
+                // Angemeldet: zurück zur Ansicht, ohne sich abzumelden
+                Button { modell.vorne = .team } label: {
+                    RollenKnopf(titel: modell.teamSitzung?.teamName ?? "Team", text: "Angemeldet · öffnen", symbol: "checkmark.circle.fill")
+                }
+            } else {
+                NavigationLink {
+                    // Läuft der Einsatz noch (Code gespeichert), direkt zur Teamauswahl
+                    TeamAnmeldungView(vorgabe: modell.einsatzZugang)
+                } label: {
+                    RollenKnopf(titel: "Team", text: "QR-Code aus dem Einsatz scannen", symbol: "qrcode.viewfinder")
+                }
             }
-            NavigationLink {
-                ELAnmeldungView()
-            } label: {
-                RollenKnopf(titel: "Einsatzleitung", text: "Nur im VPN der Staffel", symbol: "lock.shield")
+            if modell.elAnsicht != nil {
+                Button { modell.vorne = .el } label: {
+                    RollenKnopf(titel: "Einsatzleitung", text: elStatus, symbol: "checkmark.shield.fill")
+                }
+            } else {
+                NavigationLink {
+                    ELAnmeldungView()
+                } label: {
+                    RollenKnopf(titel: "Einsatzleitung", text: "Nur im VPN der Staffel", symbol: "lock.shield")
+                }
             }
             NavigationLink {
                 PacklisteView(liste: modell.packliste)

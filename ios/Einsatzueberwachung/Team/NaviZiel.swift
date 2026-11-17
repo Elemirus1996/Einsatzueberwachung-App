@@ -77,14 +77,25 @@ struct PunktSetzenView: View {
     @State private var ortet = false
     @State private var fehler: String?
     @State private var ortung = EinmalOrtung()
+    /// Fund der Person statt Hinweis (Server 1.17.0): eigenes Symbol, Vorschlag für den Fundort im Bericht
+    @State private var fund = false
 
-    private static let vorschlaege = ["Fund", "Spur", "Hinweis", "Gefahr"]
+    private static let vorschlaege = ["Spur", "Hinweis", "Gefahr", "Gegenstand"]
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("z. B. Fund: Jacke", text: $text, axis: .vertical)
+                    Picker("Art", selection: $fund) {
+                        Text("Hinweis").tag(false)
+                        Text("Person gefunden").tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                } footer: {
+                    if fund { Text("Die Einsatzleitung sieht den Fund sofort und übernimmt ihn als Fundort in den Einsatzbericht.") }
+                }
+                Section {
+                    TextField(fund ? "z. B. ansprechbar, am Bachufer" : "z. B. Jacke am Wegrand", text: $text, axis: .vertical)
                         .lineLimit(1...3)
                         .onChange(of: text) { _, neu in
                             if neu.count > TeamPunkt.maxText { text = String(neu.prefix(TeamPunkt.maxText)) }
@@ -114,7 +125,7 @@ struct PunktSetzenView: View {
                         ProgressView()
                     } else {
                         Button("Senden") { Task { await senden() } }
-                            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                            .disabled(!fund && text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }
             }
@@ -126,7 +137,9 @@ struct PunktSetzenView: View {
         defer { ortet = false }
         do {
             let ort = try await ortung.position()
-            await ansicht.punktSetzen(text: text, lat: ort.lat, lng: ort.lng, genauigkeit: ort.genauigkeit, zeit: ort.zeit)
+            let inhalt = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            await ansicht.punktSetzen(text: fund ? (inhalt.isEmpty ? "Person gefunden" : "Person gefunden: \(inhalt)") : inhalt,
+                                      lat: ort.lat, lng: ort.lng, genauigkeit: ort.genauigkeit, zeit: ort.zeit, fund: fund)
             schliessen()
         } catch EinmalOrtung.Fehler.keineFreigabe {
             fehler = "Ohne Freigabe der Ortung kann die App keinen Punkt setzen. Bitte in den Einstellungen von iOS erlauben."

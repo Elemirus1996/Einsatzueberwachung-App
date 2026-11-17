@@ -33,6 +33,11 @@ struct TeamAnsichtView: View {
         .navigationTitle(ansicht.lage?.team.teamName ?? sitzung.teamName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                // Startseite (Packliste, andere Rolle), ohne sich abzumelden
+                Button { modell.vorne = .start } label: { Image(systemName: "house") }
+                    .accessibilityLabel("Startseite")
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { infoOffen = true } label: { Image(systemName: "info.circle") }
                     .accessibilityLabel("Team-Info")
@@ -94,7 +99,9 @@ struct TeamAnsichtView: View {
 
     private var hundText: String {
         let hund = ansicht.lage?.team.dogName ?? ""
-        return hund.isEmpty ? "(ohne Hund)" : hund
+        let text = hund.isEmpty ? "(ohne Hund)" : hund
+        // „Eingesetzt als“ der Einsatzleitung, z. B. „Rex · Mantrailer“
+        return ELEinsatzart.anzeige(ansicht.lage?.team.einsatzart).map { "\(text) · \($0)" } ?? text
     }
 
     private var sucheText: String {
@@ -411,6 +418,7 @@ private struct TeamInfoView: View {
                     Section("Team") {
                         LabeledContent("Team", value: lage.team.teamName)
                         if let hund = lage.team.dogName, !hund.isEmpty { LabeledContent("Hund", value: hund) }
+                        if let art = ELEinsatzart.anzeige(lage.team.einsatzart) { LabeledContent("Eingesetzt als", value: art) }
                         if let fuehrer = lage.team.hundefuehrerName, !fuehrer.isEmpty {
                             LabeledContent("Hundeführer", value: fuehrer)
                         }

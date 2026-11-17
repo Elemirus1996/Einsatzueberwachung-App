@@ -19,6 +19,8 @@ struct TeamLage: Decodable, Equatable, Sendable {
         var dogName: String?
         var hundefuehrerName: String?
         var helfer: [String]?
+        /// „Eingesetzt als“ (Server 1.17.0, `Flaeche` …); nil = nicht festgelegt oder älterer Server
+        var einsatzart: String?
     }
 
     struct Suche: Decodable, Equatable, Sendable {
@@ -77,6 +79,10 @@ struct TeamPunkt: Codable, Equatable, Identifiable, Sendable {
     var genauigkeit: Double?
     /// Zeitpunkt der Ortung (UTC)
     var zeit: Date
+    /// `fund` oder `hinweis` (Server 1.17.0, ältere ignorieren das Feld); nil = Hinweis
+    var typ: String?
+
+    var istFund: Bool { typ == "fund" }
 
     static let maxText = 200
 }

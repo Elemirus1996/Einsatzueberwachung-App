@@ -361,10 +361,11 @@ final class TeamAnsicht: ObservableObject {
     // MARK: Punkte (Abschnitt 13)
 
     /// Punkt am eigenen Standort setzen. Im Funkloch wartet er auf dem Gerät; dieselbe `id` erzeugt nur einen Punkt.
-    func punktSetzen(text: String, lat: Double, lng: Double, genauigkeit: Double?, zeit: Date) async {
+    func punktSetzen(text: String, lat: Double, lng: Double, genauigkeit: Double?, zeit: Date, fund: Bool = false) async {
         let inhalt = String(text.trimmingCharacters(in: .whitespacesAndNewlines).prefix(TeamPunkt.maxText))
         guard !inhalt.isEmpty else { return }
-        offenePunkte.append(TeamPunkt(id: UUID().uuidString, text: inhalt, lat: lat, lng: lng, genauigkeit: genauigkeit, zeit: zeit))
+        offenePunkte.append(TeamPunkt(id: UUID().uuidString, text: inhalt, lat: lat, lng: lng, genauigkeit: genauigkeit, zeit: zeit,
+                                      typ: fund ? "fund" : "hinweis"))
         punkteSpeichern()
         await punkteSenden()
         if !offenePunkte.isEmpty { punktHinweis = ("Kein Netz – der Punkt wird gesendet, sobald es wieder geht.", true, jetzt()) }
