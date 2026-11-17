@@ -350,10 +350,11 @@ class TeamAnsicht(
     // MARK: Punkte (Abschnitt 13)
 
     /** Punkt am eigenen Standort setzen; im Funkloch wartet er, dieselbe `id` erzeugt nur einen Punkt. */
-    suspend fun punktSetzen(text: String, lat: Double, lng: Double, genauigkeit: Double?, zeitMs: Long) {
+    suspend fun punktSetzen(text: String, lat: Double, lng: Double, genauigkeit: Double?, zeitMs: Long, fund: Boolean = false) {
         val inhalt = text.trim().take(TeamPunkt.MAX_TEXT)
         if (inhalt.isEmpty()) return
-        _offenePunkte.value = _offenePunkte.value + TeamPunkt(UUID.randomUUID().toString(), inhalt, lat, lng, genauigkeit, zeitMs)
+        _offenePunkte.value = _offenePunkte.value + TeamPunkt(UUID.randomUUID().toString(), inhalt, lat, lng, genauigkeit, zeitMs,
+            if (fund) "fund" else "hinweis")
         speicherePunkte()
         punkteSenden()
         if (_offenePunkte.value.isNotEmpty()) _punktHinweis.value = Triple("Kein Netz – der Punkt wird gesendet, sobald es wieder geht.", true, jetzt())
@@ -400,7 +401,7 @@ class TeamAnsicht(
         (0 until liste.length()).map { i ->
             val o = liste.getJSONObject(i)
             TeamPunkt(o.getString("id"), o.getString("text"), o.getDouble("lat"), o.getDouble("lng"),
-                if (o.isNull("genauigkeit")) null else o.getDouble("genauigkeit"), o.getLong("zeitMs"))
+                if (o.isNull("genauigkeit")) null else o.getDouble("genauigkeit"), o.getLong("zeitMs"), o.optString("typ", "hinweis"))
         }
     }.getOrDefault(emptyList())
 

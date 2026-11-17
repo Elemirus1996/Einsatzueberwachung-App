@@ -88,15 +88,24 @@ class TeamOrtung(
     val pauseTaktMs: Long get() = (steuerung.pauseCheckSec ?: 60).coerceIn(5, 60) * 1000L
 
     /** Übernimmt eine Antwort des Servers. `melden = false`, wenn der Modus aus /lage kommt. */
-    fun anwenden(antwort: SteuerAntwort, melden: Boolean = true) {
+    /** Ortung ruht: `track` wirkt wie `pause` (EL-Ortung, solange auf dem Handy auch ein Team angemeldet ist) */
+    var ruht: Boolean = false
+        set(wert) {
+            val alt = field
+            field = wert
+            if (alt != wert && _zustand.value != Zustand.BEENDET) anwenden(steuerung, melden = false)
+        }
+
+    fun anwenden(vorgabe: SteuerAntwort, melden: Boolean = true) {
         if (_zustand.value == Zustand.BEENDET) return
+        val antwort = if (ruht && vorgabe.mode == Modus.TRACK) vorgabe.copy(mode = Modus.PAUSE) else vorgabe
         val vorher = steuerung.mode
         steuerung = SteuerAntwort(
-            mode = antwort.mode,
-            intervalSec = antwort.intervalSec ?: steuerung.intervalSec,
-            uploadEverySec = antwort.uploadEverySec ?: steuerung.uploadEverySec,
-            pauseCheckSec = antwort.pauseCheckSec ?: steuerung.pauseCheckSec,
-            expiresAtMs = antwort.expiresAtMs ?: steuerung.expiresAtMs,
+            mode = vorgabe.mode,
+            intervalSec = vorgabe.intervalSec ?: steuerung.intervalSec,
+            uploadEverySec = vorgabe.uploadEverySec ?: steuerung.uploadEverySec,
+            pauseCheckSec = vorgabe.pauseCheckSec ?: steuerung.pauseCheckSec,
+            expiresAtMs = vorgabe.expiresAtMs ?: steuerung.expiresAtMs,
         )
         if (abgelaufen) {
             beenden()

@@ -67,6 +67,8 @@ fun TeamAnsichtScreen(
     vomEinsatzAbmelden: () -> Unit,
     schliessen: () -> Unit,
     toene: Toene,
+    /** Startseite (Packliste, andere Rolle), ohne sich abzumelden */
+    startseite: () -> Unit = {},
 ) {
     var ausgeblendet by remember { mutableStateOf(emptySet<String>()) }
     val zustand by ortung.zustand.collectAsState()
@@ -113,9 +115,13 @@ fun TeamAnsichtScreen(
         Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             // Kopf
             Row(Modifier.fillMaxWidth().padding(16.dp, 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.TextButton(onClick = startseite) { Text("Start") }
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(lage?.dogName ?: "(ohne Hund)", fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        // „Eingesetzt als“ der Einsatzleitung, z. B. „Rex · Mantrailer“
+                        val hund = lage?.dogName ?: "(ohne Hund)"
+                        Text(io.github.elemirus1996.einsatzspur.kern.ELEinsatzart.anzeige(lage?.einsatzart)?.let { "$hund · $it" } ?: hund,
+                            fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                         if (lage?.uebung == true) {
                             Text(
                                 "ÜBUNG", Modifier.padding(start = 6.dp).clip(RoundedCornerShape(50)).background(Color(0xFFF07A2A))

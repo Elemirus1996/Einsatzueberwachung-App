@@ -52,6 +52,8 @@ fun PunktSetzenDialog(ansicht: TeamAnsicht, schliessen: () -> Unit) {
     var text by remember { mutableStateOf("") }
     var ortet by remember { mutableStateOf(false) }
     var fehler by remember { mutableStateOf<String?>(null) }
+    /** Fund der Person statt Hinweis (Server 1.17.0): eigenes Symbol, Vorschlag für den Fundort im Bericht */
+    var fund by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = { if (!ortet) schliessen() },
@@ -60,15 +62,21 @@ fun PunktSetzenDialog(ansicht: TeamAnsicht, schliessen: () -> Unit) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Der Punkt kommt mit deinem jetzigen Standort zur Einsatzleitung, auf die Karte und als Notiz.",
                     style = MaterialTheme.typography.bodySmall)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    androidx.compose.material3.FilterChip(!fund, { fund = false }, label = { Text("Hinweis") })
+                    androidx.compose.material3.FilterChip(fund, { fund = true }, label = { Text("Person gefunden") })
+                }
+                if (fund) Text("Die Einsatzleitung sieht den Fund sofort und übernimmt ihn als Fundort in den Einsatzbericht.",
+                    style = MaterialTheme.typography.bodySmall)
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it.take(TeamPunkt.MAX_TEXT) },
                     label = { Text("Was ist hier?") },
-                    placeholder = { Text("z. B. Fund: Jacke") },
+                    placeholder = { Text(if (fund) "z. B. ansprechbar, am Bachufer" else "z. B. Jacke am Wegrand") },
                     maxLines = 3,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    listOf("Fund", "Spur", "Hinweis", "Gefahr").forEach { vorschlag ->
+                    if (!fund) listOf("Spur", "Hinweis", "Gefahr", "Gegenstand").forEach { vorschlag ->
                         OutlinedButton(onClick = { if (text.isEmpty()) text = "$vorschlag: " }) {
                             Text(vorschlag, style = MaterialTheme.typography.labelSmall)
                         }
@@ -81,7 +89,7 @@ fun PunktSetzenDialog(ansicht: TeamAnsicht, schliessen: () -> Unit) {
             if (ortet) {
                 CircularProgressIndicator()
             } else {
-                TextButton(enabled = text.isNotBlank(), onClick = {
+                TextButton(enabled = fund || text.isNotBlank(), onClick = {
                     ortet = true
                     bereich.launch {
                         if (!ortung.freigegeben) {
@@ -91,7 +99,9 @@ fun PunktSetzenDialog(ansicht: TeamAnsicht, schliessen: () -> Unit) {
                             if (ort == null) {
                                 fehler = "Keine Position gefunden. Bitte kurz unter freiem Himmel erneut versuchen."
                             } else {
-                                ansicht.punktSetzen(text, ort.lat, ort.lng, ort.genauigkeit, ort.zeitMs)
+                                val inhalt = text.trim()
+                                ansicht.punktSetzen(if (fund) (if (inhalt.isEmpty()) "Person gefunden" else "Person gefunden: $inhalt") else inhalt,
+                                    ort.lat, ort.lng, ort.genauigkeit, ort.zeitMs, fund = fund)
                                 schliessen()
                             }
                         }

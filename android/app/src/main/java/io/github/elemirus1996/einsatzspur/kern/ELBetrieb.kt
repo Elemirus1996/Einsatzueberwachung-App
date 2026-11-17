@@ -249,6 +249,9 @@ class ELBetrieb(
 
     /** Personal und Hunde für das Einsatzende; ohne Netz bzw. Server vor 1.14.1 null (dann Vorauswahl des Servers) */
     suspend fun vorOrt(): ELVorOrt? = einsatz?.let { e -> runCatching { e.vorOrt() }.getOrNull() }
+
+    /** Abschlussangaben für das Einsatzende; ohne Netz bzw. Server vor 1.17.0 null (dann Beenden wie bisher) */
+    suspend fun abschluss(): ELAbschluss? = einsatz?.let { e -> runCatching { e.abschluss() }.getOrNull() }
     suspend fun ergebnisse(): List<ELErgebnis> = einsatz?.let { e -> runCatching { e.ergebnisse() }.getOrNull() } ?: emptyList()
 
     /** Bericht laden und in [ordner] ablegen (nur bis zum nächsten Laden bzw. [berichtLoeschen]); Fehlertext statt Datei */

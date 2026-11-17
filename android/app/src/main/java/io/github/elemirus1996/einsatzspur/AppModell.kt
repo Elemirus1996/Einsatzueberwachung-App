@@ -61,6 +61,8 @@ class AppModell(private val context: Context) {
     private val bereich = MainScope()
     private val schluesselbund = Schluesselbund(context)
     private val quelle = LocationManagerQuelle(context)
+    /** Eigene Quelle der Einsatzleitung: Mit einer gemeinsamen Quelle würde das Beenden der einen Rolle die Ortung der anderen abschalten */
+    private val elQuelle = LocationManagerQuelle(context)
     private val puffer by lazy { SqlitePuffer(context) }
     private val elPuffer by lazy { SqlitePuffer(context, "el-positionen.db") }
 
@@ -118,6 +120,18 @@ class AppModell(private val context: Context) {
     val elHinweis: StateFlow<String?> = _elHinweis
     private var elAbmeldungDurchNutzer = false
     private var elTakt: Job? = null
+    private var elClient: ELClient? = null
+    private var elZugang: ELZugang? = null
+
+    /** „Wer bin ich“ (APP_API EL Abschnitt 4a): Liste zur Auswahl, solange keine Person gewählt ist */
+    private val _elPersonen = MutableStateFlow<List<io.github.elemirus1996.einsatzspur.kern.ELPerson>?>(null)
+    val elPersonen: StateFlow<List<io.github.elemirus1996.einsatzspur.kern.ELPerson>?> = _elPersonen
+
+    /** Welche Ansicht vorne ist, wenn Team und Einsatzleitung angemeldet sind */
+    enum class Vorne { AUTOMATISCH, START, EL, TEAM }
+    private val _vorne = MutableStateFlow(Vorne.AUTOMATISCH)
+    val vorne: StateFlow<Vorne> = _vorne
+    fun zeigen(v: Vorne) { _vorne.value = v }
 
     /** Zuletzt verwendete interne Adresse (nicht geheim) */
     private val einstellungen = context.getSharedPreferences("einstellungen", Context.MODE_PRIVATE)
@@ -170,7 +184,10 @@ class AppModell(private val context: Context) {
         packliste.erinnerungPlanen()
         // Heimatstaffel in den Einstellungen entfernt: ihre Packliste mit
         bereich.launch { heimat.eintrag.collect { if (it == null) packliste.vorlageEntfernen() } }
-        schluesselbund.elSitzungLesen()?.let { elStarten(it) }
+        schluesselbund.elSitzungLesen()?.let {
+            elStarten(it)
+            bereich.launch { elPersonFragen() }
+        }
         schluesselbund.sitzungLesen()?.let {
             teamStarten(it)
             konfigurieren()
@@ -189,6 +206,7 @@ class AppModell(private val context: Context) {
         _team.value?.anwenden(SteuerAntwort.STOP)
         schluesselbund.sitzungSpeichern(sitzung)
         teamStarten(sitzung)
+        _vorne.value = Vorne.TEAM
         dienstSicherstellen()
         konfigurieren()
     }
@@ -331,6 +349,30 @@ class AppModell(private val context: Context) {
             bereich.launch { ELClient(ELZugang(sitzung)).let { heimatAktualisieren(info, it::logo, it::packliste) } }
         }
         elStarten(sitzung)
+        _vorne.value = Vorne.EL
+        bereich.launch { elPersonFragen() }
+    }
+
+    /**
+     * Personenliste laden, wenn noch keine Person feststeht (ältere Server ohne `/personen`: nichts fragen).
+     * Kein Wechsel: eine andere Person nur über Abmelden und neue Anmeldung (Entscheidung Paul 17.11.2026)
+     */
+    suspend fun elPersonFragen() {
+        val client = elClient ?: return
+        if (_elSitzung.value?.personId != null) return
+        runCatching { client.personen() }.getOrNull()?.takeIf { it.isNotEmpty() }?.let { _elPersonen.value = it }
+    }
+
+    /** Person wählen: neues Token mit Person, Lage neu laden (Rolle steht dann in `lage.ich`) */
+    suspend fun elPersonWaehlen(person: io.github.elemirus1996.einsatzspur.kern.ELPerson) {
+        val client = elClient ?: return
+        val zugang = elZugang ?: return
+        val (neu, _) = client.ich(person.personId)
+        zugang.ersetzen(neu)
+        schluesselbund.elSitzungSpeichern(neu)
+        _elSitzung.value = neu
+        _elPersonen.value = null
+        _elAnsicht.value?.neuLaden()
     }
 
     /** Abmelden: Token auf dem Server ungültig machen, Ortung aus, Token löschen. */
@@ -350,7 +392,7 @@ class AppModell(private val context: Context) {
         val zugang = ELZugang(sitzung)
         val client = ELClient(zugang)
         val ortung = TeamOrtung(
-            schnittstelle = client, quelle = quelle, puffer = elPuffer, ablaufMs = sitzung.expiresAtMs,
+            schnittstelle = client, quelle = elQuelle, puffer = elPuffer, ablaufMs = sitzung.expiresAtMs,
             bereich = bereich, pauseOhneOrtung = true, beimBeenden = ::elBeendet,
         )
         val ansicht = ELAnsicht(client, bereich) { modus ->
@@ -376,13 +418,20 @@ class AppModell(private val context: Context) {
         ansicht.beiVermisste = { vermisste.laden() }
         _elVermisste.value = vermisste
         _elBetrieb.value = betrieb
+        var letzterEinsatz: io.github.elemirus1996.einsatzspur.kern.ELLage.Einsatz? = null
         ansicht.nachLage = { lage ->
+            LageMeldung.einsatzAngelegt(letzterEinsatz, lage.einsatz)?.let { mitteilungen.senden(it) }
+            letzterEinsatz = lage.einsatz
             betrieb.senden()
             karte.lageGeaendert()
             verlaengerung.pruefen(lage.einsatz.aktiv)
             datenschutzVersionPruefen(lage.datenschutzVersion, zugang.sitzung.kennung) { client.datenschutz() }
         }
         _elVerlaengerung.value = verlaengerung
+        elClient = client
+        elZugang = zugang
+        // Ist auch ein Team angemeldet, sendet das Handy nur als Team (APP_API EL Abschnitt 4a)
+        ortung.ruht = _team.value != null
         _elOrtung.value = ortung
         _elAnsicht.value = ansicht
         ortung.ablaufPruefen()
@@ -421,6 +470,10 @@ class AppModell(private val context: Context) {
         _elOrtung.value = null
         _elAnsicht.value = null
         _elVerlaengerung.value = null
+        elClient = null
+        elZugang = null
+        _elPersonen.value = null
+        if (_vorne.value == Vorne.EL) _vorne.value = Vorne.AUTOMATISCH
     }
 
     /** Nach dem Ende bleibt „beendet“ stehen, bis der Nutzer zurück zum Start geht. */
@@ -431,6 +484,8 @@ class AppModell(private val context: Context) {
 
     private fun teamEntfernen() {
         _team.value = null
+        _elOrtung.value?.ruht = false
+        if (_vorne.value == Vorne.TEAM) _vorne.value = Vorne.AUTOMATISCH
         _ansicht.value = null
         _sitzung.value = null
     }
@@ -513,6 +568,8 @@ class AppModell(private val context: Context) {
         ansicht.beiMeldungen = { liste -> liste.forEach { mitteilungen.senden(it, stumm = it.tonart?.let { art -> !toene.mitTon(art) } ?: false) } }
         ansicht.beiLage = { lage -> datenschutzVersionPruefen(lage.datenschutzVersion, teamKennung) { client.datenschutz() } }
         _team.value = team
+        // Ist auch die Einsatzleitung angemeldet, sendet das Handy nur als Team (APP_API EL Abschnitt 4a)
+        _elOrtung.value?.ruht = true
         _ansicht.value = ansicht
         if (imVordergrund) ansicht.starten() else ansicht.hintergrund()
         team.ablaufPruefen()

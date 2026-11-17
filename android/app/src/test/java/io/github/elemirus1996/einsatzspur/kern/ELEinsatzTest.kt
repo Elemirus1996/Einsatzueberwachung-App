@@ -32,8 +32,10 @@ class ELEinsatzTest {
     @Test fun startVollstaendig() {
         assertFalse(ELEinsatzStart(ort = "Wald").vollstaendig)   // Szenario fehlt
         assertFalse(ELEinsatzStart(szenario = ELSzenario.FLAECHE, ort = "  ").vollstaendig)
-        assertTrue(ELEinsatzStart(szenario = ELSzenario.FLAECHE, ort = "Wald").vollstaendig)
-        assertTrue(ELEinsatzStart(szenario = ELSzenario.FLAECHE, diveraAlarmId = 42).vollstaendig)   // Ort aus dem Alarm
+        assertFalse(ELEinsatzStart(szenario = ELSzenario.FLAECHE, ort = "Wald").vollstaendig)   // Alarmiert durch fehlt (Server 1.17.0)
+        val p = ELAlarmiertDurch.POLIZEI
+        assertTrue(ELEinsatzStart(szenario = ELSzenario.FLAECHE, ort = "Wald", alarmiertDurch = p).vollstaendig)
+        assertTrue(ELEinsatzStart(szenario = ELSzenario.FLAECHE, diveraAlarmId = 42, alarmiertDurch = p).vollstaendig)   // Ort aus dem Alarm
     }
 
     @Test fun startAktion() {
