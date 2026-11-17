@@ -62,7 +62,8 @@ struct ELAnmeldungView: View {
             if server.isEmpty { server = modell.elServerAdresse }
             #if DEBUG
             // Nur für Bildschirmfotos im Simulator gegen einen lokalen Testserver
-            if passwort.isEmpty, let demo = ProcessInfo.processInfo.environment["EL_DEMO_PASSWORT"] { passwort = demo }
+            if passwort.isEmpty, let demo = ProcessInfo.processInfo.environment["EL_DEMO_PASSWORT"]
+                ?? UserDefaults.standard.string(forKey: "el.demo.passwort") { passwort = demo }
             #endif
         }
         .alert("Anmeldung nicht möglich", isPresented: Binding(get: { fehler != nil }, set: { if !$0 { fehler = nil } })) {

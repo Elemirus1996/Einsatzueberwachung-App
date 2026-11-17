@@ -30,10 +30,14 @@ data class NavigationsZiel(
 )
 
 /** Punkt am eigenen Standort (`POST /punkt`, Abschnitt 13); wartet im Funkloch auf dem Gerät. */
-data class TeamPunkt(val id: String, val text: String, val lat: Double, val lng: Double, val genauigkeit: Double?, val zeitMs: Long) {
+data class TeamPunkt(
+    val id: String, val text: String, val lat: Double, val lng: Double, val genauigkeit: Double?, val zeitMs: Long,
+    /** `fund` oder `hinweis` (Server 1.17.0, ältere ignorieren das Feld) */
+    val typ: String = "hinweis",
+) {
     /** Körper für den Server, Zeit als UTC mit `Z` */
     fun json(): JSONObject = JSONObject().put("id", id).put("text", text).put("lat", lat).put("lng", lng)
-        .put("genauigkeit", genauigkeit ?: JSONObject.NULL)
+        .put("genauigkeit", genauigkeit ?: JSONObject.NULL).put("typ", typ)
         .put("zeit", java.time.Instant.ofEpochMilli(zeitMs).truncatedTo(java.time.temporal.ChronoUnit.SECONDS).toString())
 
     companion object {
@@ -56,6 +60,8 @@ data class TeamLage(
     val dogName: String?,
     val hundefuehrerName: String?,
     val helfer: List<String>,
+    /** „Eingesetzt als“ der Einsatzleitung (Server 1.17.0) */
+    val einsatzart: String? = null,
     val suche: Suche,
     val suchgebiet: Suchgebiet?,
     val halsband: Halsband?,
@@ -84,6 +90,7 @@ data class TeamLage(
                 dogName = team.textOderNull("dogName"),
                 hundefuehrerName = team.textOderNull("hundefuehrerName"),
                 helfer = team.optJSONArray("helfer")?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList(),
+                einsatzart = team.textOderNull("einsatzart"),
                 suche = suche(suche),
                 suchgebiet = json.objektOderNull("suchgebiet")?.let { g ->
                     Suchgebiet(g.textOderNull("id"), g.textOderNull("name"), g.textOderNull("farbe"), punkte(g.getJSONArray("punkte")))
@@ -266,6 +273,13 @@ class SseLeser {
 data class LageMeldung(val titel: String, val text: String? = null, val tonart: Tonart? = null) {
     companion object {
         val EINSATZ_BEENDET = LageMeldung("Einsatz beendet – Ortung aus")
+
+        /** Einsatzleitung: neuer Einsatz oder neue Übung angelegt (nur beim Wechsel, nicht beim ersten Laden) */
+        fun einsatzAngelegt(alt: ELLage.Einsatz?, neu: ELLage.Einsatz): LageMeldung? {
+            if (alt == null || alt.aktiv || !neu.aktiv) return null
+            val text = listOfNotNull(neu.stichwort?.takeIf { it.isNotEmpty() }, neu.ort?.takeIf { it.isNotEmpty() }).joinToString(" · ")
+            return LageMeldung(if (neu.uebung) "Übung angelegt" else "Einsatz angelegt", text.ifEmpty { null })
+        }
 
         /** Was sich geändert hat; je Zustandsänderung höchstens eine Meldung (wie iOS `LageMeldung.vergleichen`). */
         fun vergleichen(alt: TeamLage, neu: TeamLage): List<LageMeldung> = buildList {

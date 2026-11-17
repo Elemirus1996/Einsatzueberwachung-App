@@ -13,6 +13,7 @@ struct ELFunkView: View {
     @State private var teamId: String?
     @State private var antwortAuf: ELNotiz?
     @FocusState private var eingabeAktiv: Bool
+    @Environment(\.elDarfSteuern) private var darfSteuern
 
     var body: some View {
         VStack(spacing: 0) {
@@ -37,7 +38,15 @@ struct ELFunkView: View {
                     if let neu { withAnimation { leser.scrollTo(neu, anchor: .bottom) } }
                 }
             }
-            eingabe
+            if darfSteuern {
+                eingabe
+            } else {
+                Text("Nur lesen: Funk und Notizen schreibt die Einsatzleitung.")
+                    .font(.footnote)
+                    .foregroundStyle(ELStil.vermerk)
+                    .frame(maxWidth: .infinity)
+                    .padding(10)
+            }
         }
         .background(ELStil.papier.ignoresSafeArea())
         .toolbar(.hidden, for: .navigationBar)

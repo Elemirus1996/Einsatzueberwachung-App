@@ -57,10 +57,17 @@ final class TeamOrtung: ObservableObject {
 
     /// Übernimmt eine Antwort des Servers und schaltet die Ortung entsprechend.
     /// `melden: false`, wenn der Modus aus /lage kommt (die Anzeige ist dann schon aktuell).
-    func anwenden(_ antwort: SteuerAntwort, melden: Bool = true) {
+    /// Ortung ruht: `track` wirkt wie `pause` (EL-Ortung, solange auf dem Handy auch ein Team angemeldet ist)
+    var ruht = false {
+        didSet { if ruht != oldValue, zustand != .beendet { anwenden(steuerung, melden: false) } }
+    }
+
+    func anwenden(_ vorgabe: SteuerAntwort, melden: Bool = true) {
         guard zustand != .beendet else { return }
+        var antwort = vorgabe
+        if ruht && antwort.mode == .track { antwort.mode = .pause }
         let vorher = steuerung.mode
-        steuerung.mode = antwort.mode
+        steuerung.mode = vorgabe.mode
         steuerung.intervalSec = antwort.intervalSec ?? steuerung.intervalSec
         steuerung.uploadEverySec = antwort.uploadEverySec ?? steuerung.uploadEverySec
         steuerung.pauseCheckSec = antwort.pauseCheckSec ?? steuerung.pauseCheckSec

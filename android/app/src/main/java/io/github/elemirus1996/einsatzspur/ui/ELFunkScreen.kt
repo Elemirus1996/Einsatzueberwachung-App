@@ -89,7 +89,11 @@ fun ELFunkScreen(betrieb: ELBetrieb, teams: List<ELLage.Team>, lage: ELLage? = n
                     loeschen = if (n.loeschbar) ({ bereich.launch { betrieb.ausfuehren(ELAktion.notizLoeschen(n.id)); betrieb.notizenLaden() } }) else null)
             }
         }
-        // Eingabe
+        // Eingabe; Rolle `lesen` (APP_API EL Abschnitt 4a): nur lesen
+        if (lage?.darfSteuern == false) {
+            Text("Nur lesen: Funk und Notizen schreibt die Einsatzleitung.", style = MaterialTheme.typography.bodySmall,
+                color = ELStil.vermerk, modifier = Modifier.fillMaxWidth().background(ELStil.platte).padding(12.dp))
+        } else
         Column(Modifier.fillMaxWidth().background(ELStil.platte).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val antwort = antwortAuf
             if (antwort != null) {

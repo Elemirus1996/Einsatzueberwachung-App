@@ -6,6 +6,8 @@ import SwiftUI
 struct ELEinsatzStartView: View {
     @ObservedObject var betrieb: ELBetrieb
     let eigenePosition: Position?
+    /// Gewählte Person (Abschnitt 4a): als Einsatzleiter vorgeschlagen, damit wer anlegt auch steuern darf
+    var eigenerName: String? = nil
     @Environment(\.dismiss) private var schliessen
     @State private var daten = ELEinsatzStart()
     @State private var standortUebernehmen = true
@@ -23,6 +25,21 @@ struct ELEinsatzStartView: View {
                     Section {
                         Label("Es läuft bereits ein Einsatz. Erst beenden, dann neu starten.", systemImage: "exclamationmark.triangle")
                             .foregroundStyle(.orange)
+                    }
+                }
+                // Offener Divera-Alarm: oben vorschlagen wie im Browser
+                if daten.diveraAlarmId == nil, let neuester = vorlage?.divera.max(by: { ($0.zeit ?? .distantPast) < ($1.zeit ?? .distantPast) }) {
+                    Section {
+                        Button {
+                            daten.diveraAlarmId = neuester.id
+                        } label: {
+                            Label {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Divera-Alarm übernehmen").font(.headline)
+                                    Text(Self.alarmText(neuester)).font(.subheadline).foregroundStyle(.secondary)
+                                }
+                            } icon: { Image(systemName: "bell.badge.fill").foregroundStyle(.red) }
+                        }
                     }
                 }
                 if let alarme = vorlage?.divera, !alarme.isEmpty {
@@ -53,6 +70,17 @@ struct ELEinsatzStartView: View {
                         Text("bitte wählen").tag(ELSzenario.unbestimmt)
                         ForEach((vorlage ?? ELVorlage()).szenarioWahl, id: \.self) { Text($0.anzeige).tag($0) }
                     }
+                }
+                Section {
+                    Picker("Alarmiert durch (Pflicht)", selection: $daten.alarmiertDurch) {
+                        Text("bitte wählen").tag(ELAlarmiertDurch?.none)
+                        ForEach(ELAlarmiertDurch.allCases) { Text($0.anzeige).tag(Optional($0)) }
+                    }
+                    TextField("Stelle oder Name (optional)", text: $daten.melder)
+                } header: {
+                    Text("Alarmierung")
+                } footer: {
+                    if alarm != nil { Text("Den Melder aus dem Alarm übernimmt der Server, wer alarmiert hat, wählst du hier.") }
                 }
                 Section("Führung") {
                     ELNamensFeld(titel: "Einsatzleiter", text: $daten.einsatzleiter, vorschlaege: vorlage?.einsatzleiter ?? [])
@@ -89,6 +117,7 @@ struct ELEinsatzStartView: View {
                 }
             }
             .task {
+                if daten.einsatzleiter.isEmpty, let eigenerName { daten.einsatzleiter = eigenerName }
                 vorlage = await betrieb.vorlage()
                 geladen = true
             }
@@ -145,6 +174,14 @@ struct ELEinsatzBeendenView: View {
     @State private var vorOrt: ELVorOrt?
     @State private var personalIds: Set<String> = []
     @State private var hundeIds: Set<String> = []
+    // Server 1.17.0: Angaben für den Bericht und Abschnitte; nil = älterer Server, Beenden wie bisher
+    @State private var abschluss: ELAbschluss?
+    @State private var eingabe = ELAbschlussEingabe()
+    @State private var abschnitte = Set(ELBerichtAbschnitt.allCases)
+    @State private var trotzdem = false
+
+    private var istFund: Bool { ergebnis?.fund == true }
+    private var fehlend: [String] { abschluss.map { eingabe.fehlend(abschluss: $0, fund: istFund) } ?? [] }
 
     private var endzeitBereich: ClosedRange<Date> {
         let jetzt = Date()
@@ -163,6 +200,9 @@ struct ELEinsatzBeendenView: View {
                         ForEach(ergebnisse) { Text($0.anzeige).tag(Optional($0)) }
                     }
                     TextField("Bemerkungen (optional)", text: $bemerkungen, axis: .vertical)
+                }
+                if let abschluss {
+                    ELAbschlussAbschnitte(abschluss: abschluss, eingabe: $eingabe, fund: istFund)
                 }
                 if let vorOrt {
                     Section {
@@ -203,6 +243,15 @@ struct ELEinsatzBeendenView: View {
                     Picker("Karte", selection: $kartenart) {
                         ForEach(kartenarten) { Text($0.anzeige).tag($0.wert) }
                     }
+                    if abschluss != nil {
+                        DisclosureGroup("Abschnitte (\(abschnitte.count) von \(ELBerichtAbschnitt.allCases.count))") {
+                            ForEach(ELBerichtAbschnitt.allCases) { a in
+                                Toggle(a.anzeige, isOn: Binding(
+                                    get: { abschnitte.contains(a) },
+                                    set: { if $0 { abschnitte.insert(a) } else { abschnitte.remove(a) } }))
+                            }
+                        }
+                    }
                     if !lage.teams.isEmpty {
                         Toggle("Alle Teams im Bericht", isOn: $alleTeams)
                         if !alleTeams {
@@ -217,13 +266,26 @@ struct ELEinsatzBeendenView: View {
                     }
                 }
             }
+            .safeAreaInset(edge: .bottom) {
+                if !fehlend.isEmpty {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Label("Es fehlen noch: \(fehlend.joined(separator: ", ")). Nach dem Beenden ist nichts mehr änderbar.",
+                              systemImage: "exclamationmark.triangle.fill")
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                        Toggle("Trotzdem ohne diese Angaben beenden", isOn: $trotzdem).font(.footnote)
+                    }
+                    .padding(12)
+                    .background(.regularMaterial)
+                }
+            }
             .navigationTitle("Einsatz beenden")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Abbrechen") { schliessen() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Beenden") { fragen = true }
-                        .disabled(ergebnis == nil || !geprueft || (!alleTeams && teamIds.isEmpty))
+                        .disabled(ergebnis == nil || !geprueft || (!alleTeams && teamIds.isEmpty) || (!fehlend.isEmpty && !trotzdem))
                 }
             }
             .confirmationDialog("Einsatz wirklich beenden?", isPresented: $fragen, titleVisibility: .visible) {
@@ -234,11 +296,17 @@ struct ELEinsatzBeendenView: View {
                     // Reihenfolge wie in der Liste; ohne Liste (alter Server) nimmt der Server die Vorauswahl
                     let personal = vorOrt?.personal.map(\.id).filter(personalIds.contains)
                     let hunde = vorOrt?.hunde.map(\.id).filter(hundeIds.contains)
+                    // Lücken hat die Einsatzleitung oben ausdrücklich bestätigt
+                    let angaben = abschluss.map { eingabe.json(abschluss: $0, fund: istFund) }
+                    let berichtAbschnitte: [String]? = abschluss == nil ? nil
+                        : ELBerichtAbschnitt.allCases.filter(abschnitte.contains).map(\.rawValue) + (mitTracks ? ["tracks"] : [])
                     Task {
                         await betrieb.ausfuehren(.einsatzBeenden(
                             ergebnis: ergebnis.wert, mitTracks: mitTracks, kartenart: kartenart, teamIds: auswahl,
                             endzeit: endzeitAngeben ? min(endzeit, Date()) : nil, bemerkungen: bemerkungen,
-                            mitPunkten: mitPunkten, personalIds: personal, hundeIds: hunde))
+                            mitPunkten: mitPunkten, personalIds: personal, hundeIds: hunde,
+                            abschluss: angaben, unvollstaendigBestaetigt: abschluss == nil ? nil : true,
+                            abschnitte: berichtAbschnitte))
                     }
                     schliessen()
                 }
@@ -249,6 +317,10 @@ struct ELEinsatzBeendenView: View {
                 let vorlage = await betrieb.vorlage()
                 if let v = vorlage { kartenarten = v.kartenWahl }
                 ergebnisse = vorlage?.ergebnisse.isEmpty == false ? vorlage!.ergebnisse : await betrieb.ergebnisse()
+                if let a = await betrieb.abschluss() {
+                    eingabe = ELAbschlussEingabe(a)
+                    abschluss = a
+                }
                 if let liste = await betrieb.vorOrt() {
                     personalIds = Set(liste.personal.filter(\.vorausgewaehlt).map(\.id))
                     hundeIds = Set(liste.hunde.filter(\.vorausgewaehlt).map(\.id))

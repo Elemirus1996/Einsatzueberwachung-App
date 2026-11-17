@@ -6,7 +6,10 @@ import Foundation
 final class AppModell: ObservableObject {
     static let statusAufgabe = "io.github.elemirus1996.einsatzspur.status"
 
-    @Published private(set) var team: TeamOrtung?
+    @Published private(set) var team: TeamOrtung? {
+        // Ist auch ein Team angemeldet, sendet das Handy nur als Team (APP_API EL Abschnitt 4a)
+        didSet { elOrtung?.ruht = team != nil }
+    }
     @Published private(set) var teamAnsicht: TeamAnsicht?
     @Published private(set) var teamSitzung: TeamSitzung?
     /// Offene Frage „Ist das deine eigene Staffel?“ nach der ersten Anmeldung an einem Server.
@@ -16,7 +19,7 @@ final class AppModell: ObservableObject {
     /// Server und Anmelde-Code des laufenden Einsatzes (Schlüsselbund), solange der Einsatz läuft.
     @Published private(set) var einsatzZugang: TeamQRCode?
 
-    // Rolle Einsatzleitung (nur im VPN). Immer nur eine Rolle aktiv, beide teilen sich die Ortung.
+    // Rolle Einsatzleitung (nur im VPN). Team und EL dürfen gleichzeitig angemeldet sein; dann sendet nur das Team.
     @Published private(set) var elSitzung: ELSitzung?
     @Published private(set) var elOrtung: TeamOrtung?
     @Published private(set) var elAnsicht: ELAnsicht?
@@ -28,6 +31,14 @@ final class AppModell: ObservableObject {
     /// Hinweis nach Ende der EL-Sitzung durch den Server (Token abgelaufen, Passwort geändert).
     @Published private(set) var elHinweis: String?
     private var elAbmeldungDurchNutzer = false
+    private var elClient: ELClient?
+    private var elZugang: ELZugang?
+    /// „Wer bin ich“ (APP_API EL Abschnitt 4a): Liste zur Auswahl, solange keine Person gewählt ist; nil = gewählt oder älterer Server
+    @Published private(set) var elPersonen: [ELPerson]?
+
+    /// Welche Ansicht vorne ist, wenn Team und Einsatzleitung angemeldet sind; `automatisch` = EL vor Team vor Startseite
+    enum Vorne { case automatisch, start, el, team }
+    @Published var vorne: Vorne = .automatisch
 
     // Datenschutzerklärung der Staffel (#148): zuerst Datenschutz, dann Heimatstaffel
     @Published private(set) var datenschutzFrage: DatenschutzFrage?
@@ -66,6 +77,8 @@ final class AppModell: ObservableObject {
 
     private let schluesselbund = Schluesselbund()
     private let quelle = CoreLocationQuelle()
+    /// Eigene Quelle der Einsatzleitung: Mit einer gemeinsamen Quelle würde das Beenden der einen Rolle die Ortung der anderen abschalten
+    private let elQuelle = CoreLocationQuelle()
     private lazy var puffer = PositionsPuffer.standard()
 
     init() {
@@ -73,6 +86,7 @@ final class AppModell: ObservableObject {
         einsatzZugang = schluesselbund.lesen(TeamQRCode.self, konto: Schluesselbund.kontoEinsatzZugang)
         if let el = schluesselbund.lesen(ELSitzung.self, konto: Schluesselbund.kontoEL) {
             elStarten(el)
+            Task { await elPersonFragen() }
         }
         if let sitzung = schluesselbund.lesen(TeamSitzung.self, konto: Schluesselbund.kontoTeam) {
             teamStarten(sitzung)
@@ -188,6 +202,7 @@ final class AppModell: ObservableObject {
         team?.anwenden(.stop)
         guard schluesselbund.speichern(sitzung, konto: Schluesselbund.kontoTeam) else { return }
         teamStarten(sitzung)
+        vorne = .team
         Task { await teamKonfigurieren() }
     }
 
@@ -250,6 +265,26 @@ final class AppModell: ObservableObject {
             Task { await heimatAktualisieren(info, logo: client.logo, packliste: client.packliste) }
         }
         elStarten(sitzung)
+        vorne = .el
+        Task { await elPersonFragen() }
+    }
+
+    /// Personenliste laden, wenn noch keine Person feststeht (ältere Server ohne `/personen`: nichts fragen).
+    /// Kein Wechsel: eine andere Person nur über Abmelden und neue Anmeldung (Entscheidung Paul 17.11.2026)
+    func elPersonFragen() async {
+        guard let client = elClient, elSitzung?.personId == nil else { return }
+        if let liste = try? await client.personen(), !liste.isEmpty { elPersonen = liste }
+    }
+
+    /// Person wählen: neues Token mit Person, Lage neu laden (Rolle steht dann in `lage.ich`)
+    func elPersonWaehlen(_ person: ELPerson) async throws {
+        guard let client = elClient, let zugang = elZugang else { return }
+        let (neu, _) = try await client.ich(personId: person.personId)
+        zugang.ersetzen(neu)
+        schluesselbund.speichern(neu, konto: Schluesselbund.kontoEL)
+        elSitzung = neu
+        elPersonen = nil
+        await elAnsicht?.neuLaden()
     }
 
     /// Abmelden: Token auf dem Server ungültig machen, Ortung aus, Token löschen.
@@ -265,7 +300,7 @@ final class AppModell: ObservableObject {
         let zugang = ELZugang(sitzung)
         let client = ELClient(zugang: zugang)
         let ortung = TeamOrtung(
-            schnittstelle: client, quelle: quelle, puffer: elPuffer, ablauf: sitzung.expiresAt,
+            schnittstelle: client, quelle: elQuelle, puffer: elPuffer, ablauf: sitzung.expiresAt,
             pauseOhneOrtung: true,
             beimBeenden: { [weak self] in self?.elBeendet() })
         let ansicht = ELAnsicht(schnittstelle: client) { [weak self] modus in
@@ -289,7 +324,12 @@ final class AppModell: ObservableObject {
             self.elSitzung = neu
             self.elOrtung?.ablaufSetzen(neu.expiresAt)
         }
+        var letzterEinsatz: ELLage.Einsatz?
         ansicht.nachLage = { [weak self, weak betrieb, weak ansicht, weak verlaengerung] in
+            if let neu = ansicht?.lage?.einsatz {
+                if let meldung = LageMeldung.einsatzAngelegt(alt: letzterEinsatz, neu: neu) { self?.mitteiler.senden(meldung) }
+                letzterEinsatz = neu
+            }
             await betrieb?.senden()
             await verlaengerung?.pruefen(einsatzLaeuft: ansicht?.lage?.einsatz.aktiv == true)
             self?.datenschutzVersionPruefen(ansicht?.lage?.datenschutz?.version, kennung: zugang.sitzung.kennung) {
@@ -297,6 +337,9 @@ final class AppModell: ObservableObject {
             }
         }
         elVerlaengerung = verlaengerung
+        elClient = client
+        elZugang = zugang
+        ortung.ruht = team != nil
         elOrtung = ortung
         elAnsicht = ansicht
         elBetrieb = betrieb
@@ -336,6 +379,10 @@ final class AppModell: ObservableObject {
         elVerlaengerTakt?.cancel()
         elVerlaengerTakt = nil
         elVerlaengerung = nil
+        elClient = nil
+        elZugang = nil
+        elPersonen = nil
+        if vorne == .el { vorne = .automatisch }
     }
 
     /// App kommt in den Vordergrund: Ablauf prüfen und Status holen.

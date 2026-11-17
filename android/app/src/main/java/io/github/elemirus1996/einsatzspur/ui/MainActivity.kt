@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import io.github.elemirus1996.einsatzspur.AppModell
 import io.github.elemirus1996.einsatzspur.EinsatzSpurApp
 
 class MainActivity : ComponentActivity() {
@@ -58,6 +59,8 @@ class MainActivity : ComponentActivity() {
                 val elKarte by modell.elKarte.collectAsState()
                 val elVermisste by modell.elVermisste.collectAsState()
                 val elHinweis by modell.elHinweis.collectAsState()
+                val vorne by modell.vorne.collectAsState()
+                val elPersonen by modell.elPersonen.collectAsState()
                 var elAnmeldungOffen by remember { mutableStateOf(elHinweis != null) }
                 var einstellungenOffen by remember { mutableStateOf(false) }
                 var packlisteOffen by remember { mutableStateOf(false) }
@@ -69,28 +72,41 @@ class MainActivity : ComponentActivity() {
                 val elO = elOrtung
                 val elA = elAnsicht
                 val elB = elBetrieb
+                // Vorne: gewählt oder automatisch (EL vor Team vor Startseite); die andere Anmeldung bleibt bestehen
+                val zeigtEL = elO != null && (vorne == AppModell.Vorne.EL || vorne == AppModell.Vorne.AUTOMATISCH)
+                val zeigtTeam = vorne == AppModell.Vorne.TEAM || vorne == AppModell.Vorne.AUTOMATISCH ||
+                    (vorne == AppModell.Vorne.EL && elO == null)
+                val personen = elPersonen
                 if (packlisteOffen) {
                     PacklisteScreen(modell.packliste, zurueck = { packlisteOffen = false })
                 } else if (einstellungenOffen) {
                     EinstellungenScreen(modell.heimat, modell.datenschutz.alle(), version(), modell.toene, zurueck = { einstellungenOffen = false })
-                } else if (elO != null && elA != null && elB != null) {
-                    ELUebersichtScreen(elA, elO, elB, elKarte, elVermisste, elVerlaengerung, modell.toene, abmelden = {
+                } else if (zeigtEL && personen != null) {
+                    // Erst „Wer bin ich“, dann die Lage (APP_API EL Abschnitt 4a)
+                    ELPersonWahlScreen(personen, waehlen = modell::elPersonWaehlen, abmelden = {
                         modell.elAbmelden()
                         elAnmeldungOffen = false
                     })
-                } else if (elAnmeldungOffen || elHinweis != null) {
+                } else if (zeigtEL && elO != null && elA != null && elB != null) {
+                    ELUebersichtScreen(elA, elO, elB, elKarte, elVermisste, elVerlaengerung, modell.toene, abmelden = {
+                        modell.elAbmelden()
+                        elAnmeldungOffen = false
+                    }, startseite = { modell.zeigen(AppModell.Vorne.START) })
+                } else if (elO == null && (elAnmeldungOffen || elHinweis != null)) {
                     ELAnmeldungScreen(
                         modell.elServerAdresse, elHinweis,
                         anmelden = { server, passwort, geraet ->
                             berechtigungenAnfragen()
                             modell.elAnmelden(server, passwort, geraet)
+                            // Angemeldet: zurück auf der Startseite nicht wieder die Anmeldung zeigen
+                            elAnmeldungOffen = false
                         },
                         zurueck = {
                             elAnmeldungOffen = false
                             modell.elHinweisGelesen()
                         },
                     )
-                } else if (ortung != null && zugang != null && lage != null) {
+                } else if (zeigtTeam && ortung != null && zugang != null && lage != null) {
                     TeamAnsichtScreen(
                         ortung, lage, zugang, hinweise.value,
                         einstellungOeffnen = { runCatching { startActivity(it) } },
@@ -99,6 +115,7 @@ class MainActivity : ComponentActivity() {
                         vomEinsatzAbmelden = modell::vomEinsatzAbmelden,
                         schliessen = modell::schliessen,
                         toene = modell.toene,
+                        startseite = { modell.zeigen(AppModell.Vorne.START) },
                     )
                 } else {
                     val anmelden = { sitzung: TeamSitzung, zugang: TeamQRCode, auswahl: TeamAuswahl ->
@@ -122,6 +139,10 @@ class MainActivity : ComponentActivity() {
                             vorAuswahl = vorAuswahl, datenschutzOffen = datenschutzFrage != null,
                             heimat = modell.heimat, einstellungen = { einstellungenOffen = true },
                             packliste = modell.packliste, packlisteOeffnen = { packlisteOffen = true },
+                            teamAngemeldet = if (ortung != null) zugang?.teamName ?: "Team" else null,
+                            teamOeffnen = { modell.zeigen(AppModell.Vorne.TEAM) },
+                            elAngemeldet = if (elO != null) elStatus(elA) else null,
+                            elOeffnen = { modell.zeigen(AppModell.Vorne.EL) },
                         )
                     }
                 }
@@ -149,6 +170,14 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         hinweise.value = GeraeteHinweise.pruefen(this)
         modell.aktiviert()
+    }
+
+    /** „Angemeldet · Anna Berg · Einsatzleiter · öffnen“ */
+    @androidx.compose.runtime.Composable
+    private fun elStatus(ansicht: io.github.elemirus1996.einsatzspur.kern.ELAnsicht?): String {
+        val lage = ansicht?.lage?.collectAsState()?.value
+        val ich = lage?.ich
+        return (listOf("Angemeldet") + listOfNotNull(ich?.name, ich?.rollenWert?.anzeige) + "öffnen").joinToString(" · ")
     }
 
     private fun version(): String =

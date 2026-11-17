@@ -25,17 +25,21 @@ data class ELEinsatzStart(
     val lng: Double? = null,
     /** Divera-Alarm aus `GET /einsatz/vorlage`; dann übernimmt der Server Ort, Koordinate und Stichwort aus dem Alarm */
     val diveraAlarmId: Int? = null,
+    /** Wer alarmiert hat (Pflicht ab Server 1.17.0, auch bei Divera); `melder` = Stelle oder Name, optional */
+    val alarmiertDurch: ELAlarmiertDurch? = null,
+    val melder: String = "",
 ) {
-    /** Szenario immer Pflicht (nicht „Unbestimmt“), der Ort nur ohne Divera-Alarm */
-    val vollstaendig: Boolean get() = szenario != ELSzenario.UNBESTIMMT && (diveraAlarmId != null || ort.isNotBlank())
+    /** Szenario und „Alarmiert durch“ immer Pflicht, der Ort nur ohne Divera-Alarm */
+    val vollstaendig: Boolean
+        get() = szenario != ELSzenario.UNBESTIMMT && alarmiertDurch != null && (diveraAlarmId != null || ort.isNotBlank())
 }
 
 /** Erlaubtes Ergebnis für das Einsatzende (`GET /einsatz/ergebnisse`). */
-data class ELErgebnis(val wert: String, val anzeige: String) {
+data class ELErgebnis(val wert: String, val anzeige: String, val fund: Boolean = false) {
     companion object {
         fun liste(a: JSONArray) = (0 until a.length()).map {
             val e = a.getJSONObject(it)
-            ELErgebnis(e.getString("wert"), e.textOderNull("anzeige") ?: e.getString("wert"))
+            ELErgebnis(e.getString("wert"), e.textOderNull("anzeige") ?: e.getString("wert"), e.optBoolean("fund", false))
         }
     }
 }
@@ -134,6 +138,7 @@ data class ELEinsatzEnde(
             pdf.optJSONArray("teamIds")?.let { a -> (0 until a.length()).map { a.getString(it) } }
                 ?.takeIf { it.isNotEmpty() }?.let { teile += "teams=${it.joinToString(",")}" }
             if (pdf.has("tracks") && !pdf.optBoolean("tracks", true)) teile += "tracks=0"
+            pdf.optJSONArray("abschnitte")?.let { a -> teile += "abschnitte=${(0 until a.length()).joinToString(",") { a.getString(it) }}" }
             return teile.joinToString("&")
         }
 
@@ -167,11 +172,15 @@ interface ELEinsatzSchnittstelle {
     suspend fun vorlage(): ELVorlage
     suspend fun ergebnisse(): List<ELErgebnis>
     suspend fun vorOrt(): ELVorOrt
+    /** Abschlussangaben (Server 1.17.0); ältere Server und Attrappen: 404 */
+    suspend fun abschluss(): ELAbschluss = throw SchnittstellenFehler.Server(404)
 }
 
 fun ELAktion.Companion.einsatzStart(d: ELEinsatzStart): ELAktion {
     val inhalt = JSONObject().put("szenario", d.szenario.wert).put("uebung", d.uebung)
-    listOf("stichwort" to d.stichwort, "ort" to d.ort, "einsatzleiter" to d.einsatzleiter, "fuehrungsassistent" to d.fuehrungsassistent)
+    d.alarmiertDurch?.let { inhalt.put("alarmiertDurch", it.wert) }
+    listOf("stichwort" to d.stichwort, "ort" to d.ort, "einsatzleiter" to d.einsatzleiter, "fuehrungsassistent" to d.fuehrungsassistent,
+        "melder" to d.melder)
         .forEach { (feld, wert) -> wert.trim().takeIf { it.isNotEmpty() }?.let { inhalt.put(feld, it) } }
     if (d.lat != null && d.lng != null) inhalt.put("lat", d.lat).put("lng", d.lng)
     d.diveraAlarmId?.let { inhalt.put("diveraAlarmId", it) }
@@ -189,10 +198,17 @@ fun ELAktion.Companion.einsatzBeenden(
     /** Wer vor Ort war (IDs aus `GET /einsatz/vorort`); null = Vorauswahl des Servers aus den Teams */
     personalIds: List<String>? = null,
     hundeIds: List<String>? = null,
+    /** Server 1.17.0 (Abschnitt 10); ältere Server ignorieren die Felder */
+    abschluss: JSONObject? = null,
+    unvollstaendigBestaetigt: Boolean? = null,
+    abschnitte: List<String>? = null,
 ): ELAktion {
     val pdf = JSONObject().put("tracks", mitTracks).put("kartenart", kartenart)
         .put("teamIds", teamIds?.let { JSONArray(it) } ?: JSONObject.NULL).put("punkte", mitPunkten)
+    abschnitte?.let { pdf.put("abschnitte", JSONArray(it)) }
     val inhalt = JSONObject().put("ergebnis", ergebnis).put("ressourcenGeprueft", true).put("pdf", pdf)
+    abschluss?.let { inhalt.put("abschluss", it) }
+    unvollstaendigBestaetigt?.let { inhalt.put("unvollstaendigBestaetigt", it) }
     endzeitMs?.let { inhalt.put("endzeit", ELEinsatzEnde.utc(it)) }
     bemerkungen?.trim()?.takeIf { it.isNotEmpty() }?.let { inhalt.put("bemerkungen", it) }
     personalIds?.let { inhalt.put("personalIds", JSONArray(it)) }

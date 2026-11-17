@@ -40,7 +40,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import io.github.elemirus1996.einsatzspur.kern.ELAbschluss
+import io.github.elemirus1996.einsatzspur.kern.ELAbschlussEingabe
 import io.github.elemirus1996.einsatzspur.kern.ELAktion
+import io.github.elemirus1996.einsatzspur.kern.ELAlarmiertDurch
+import io.github.elemirus1996.einsatzspur.kern.ELBerichtAbschnitt
 import io.github.elemirus1996.einsatzspur.kern.ELBetrieb
 import io.github.elemirus1996.einsatzspur.kern.ELEinsatzStart
 import io.github.elemirus1996.einsatzspur.kern.ELErgebnis
@@ -63,7 +67,9 @@ import java.util.Date
  * Einsatz/Übung, Einsatzleiter und Führungsassistent. Die Auswahllisten kommen aus `GET /einsatz/vorlage`.
  */
 @Composable
-fun ELEinsatzStartScreen(betrieb: ELBetrieb, eigenePosition: Position?, schliessen: () -> Unit) {
+fun ELEinsatzStartScreen(betrieb: ELBetrieb, eigenePosition: Position?, schliessen: () -> Unit,
+                         /** Gewählte Person (Abschnitt 4a): als Einsatzleiter vorgeschlagen, damit wer anlegt auch steuern darf */
+                         eigenerName: String? = null) {
     val bereich = rememberCoroutineScope()
     var daten by remember { mutableStateOf(ELEinsatzStart()) }
     var standortUebernehmen by remember { mutableStateOf(true) }
@@ -72,6 +78,7 @@ fun ELEinsatzStartScreen(betrieb: ELBetrieb, eigenePosition: Position?, schliess
     val alarm = daten.diveraAlarmId?.let { id -> vorlage?.divera?.firstOrNull { it.id == id } }
     BackHandler(onBack = schliessen)
     LaunchedEffect(Unit) {
+        if (daten.einsatzleiter.isEmpty() && eigenerName != null) daten = daten.copy(einsatzleiter = eigenerName)
         vorlage = betrieb.vorlage()
         geladen = true
     }
@@ -87,6 +94,14 @@ fun ELEinsatzStartScreen(betrieb: ELBetrieb, eigenePosition: Position?, schliess
         if (vorlage?.aktiv == true) {
             Text("Es läuft bereits ein Einsatz. Erst beenden, dann neu starten.", color = ORANGE_HINWEIS)
         }
+        // Offener Divera-Alarm: oben vorschlagen wie im Browser
+        val neuester = vorlage?.divera?.maxByOrNull { it.zeitMs ?: 0L }
+        if (daten.diveraAlarmId == null && neuester != null) {
+            Button(onClick = {
+                daten = daten.copy(diveraAlarmId = neuester.id)
+                if (neuester.lat != null) standortUebernehmen = false
+            }, modifier = Modifier.fillMaxWidth()) { Text("Divera-Alarm übernehmen: " + alarmText(neuester)) }
+        }
         vorlage?.divera?.takeIf { it.isNotEmpty() }?.let { alarme ->
             Wahl("Divera-Alarm", alarm?.let(::alarmText) ?: "ohne Alarm (von Hand)",
                 listOf("ohne Alarm (von Hand)") + alarme.map(::alarmText)) { i ->
@@ -101,6 +116,11 @@ fun ELEinsatzStartScreen(betrieb: ELBetrieb, eigenePosition: Position?, schliess
             FilterChip(!daten.uebung, { daten = daten.copy(uebung = false) }, label = { Text("Einsatz") })
             FilterChip(daten.uebung, { daten = daten.copy(uebung = true) }, label = { Text("Übung") })
         }
+        Wahl("Alarmiert durch (Pflicht)", daten.alarmiertDurch?.anzeige ?: "bitte wählen", ELAlarmiertDurch.entries.map { it.anzeige }) {
+            daten = daten.copy(alarmiertDurch = ELAlarmiertDurch.entries[it])
+        }
+        Feld("Stelle oder Name (optional)", daten.melder) { daten = daten.copy(melder = it) }
+        if (alarm != null) Klein("Den Melder aus dem Alarm übernimmt der Server, wer alarmiert hat, wählst du hier.")
         Feld(alarm?.titel?.let { "Stichwort (aus Alarm: $it)" } ?: "Stichwort", daten.stichwort) { daten = daten.copy(stichwort = it) }
         Feld(alarm?.let { "Einsatzort (aus Alarm: ${it.ort ?: "–"})" } ?: "Einsatzort (Pflicht)", daten.ort) { daten = daten.copy(ort = it) }
         val szenarien = (vorlage ?: ELVorlage()).szenarioWahl
@@ -146,8 +166,19 @@ fun ELEinsatzBeendenScreen(betrieb: ELBetrieb, lage: ELLage, schliessen: () -> U
     var vorOrt by remember { mutableStateOf<ELVorOrt?>(null) }
     var personalIds by remember { mutableStateOf(emptySet<String>()) }
     var hundeIds by remember { mutableStateOf(emptySet<String>()) }
+    // Server 1.17.0: Angaben für den Bericht und Abschnitte; null = älterer Server, Beenden wie bisher
+    var abschluss by remember { mutableStateOf<ELAbschluss?>(null) }
+    var eingabe by remember { mutableStateOf(ELAbschlussEingabe()) }
+    var abschnitte by remember { mutableStateOf(ELBerichtAbschnitt.entries.toSet()) }
+    var trotzdem by remember { mutableStateOf(false) }
+    val istFund = ergebnis?.fund == true
+    val fehlend = abschluss?.let { eingabe.fehlend(it, istFund) }.orEmpty()
     BackHandler(onBack = schliessen)
     LaunchedEffect(Unit) {
+        betrieb.abschluss()?.let { a ->
+            eingabe = ELAbschlussEingabe.aus(a)
+            abschluss = a
+        }
         val v = betrieb.vorlage()
         v?.let { kartenarten = it.kartenWahl }
         ergebnisse = v?.ergebnisse?.takeIf { it.isNotEmpty() } ?: betrieb.ergebnisse()
@@ -158,13 +189,18 @@ fun ELEinsatzBeendenScreen(betrieb: ELBetrieb, lage: ELLage, schliessen: () -> U
         }
     }
 
-    Formular("Einsatz beenden", "Beenden", aktiv = ergebnis != null && geprueft && (alleTeams || teamIds.isNotEmpty()),
+    Formular("Einsatz beenden", "Beenden",
+        aktiv = ergebnis != null && geprueft && (alleTeams || teamIds.isNotEmpty()) && (fehlend.isEmpty() || trotzdem),
         schliessen = schliessen, bestaetigen = { fragen = true }) {
         Ueberschrift("Ergebnis")
         if (ergebnisse.isEmpty()) Klein("Lade …")
         Wahl("Ergebnis", ergebnis?.anzeige ?: "bitte wählen", ergebnisse.map { it.anzeige }) { ergebnis = ergebnisse[it] }
         Feld("Bemerkungen (optional)", bemerkungen, lang = true) { bemerkungen = it }
         HorizontalDivider()
+        abschluss?.let { a ->
+            ELAbschlussAngaben(a, eingabe, istFund) { eingabe = it }
+            HorizontalDivider()
+        }
         vorOrt?.let { liste ->
             Ueberschrift("Vor Ort")
             AnwesenheitListe("Personal", liste.personal, personalIds) { personalIds = it }
@@ -206,6 +242,16 @@ fun ELEinsatzBeendenScreen(betrieb: ELBetrieb, lage: ELLage, schliessen: () -> U
         Wahl("Karte", kartenarten.firstOrNull { it.first == kartenart }?.second ?: kartenart, kartenarten.map { it.second }) {
             kartenart = kartenarten[it].first
         }
+        if (abschluss != null) {
+            Klein("Abschnitte im Bericht (Kopf, Ergebnis und Polizei immer):")
+            ELBerichtAbschnitt.entries.forEach { ab ->
+                Schalter(ab.anzeige, ab in abschnitte) { an -> abschnitte = if (an) abschnitte + ab else abschnitte - ab }
+            }
+        }
+        if (fehlend.isNotEmpty()) {
+            Text("Es fehlen noch: ${fehlend.joinToString(", ")}. Nach dem Beenden ist nichts mehr änderbar.", color = ORANGE_HINWEIS)
+            Schalter("Trotzdem ohne diese Angaben beenden", trotzdem) { trotzdem = it }
+        }
         if (lage.teams.isNotEmpty()) {
             Schalter("Alle Teams im Bericht", alleTeams) { alleTeams = it }
             if (!alleTeams) lage.teams.forEach { team ->
@@ -229,11 +275,16 @@ fun ELEinsatzBeendenScreen(betrieb: ELBetrieb, lage: ELLage, schliessen: () -> U
                     // Reihenfolge wie in der Liste; ohne Liste (alter Server) nimmt der Server die Vorauswahl
                     val personal = vorOrt?.personal?.map { it.id }?.filter { it in personalIds }
                     val hunde = vorOrt?.hunde?.map { it.id }?.filter { it in hundeIds }
+                    // Lücken hat die Einsatzleitung oben ausdrücklich bestätigt
+                    val a = abschluss
+                    val angaben = a?.let { eingabe.json(it, istFund) }
+                    val berichtAbschnitte = a?.let { ELBerichtAbschnitt.entries.filter { it in abschnitte }.map { it.wert } + if (mitTracks) listOf("tracks") else emptyList() }
                     bereich.launch {
                         betrieb.ausfuehren(ELAktion.einsatzBeenden(
                             e.wert, mitTracks, kartenart, auswahl,
                             if (endzeitAngeben) minOf(endzeit, System.currentTimeMillis()) else null, bemerkungen, mitPunkten,
-                            personal, hunde,
+                            personal, hunde, abschluss = angaben, unvollstaendigBestaetigt = if (a == null) null else true,
+                            abschnitte = berichtAbschnitte,
                         ))
                     }
                     schliessen()
@@ -245,6 +296,66 @@ fun ELEinsatzBeendenScreen(betrieb: ELBetrieb, lage: ELLage, schliessen: () -> U
 }
 
 private val ORANGE_HINWEIS = Color(0xFFF07A2A)
+
+/** Angaben für den Einsatzbericht (APP_API EL Abschnitt 10), wie iOS `ELAbschlussAbschnitte` */
+@Composable
+private fun ELAbschlussAngaben(a: ELAbschluss, e: ELAbschlussEingabe, fund: Boolean, aendern: (ELAbschlussEingabe) -> Unit) {
+    val context = LocalContext.current
+    Ueberschrift("Alarmierung")
+    Wahl("Alarmiert durch", e.alarmiertDurch?.anzeige ?: "bitte wählen", ELAlarmiertDurch.entries.map { it.anzeige }) {
+        aendern(e.copy(alarmiertDurch = ELAlarmiertDurch.entries[it]))
+    }
+    Feld("Stelle oder Name (optional)", e.melder) { aendern(e.copy(melder = it)) }
+    if (!e.uebung) Schalter("Keine Polizei beteiligt", e.keinePolizei) { aendern(e.copy(keinePolizei = it)) }
+    if (!e.keinePolizei) {
+        Ueberschrift("Polizei")
+        Feld("Vorgangsnummer", e.vorgangsnummer) { aendern(e.copy(vorgangsnummer = it)) }
+        Feld("Ansprechpartner", e.polizeiName) { aendern(e.copy(polizeiName = it)) }
+        Feld("Dienstnummer", e.dienstnummer) { aendern(e.copy(dienstnummer = it)) }
+        Feld("Telefon", e.telefon) { aendern(e.copy(telefon = it)) }
+        Klein(if (e.polizeiGefragt) "Pflicht, weil die Polizei alarmiert hat. Nach dem Beenden ist nichts mehr änderbar."
+              else "Freiwillig, wenn die Polizei nicht alarmiert hat.")
+    }
+    if (fund) {
+        Ueberschrift("Fund")
+        OutlinedButton(onClick = {
+            val k = Calendar.getInstance().apply { timeInMillis = e.fundZeitMs ?: System.currentTimeMillis() }
+            TimePickerDialog(context, { _, h, min ->
+                val zeit = Calendar.getInstance().apply { set(Calendar.HOUR_OF_DAY, h); set(Calendar.MINUTE, min); set(Calendar.SECOND, 0) }.timeInMillis
+                // Uhrzeit nach „jetzt“ war am Vortag
+                aendern(e.copy(fundZeitMs = if (zeit > System.currentTimeMillis()) zeit - 86_400_000L else zeit))
+            }, k.get(Calendar.HOUR_OF_DAY), k.get(Calendar.MINUTE), true).show()
+        }) { Text("Fundzeit: " + (e.fundZeitMs?.let { DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(it)) } ?: "angeben")) }
+        Feld("Fundort (Beschreibung)", e.fundOrt) { aendern(e.copy(fundOrt = it)) }
+        if (e.fundLat != null && e.fundLng != null) Klein("Koordinate %.5f, %.5f".format(e.fundLat, e.fundLng))
+        a.fund.vorschlag?.let { v -> OutlinedButton(onClick = { aendern(e.vorschlagUebernehmen(v)) }) { Text("Fund-Punkt übernehmen") } }
+        Wahl("Gefunden durch", a.teams.firstOrNull { it.teamId == e.fundTeamId }?.teamName ?: "nicht angegeben",
+            listOf("nicht angegeben") + a.teams.map { it.teamName }) { i ->
+            aendern(e.copy(fundTeamId = if (i == 0) null else a.teams[i - 1].teamId))
+        }
+        Feld("Übergabe an (z. B. Rettungsdienst)", e.uebergabeAn) { aendern(e.copy(uebergabeAn = it)) }
+    }
+    if (a.teams.isNotEmpty()) {
+        Ueberschrift("Eingesetzt als")
+        a.teams.forEach { t ->
+            val wahl = t.wahl
+            Wahl(t.teamName, e.einsatzart[t.teamId]?.anzeige ?: "nicht festgelegt", wahl.map { it.anzeige }) { i ->
+                aendern(e.copy(einsatzart = e.einsatzart + (t.teamId to wahl[i])))
+            }
+        }
+    }
+    if (a.trails.isNotEmpty()) {
+        Ueberschrift("Trails")
+        a.trails.forEach { t ->
+            Text(t.teamName, fontWeight = FontWeight.SemiBold)
+            val gruende = (a.abbruchgruende + listOf(t.abbruchgrund)).filter { it.isNotEmpty() }.distinct()
+            Wahl("Abbruchgrund", e.abbruchgrund[t.sucheId]?.takeIf { it.isNotEmpty() } ?: "bitte wählen", gruende) { i ->
+                aendern(e.copy(abbruchgrund = e.abbruchgrund + (t.sucheId to gruende[i])))
+            }
+            Feld("Geruchsartikel", e.geruchsartikel[t.sucheId] ?: "") { aendern(e.copy(geruchsartikel = e.geruchsartikel + (t.sucheId to it))) }
+        }
+    }
+}
 
 /** Aufklappbare Liste zum Ankreuzen (Personal oder Hunde vor Ort) mit Zähler wie in `/el/beenden` */
 @Composable

@@ -31,6 +31,8 @@ data class ELSitzung(
     val verlaengerbarBisMs: Long? = null,
     /** Feste Server-Kennung aus der Anmeldung (Bestätigung der Datenschutzerklärung, Heimatstaffel) */
     val kennung: String? = null,
+    /** Gewählte Person (`POST /ich`, Server 1.17.0); null = noch nicht gewählt */
+    val personId: String? = null,
 ) {
     fun alsText(): String = JSONObject().apply {
         kennung?.let { put("kennung", it) }
@@ -39,6 +41,7 @@ data class ELSitzung(
         put("expiresAtMs", expiresAtMs)
         geraet?.let { put("geraet", it) }
         verlaengerbarBisMs?.let { put("verlaengerbarBisMs", it) }
+        personId?.let { put("personId", it) }
     }.toString()
 
     companion object {
@@ -51,6 +54,7 @@ data class ELSitzung(
                 geraet = json.textOderNull("geraet"),
                 verlaengerbarBisMs = if (json.has("verlaengerbarBisMs")) json.getLong("verlaengerbarBisMs") else null,
                 kennung = json.textOderNull("kennung"),
+                personId = json.textOderNull("personId"),
             )
         }.getOrNull()
     }
@@ -95,7 +99,12 @@ data class ELLage(
     val wetter: Wetter?,
     /** Nur die Version der Datenschutzerklärung (#148) */
     val datenschutzVersion: String? = null,
+    /** Wer die App bedient und welche Rolle daraus folgt (Server 1.17.0, Abschnitt 4a); null = älterer Server */
+    val ich: ELIch? = null,
 ) {
+    /** Steuern erlaubt: Einsatzleiter, Führungsassistent, älterer Server oder Token ohne Person */
+    val darfSteuern: Boolean get() = ich?.rolle != ELRolle.LESEN.wert
+
     data class Einsatz(
         val aktiv: Boolean,
         val text: String? = null,
@@ -106,6 +115,8 @@ data class ELLage(
         val beginnMs: Long? = null,
         val einsatzleiter: String? = null,
         val fuehrungsassistent: String? = null,
+        /** Server 1.17.0: `Polizei` · `Feuerwehr` · `Rettungsdienst` · `AndereStaffel` */
+        val alarmiertDurch: String? = null,
     )
 
     data class Geraet(val id: String?, val name: String?, val zeitMs: Long?, val akku: Int?)
@@ -117,6 +128,8 @@ data class ELLage(
         val dogName: String? = null,
         val hundefuehrerName: String? = null,
         val helfer: List<String> = emptyList(),
+        /** „Eingesetzt als“ (Server 1.17.0), nur Anzeige */
+        val einsatzart: String? = null,
         val suche: TeamLage.Suche,
         val warnstufe: Int = 0,
         val warnung1Min: Int? = null,
@@ -145,12 +158,14 @@ data class ELLage(
                     beginnMs = isoZuMs(e.textOderNull("beginn")),
                     einsatzleiter = e.textOderNull("einsatzleiter"),
                     fuehrungsassistent = e.textOderNull("fuehrungsassistent"),
+                    alarmiertDurch = e.textOderNull("alarmiertDurch"),
                 ),
                 teams = json.optJSONArray("teams")?.let { a -> (0 until a.length()).map { team(a.getJSONObject(it)) } } ?: emptyList(),
                 wetter = json.objektOderNull("wetter")?.let { w ->
                     Wetter(w.zahlOderNull("temperatur"), w.zahlOderNull("wind"), w.textOderNull("beschreibung"), isoZuMs(w.textOderNull("zeit")))
                 },
                 datenschutzVersion = Datenschutz.version(json),
+                ich = json.objektOderNull("ich")?.let(ELIch::aus),
             )
         } catch (e: JSONException) {
             throw SchnittstellenFehler.AntwortUngueltig
@@ -162,6 +177,7 @@ data class ELLage(
             dogName = t.textOderNull("dogName"),
             hundefuehrerName = t.textOderNull("hundefuehrerName"),
             helfer = t.optJSONArray("helfer")?.let { a -> (0 until a.length()).map { a.getString(it) } } ?: emptyList(),
+            einsatzart = t.textOderNull("einsatzart"),
             suche = TeamLage.suche(t.getJSONObject("suche")),
             warnstufe = t.optInt("warnstufe", 0),
             warnung1Min = t.ganzOderNull("warnung1Min"),
@@ -323,7 +339,9 @@ class ELAnmeldung(private val server: ServerAdresse, private val transport: Tran
                 val token = json?.textOderNull("token") ?: throw ELAnmeldeFehler.AntwortUngueltig
                 val ablauf = isoZuMs(json.textOderNull("expiresAt")) ?: throw ELAnmeldeFehler.AntwortUngueltig
                 val info = ServerInfo.aus(json.objektOderNull("server"))
-                ELAngemeldet(ELSitzung(server, token, ablauf, geraet = name, kennung = info?.kennung), info, DatenschutzAngabe.aus(json))
+                // Feste Person des VPN-Geräts (Server 1.17.0): dann fragt die App nicht nach der Person
+                ELAngemeldet(ELSitzung(server, token, ablauf, geraet = name, kennung = info?.kennung,
+                    personId = json.objektOderNull("ich")?.textOderNull("personId")), info, DatenschutzAngabe.aus(json))
             }
             401 -> throw ELAnmeldeFehler.PasswortFalsch
             429 -> throw ELAnmeldeFehler.Gesperrt(json?.optInt("wiederholenNachSec", 300) ?: 300)
@@ -434,7 +452,7 @@ class ELClient(
             in 200..299 -> text
             410 -> throw SchnittstellenFehler.Beendet
             // 400 falsche Eingabe, 404 unbekanntes Team bzw. Notiz, 409 nicht erlaubt (auch: kein Einsatz läuft)
-            400, 404, 409 -> throw ELAktionAbgelehnt(
+            400, 403, 404, 409 -> throw ELAktionAbgelehnt(
                 runCatching { JSONObject(text).textOderNull("error") }.getOrNull() ?: if (status == 404) "Nicht gefunden." else "Nicht möglich.",
             )
             else -> throw SchnittstellenFehler.Server(status)
@@ -459,6 +477,30 @@ class ELClient(
         else -> throw SchnittstellenFehler.Server(first)
     }
     override suspend fun vorlage(): ELVorlage = ELVorlage.aus(anfrage("einsatz/vorlage", "GET", null))
+    override suspend fun abschluss(): ELAbschluss = ELAbschluss.aus(anfrage("einsatz/abschluss", "GET", null))
+
+    /** Aktive Personen aus den Stammdaten für „Wer bin ich“ (Abschnitt 4a) */
+    suspend fun personen(): List<ELPerson> = ELPerson.liste(anfrage("personen", "GET", null))
+
+    /** Person wählen: neues Token mit Person (gleicher Ablauf), das alte ist danach gesperrt */
+    suspend fun ich(personId: String): Pair<ELSitzung, ELIch> {
+        val alt = sitzung
+        val (status, text) = transport(url("ich"), "POST", JSONObject().put("personId", personId), alt.token)
+        val json = runCatching { JSONObject(text) }.getOrNull()
+        return when (status) {
+            in 200..299 -> {
+                val anmeldung = json?.objektOderNull("anmeldung") ?: throw SchnittstellenFehler.AntwortUngueltig
+                val token = anmeldung.textOderNull("token") ?: throw SchnittstellenFehler.AntwortUngueltig
+                val ablauf = isoZuMs(anmeldung.textOderNull("expiresAt")) ?: throw SchnittstellenFehler.AntwortUngueltig
+                val ich = json.objektOderNull("ich")?.let(ELIch::aus) ?: throw SchnittstellenFehler.AntwortUngueltig
+                alt.copy(token = token, expiresAtMs = ablauf, personId = personId,
+                    verlaengerbarBisMs = isoZuMs(anmeldung.textOderNull("verlaengerbarBis")) ?: alt.verlaengerbarBisMs) to ich
+            }
+            400 -> throw ELAktionAbgelehnt(json?.textOderNull("error") ?: "Person nicht gefunden.")
+            410 -> throw SchnittstellenFehler.Beendet
+            else -> throw SchnittstellenFehler.Server(status)
+        }
+    }
     override suspend fun vorOrt(): ELVorOrt = ELVorOrt.aus(anfrage("einsatz/vorort", "GET", null))
 
     override suspend fun ergebnisse(): List<ELErgebnis> {

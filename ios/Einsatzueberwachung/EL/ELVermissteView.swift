@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Vermisste (wie `/el`): Szenario, Profile, Anlegen, Bearbeiten mit Versionsprüfung, Checkliste.
 struct ELVermissteView: View {
+    @Environment(\.elDarfSteuern) private var darfSteuern
     @ObservedObject var vermisste: ELVermissteAnsicht
     @ObservedObject var betrieb: ELBetrieb
     var lage: ELLage?
@@ -51,6 +52,7 @@ struct ELVermissteView: View {
         .task { await vermisste.laden() }
         .sheet(isPresented: $neuesProfil) {
             NavigationStack { ELProfilView(original: ELVermisstenprofil(), vermisste: vermisste, betrieb: betrieb) }
+                .environment(\.elDarfSteuern, darfSteuern)
         }
     }
 
@@ -64,6 +66,7 @@ struct ELVermissteView: View {
                 ForEach(ELSzenario.allCases, id: \.self) { Text($0.anzeige).tag($0) }
             }
             .tint(ELStil.aktion)
+            .disabled(!darfSteuern)
         }
         .elKarte()
     }
@@ -177,6 +180,7 @@ struct FlussLayout: Layout {
 /// Ein Profil bearbeiten. Gespeichert werden nur Änderungen mit der `version`, auf der die Bearbeitung beruht;
 /// hat jemand anderes inzwischen gespeichert (409), zeigt die App den neuen Stand zum erneuten Bearbeiten.
 struct ELProfilView: View {
+    @Environment(\.elDarfSteuern) private var darfSteuern
     @ObservedObject var vermisste: ELVermissteAnsicht
     @ObservedObject var betrieb: ELBetrieb
     @Environment(\.dismiss) private var schliessen
@@ -244,6 +248,7 @@ struct ELProfilView: View {
                 }
             }
         }
+        .disabled(!darfSteuern)
         .navigationTitle(original.profilId == nil ? "Neue Person" : (original.vollerName ?? "Profil"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

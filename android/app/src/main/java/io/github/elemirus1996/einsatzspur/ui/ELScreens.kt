@@ -249,6 +249,8 @@ fun ELUebersichtScreen(
     verlaengerung: ELVerlaengerung?,
     toene: io.github.elemirus1996.einsatzspur.kern.Toene,
     abmelden: suspend () -> Unit,
+    /** Startseite (Packliste, Team-Anmeldung), ohne sich abzumelden */
+    startseite: () -> Unit = {},
 ) {
     // Bereiche wie die Reiter unter iOS: Lage, Karte, Funk, Vermisst
     var bereichWahl by remember { mutableStateOf(ELBereich.LAGE) }
@@ -265,7 +267,8 @@ fun ELUebersichtScreen(
     val offen by betrieb.offen.collectAsState()
     val betriebHinweis by betrieb.hinweis.collectAsState()
     if (startOffen) {
-        ELEinsatzStartScreen(betrieb, ortung.letztePosition.collectAsState().value, schliessen = { startOffen = false })
+        ELEinsatzStartScreen(betrieb, ortung.letztePosition.collectAsState().value, schliessen = { startOffen = false },
+            eigenerName = ansicht.lage.collectAsState().value?.ich?.name)
         return
     }
     val beendenLage = ansicht.lage.collectAsState().value
@@ -322,7 +325,8 @@ fun ELUebersichtScreen(
                     ELBereich.VERMISST -> if (vermisste != null) ELVermissteScreen(vermisste, betrieb, lage)
                     ELBereich.LAGE -> Column(Modifier.fillMaxSize()) {
                         EinsatzKopf(lage, verbindungsfehler, jetzt,
-                            starten = { startOffen = true }, beenden = { beendenOffen = true }, abmelden = { abmeldenFragen = true })
+                            starten = { startOffen = true }, beenden = { beendenOffen = true }, abmelden = { abmeldenFragen = true },
+                            startseite = startseite)
                         val aktiv = lage?.takeIf { it.einsatz.aktiv }
                         if (aktiv != null) ELStatusChips(aktiv.teams, live)
                         val teamListe: @Composable (Modifier, Boolean) -> Unit = { mod, eineSpalte ->
@@ -359,7 +363,9 @@ fun ELUebersichtScreen(
                                         item(span = { GridItemSpan(maxLineSpan) }) { Text("Noch keine Teams im Einsatz.", color = ELStil.vermerk) }
                                     }
                                     items(aktiv.teams, key = { it.teamId }) { team ->
-                                        TeamKarte(team, ansicht, jetzt, details = { gewaehltesTeam = team }) { a -> bereich.launch { betrieb.ausfuehren(a) } }
+                                        // Rolle `lesen`: keine Knöpfe, keine Aktionen (APP_API EL Abschnitt 4a)
+                                        TeamKarte(team, ansicht, jetzt, steuern = lage?.darfSteuern != false,
+                                            details = { gewaehltesTeam = team }) { a -> bereich.launch { betrieb.ausfuehren(a) } }
                                     }
                                 }
                                 item(span = { GridItemSpan(maxLineSpan) }) {
@@ -487,7 +493,8 @@ enum class ELBereich(val titel: String, val symbol: Int) {
 
 /** Roter Kopf der Lage wie iOS: Stichwort, Übung, Menü; Ort, Szenario, EL; Uhr und Einsatzdauer */
 @Composable
-private fun EinsatzKopf(lage: ELLage?, verbindungsfehler: Boolean, jetzt: Long, starten: () -> Unit, beenden: () -> Unit, abmelden: () -> Unit) {
+private fun EinsatzKopf(lage: ELLage?, verbindungsfehler: Boolean, jetzt: Long, starten: () -> Unit, beenden: () -> Unit, abmelden: () -> Unit,
+                        startseite: () -> Unit) {
     var menue by remember { mutableStateOf(false) }
     Column(
         Modifier.fillMaxWidth().background(ELStil.rot).windowInsetsPadding(WindowInsets.statusBars).padding(horizontal = 16.dp, vertical = 10.dp),
@@ -511,8 +518,10 @@ private fun EinsatzKopf(lage: ELLage?, verbindungsfehler: Boolean, jetzt: Long, 
             Box {
                 TextButton(onClick = { menue = true }) { Text("•••", color = ELStil.aufRot, fontWeight = FontWeight.Bold) }
                 DropdownMenu(expanded = menue, onDismissRequest = { menue = false }) {
-                    if (e?.aktiv == true) DropdownMenuItem(text = { Text("Einsatz beenden …") }, onClick = { menue = false; beenden() })
-                    else if (lage != null) DropdownMenuItem(text = { Text("Einsatz oder Übung starten") }, onClick = { menue = false; starten() })
+                    if (e?.aktiv == true) {
+                        if (lage.darfSteuern) DropdownMenuItem(text = { Text("Einsatz beenden …") }, onClick = { menue = false; beenden() })
+                    } else if (lage != null) DropdownMenuItem(text = { Text("Einsatz oder Übung starten") }, onClick = { menue = false; starten() })
+                    DropdownMenuItem(text = { Text("Startseite") }, onClick = { menue = false; startseite() })
                     DropdownMenuItem(text = { Text("Abmelden", color = MaterialTheme.colorScheme.error) }, onClick = { menue = false; abmelden() })
                 }
             }
@@ -535,12 +544,19 @@ private fun EinsatzKopf(lage: ELLage?, verbindungsfehler: Boolean, jetzt: Long, 
             val text = listOfNotNull(w.temperatur?.let { "%.0f °C".format(it) }, w.beschreibung, w.wind?.let { "Wind %.0f km/h".format(it) }).joinToString(" · ")
             if (text.isNotEmpty()) Text(text, color = ELStil.aufRot.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
         }
+        // „Anna Berg · Einsatzleiter“: immer sichtbar, in welcher Rolle man ist
+        val ich = lage?.ich
+        val rolle = ich?.rollenWert
+        if (rolle != null) {
+            Text(listOfNotNull(ich.name, rolle.anzeige).joinToString(" · "), style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold,
+                color = if (rolle == io.github.elemirus1996.einsatzspur.kern.ELRolle.LESEN) ORANGE else ELStil.aufRot.copy(alpha = 0.75f))
+        }
     }
 }
 
 /** Karte eines Teams wie iOS `ELTeamKarte`: Name, Suchzeit, Personen, Balken bis Warnstufe 2, Geräte, Status-Chip und Knöpfe */
 @Composable
-private fun TeamKarte(team: ELLage.Team, ansicht: ELAnsicht, jetzt: Long, details: () -> Unit, ausfuehren: (ELAktion) -> Unit) {
+private fun TeamKarte(team: ELLage.Team, ansicht: ELAnsicht, jetzt: Long, steuern: Boolean = true, details: () -> Unit, ausfuehren: (ELAktion) -> Unit) {
     val status = team.suche.status
     val (statusText, statusFarbe) = when (status) {
         TeamLage.SucheStatus.BEREIT -> "Bereit" to ELStil.bereit
@@ -559,7 +575,7 @@ private fun TeamKarte(team: ELLage.Team, ansicht: ELAnsicht, jetzt: Long, detail
         status == TeamLage.SucheStatus.LAEUFT -> ELStil.aktiv
         else -> null
     }
-    Column(Modifier.clickable(onClick = details).elKarte(rand), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(Modifier.clickable(enabled = steuern, onClick = details).elKarte(rand), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(team.teamName, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = ELStil.inschrift,
                 modifier = Modifier.weight(1f), maxLines = 1)
@@ -568,7 +584,9 @@ private fun TeamKarte(team: ELLage.Team, ansicht: ELAnsicht, jetzt: Long, detail
                 Text(dauerText(dauer), style = ELStil.ziffern, fontSize = 22.sp, fontWeight = FontWeight.SemiBold, color = zeitFarbe)
             }
         }
-        val wer = listOfNotNull(team.hundefuehrerName, team.dogName).filter { it.isNotBlank() }.joinToString(" · ")
+        // „Eingesetzt als“ (Monitor bzw. Einsatzende), nur Anzeige
+        val wer = listOfNotNull(team.hundefuehrerName, team.dogName, io.github.elemirus1996.einsatzspur.kern.ELEinsatzart.anzeige(team.einsatzart))
+            .filter { it.isNotBlank() }.joinToString(" · ")
         if (wer.isNotEmpty()) Text(wer, color = ELStil.vermerk)
         val dauer = ansicht.suchdauerSec(team, jetzt)
         val w2 = team.warnung2Min
@@ -592,13 +610,13 @@ private fun TeamKarte(team: ELLage.Team, ansicht: ELAnsicht, jetzt: Long, detail
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ELChip(statusText, statusFarbe)
             Spacer(Modifier.weight(1f))
-            when (status) {
+            if (steuern) when (status) {
                 TeamLage.SucheStatus.LAEUFT -> Taste("Pause") { ausfuehren(ELAktion.teamPause(team.teamId, team.teamName)) }
                 TeamLage.SucheStatus.KURZPAUSE -> Taste("Weiter", ELStil.aktiv) { ausfuehren(ELAktion.teamWeiter(team.teamId, team.teamName)) }
                 TeamLage.SucheStatus.BEREIT -> Taste("Start", ELStil.aktiv, onClick = details)
                 TeamLage.SucheStatus.BEENDET -> Unit
             }
-            Taste("•••", onClick = details)
+            if (steuern) Taste("•••", onClick = details)
         }
     }
 }

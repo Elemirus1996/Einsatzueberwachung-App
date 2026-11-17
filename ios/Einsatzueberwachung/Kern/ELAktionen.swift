@@ -44,8 +44,9 @@ struct ELAktion: Codable, Equatable, Identifiable, Sendable {
     /// Leere Angaben gehen nicht mit, damit sie einen Divera-Alarm nicht überschreiben (der Server übernimmt sie dann aus dem Alarm).
     static func einsatzStart(_ daten: ELEinsatzStart) -> ELAktion {
         var inhalt: [String: ELWert] = ["szenario": .text(daten.szenario.rawValue), "uebung": .wahr(daten.uebung)]
+        if let art = daten.alarmiertDurch { inhalt["alarmiertDurch"] = .text(art.rawValue) }
         for (feld, wert) in [("stichwort", daten.stichwort), ("ort", daten.ort), ("einsatzleiter", daten.einsatzleiter),
-                             ("fuehrungsassistent", daten.fuehrungsassistent)] {
+                             ("fuehrungsassistent", daten.fuehrungsassistent), ("melder", daten.melder)] {
             let text = wert.trimmingCharacters(in: .whitespacesAndNewlines)
             if !text.isEmpty { inhalt[feld] = .text(text) }
         }
@@ -63,14 +64,20 @@ struct ELAktion: Codable, Equatable, Identifiable, Sendable {
     /// `personalIds`/`hundeIds`: wer vor Ort war (IDs aus `GET /einsatz/vorort`); nil = Vorauswahl des Servers aus den Teams
     static func einsatzBeenden(ergebnis: String, mitTracks: Bool, kartenart: String = ELKartenart.streets.rawValue,
                                teamIds: [String]? = nil, endzeit: Date? = nil, bemerkungen: String? = nil,
-                               mitPunkten: Bool = false, personalIds: [String]? = nil, hundeIds: [String]? = nil) -> ELAktion {
+                               mitPunkten: Bool = false, personalIds: [String]? = nil, hundeIds: [String]? = nil,
+                               abschluss: ELWert? = nil, unvollstaendigBestaetigt: Bool? = nil,
+                               abschnitte: [String]? = nil) -> ELAktion {
         var inhalt: [String: ELWert] = [
             "ergebnis": .text(ergebnis),
             "ressourcenGeprueft": .wahr(true),
             "pdf": .objekt(["tracks": .wahr(mitTracks), "kartenart": .text(kartenart),
                             "teamIds": teamIds.map { .liste($0.map(ELWert.text)) } ?? .null,
-                            "punkte": .wahr(mitPunkten)]),
+                            "punkte": .wahr(mitPunkten),
+                            "abschnitte": abschnitte.map { .liste($0.map(ELWert.text)) } ?? .null]),
         ]
+        // Server 1.17.0 (Abschnitt 10); ältere Server ignorieren die Felder
+        if let abschluss { inhalt["abschluss"] = abschluss }
+        if let unvollstaendigBestaetigt { inhalt["unvollstaendigBestaetigt"] = .wahr(unvollstaendigBestaetigt) }
         if let endzeit { inhalt["endzeit"] = .text(ELEinsatzEnde.utc(endzeit)) }
         if let personalIds { inhalt["personalIds"] = .liste(personalIds.map(ELWert.text)) }
         if let hundeIds { inhalt["hundeIds"] = .liste(hundeIds.map(ELWert.text)) }
@@ -212,10 +219,14 @@ struct ELEinsatzStart: Equatable, Sendable {
     var lng: Double?
     /// Divera-Alarm aus `GET /einsatz/vorlage`; dann übernimmt der Server Ort, Koordinate und Stichwort aus dem Alarm
     var diveraAlarmId: Int?
+    /// Wer alarmiert hat (Pflicht ab Server 1.17.0, auch bei Divera); `melder` = Stelle oder Name, optional
+    var alarmiertDurch: ELAlarmiertDurch?
+    var melder = ""
 
-    /// Szenario immer Pflicht (nicht „Unbestimmt“), der Ort nur ohne Divera-Alarm
+    /// Szenario und „Alarmiert durch“ immer Pflicht, der Ort nur ohne Divera-Alarm
     var vollstaendig: Bool {
-        szenario != .unbestimmt && (diveraAlarmId != nil || !ort.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        szenario != .unbestimmt && alarmiertDurch != nil
+            && (diveraAlarmId != nil || !ort.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
 }
 
@@ -327,6 +338,10 @@ struct ELEinsatzEnde: Decodable, Equatable, Sendable {
             if !liste.isEmpty { teile.append("teams=\(liste.joined(separator: ","))") }
         }
         if case .wahr(false)? = pdf["tracks"] { teile.append("tracks=0") }
+        if case .liste(let liste)? = pdf["abschnitte"] {
+            let werte = liste.compactMap { if case .text(let t) = $0 { t } else { nil } }
+            teile.append("abschnitte=\(werte.joined(separator: ","))")
+        }
         return teile.joined(separator: "&")
     }
 
@@ -376,6 +391,8 @@ struct ELEinsatzEnde: Decodable, Equatable, Sendable {
 struct ELErgebnis: Decodable, Equatable, Identifiable, Hashable, Sendable {
     var wert: String
     var anzeige: String
+    /// Ergebnis mit Fund der Person (Server 1.17.0): dann Fundzeit, Fundort und Übergabe abfragen
+    var fund: Bool?
     var id: String { wert }
 }
 
@@ -425,8 +442,12 @@ protocol ELAktionsSchnittstelle: Sendable {
     func vorOrt() async throws -> ELVorOrt
     /// Bericht als PDF (`GET /einsatz/bericht/{archivId}`), Pfad aus `ELEinsatzEnde.berichtPfad`
     func bericht(_ pfad: String) async throws -> Data
+    /// Abschlussangaben (Server 1.17.0); als Anforderung, sonst ruft Swift immer die Ersatzmethode der Erweiterung
+    func abschluss() async throws -> ELAbschluss
 }
 
 extension ELAktionsSchnittstelle {
     func bericht(_ pfad: String) async throws -> Data { throw SchnittstellenFehler.server(status: 404) }
+    /// Abschlussangaben (Server 1.17.0); ältere Server und Testattrappen: 404
+    func abschluss() async throws -> ELAbschluss { throw SchnittstellenFehler.server(status: 404) }
 }

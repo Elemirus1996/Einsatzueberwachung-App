@@ -85,6 +85,11 @@ fun StartScreen(
     einstellungen: () -> Unit,
     packliste: Packliste,
     packlisteOeffnen: () -> Unit,
+    /** Angemeldetes Team (Name) bzw. Einsatzleitung (Status): zurück zur Ansicht, ohne sich abzumelden */
+    teamAngemeldet: String? = null,
+    teamOeffnen: () -> Unit = {},
+    elAngemeldet: String? = null,
+    elOeffnen: () -> Unit = {},
 ) {
     var anmeldungOffen by remember { mutableStateOf(false) }
     val heimatEintrag by heimat.eintrag.collectAsState()
@@ -125,8 +130,16 @@ fun StartScreen(
                 Text(it.staffel, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Spacer(Modifier.height(32.dp))
-            Rollenknopf("Team", "QR-Code aus dem Einsatz scannen", aktiv = true) { anmeldungOffen = true }
-            Rollenknopf("Einsatzleitung", "Nur im VPN der Staffel, mit Staffel-Passwort", aktiv = true, aktion = einsatzleitung)
+            if (teamAngemeldet != null) {
+                Rollenknopf(teamAngemeldet, "Angemeldet · öffnen", aktiv = true, aktion = teamOeffnen)
+            } else {
+                Rollenknopf("Team", "QR-Code aus dem Einsatz scannen", aktiv = true) { anmeldungOffen = true }
+            }
+            if (elAngemeldet != null) {
+                Rollenknopf("Einsatzleitung", elAngemeldet, aktiv = true, aktion = elOeffnen)
+            } else {
+                Rollenknopf("Einsatzleitung", "Nur im VPN der Staffel, mit Staffel-Passwort", aktiv = true, aktion = einsatzleitung)
+            }
             PacklisteKnopf(packliste, packlisteOeffnen)
             val context = androidx.compose.ui.platform.LocalContext.current
             var lizenzen by remember { mutableStateOf<String?>(null) }
