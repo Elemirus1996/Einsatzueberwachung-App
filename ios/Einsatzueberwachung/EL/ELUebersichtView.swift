@@ -239,12 +239,12 @@ struct ELUebersichtView: View {
                 }
                 .fixedSize()
             }
+            rollenZeile
         }
         .padding(.horizontal, 16)
         .padding(.top, 6)
         .padding(.bottom, 12)
         .background(ELStil.anthrazit.ignoresSafeArea(edges: .top))
-        .overlay(alignment: .bottomLeading) { rollenZeile }
     }
 
     /// „Anna Berg · Einsatzleiter“ unten in der Kopfleiste, damit immer klar ist, in welcher Rolle man ist
@@ -254,8 +254,6 @@ struct ELUebersichtView: View {
             Text([ich.name, rolle.anzeige].compactMap { $0 }.joined(separator: " · "))
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(rolle == .lesen ? Color.orange : ELStil.aufAnthrazit.opacity(0.7))
-                .padding(.horizontal, 16)
-                .padding(.bottom, 1)
                 .accessibilityLabel("Angemeldet als \(ich.name ?? "") , Rolle \(rolle.anzeige)")
         }
     }

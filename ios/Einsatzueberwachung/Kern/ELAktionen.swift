@@ -442,6 +442,8 @@ protocol ELAktionsSchnittstelle: Sendable {
     func vorOrt() async throws -> ELVorOrt
     /// Bericht als PDF (`GET /einsatz/bericht/{archivId}`), Pfad aus `ELEinsatzEnde.berichtPfad`
     func bericht(_ pfad: String) async throws -> Data
+    /// Abschlussangaben (Server 1.17.0); als Anforderung, sonst ruft Swift immer die Ersatzmethode der Erweiterung
+    func abschluss() async throws -> ELAbschluss
 }
 
 extension ELAktionsSchnittstelle {

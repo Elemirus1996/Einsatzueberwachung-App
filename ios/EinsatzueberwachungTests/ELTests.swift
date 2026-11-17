@@ -471,6 +471,12 @@ struct ELEinsatzTests {
         #expect(LageMeldung.einsatzAngelegt(alt: aus, neu: an) == LageMeldung(titel: "Einsatz angelegt", text: "Vermisste Person · Stadtwald"))
     }
 
+    @Test func abschlussWieVomServer() throws {
+        let json = #"{"uebung":true,"alarmiertDurch":null,"keinePolizei":false,"polizeiGefragt":false,"vorgangsnummer":"","melder":"","polizei":{"name":"","dienstnummer":"","telefon":""},"fund":{"zeit":null,"lat":null,"lng":null,"ort":"","uebergabeAn":"","teamId":null,"vorschlag":null},"teams":[{"teamId":"8e","teamName":"Team Alpha","einsatzart":null,"erlaubt":["Flaeche","Mantrailer"]}],"trails":[],"abbruchgruende":["Spur verloren"],"fehlend":["teams"]}"#
+        let a = try JSONDecoder.server.decode(ELAbschluss.self, from: Data(json.utf8))
+        #expect(a.teams?.count == 1)
+    }
+
     @Test func berichtAbfrageMitAbschnitten() {
         let a = ELAktion.einsatzBeenden(ergebnis: "x", mitTracks: false, abschnitte: ["teams", "funk"])
         #expect(ELEinsatzEnde.abfrage(aus: a.inhalt).contains("abschnitte=teams,funk"))
