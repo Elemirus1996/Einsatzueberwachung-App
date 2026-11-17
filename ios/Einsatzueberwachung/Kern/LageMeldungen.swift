@@ -12,6 +12,14 @@ struct LageMeldung: Equatable, Sendable {
 
     static let einsatzBeendet = LageMeldung(titel: "Einsatz beendet – Ortung aus")
 
+    /// Einsatzleitung: neuer Einsatz oder neue Übung angelegt (nur beim Wechsel, nicht beim ersten Laden).
+    /// Ohne Apple-Push nur, solange die App eine Verbindung hält.
+    static func einsatzAngelegt(alt: ELLage.Einsatz?, neu: ELLage.Einsatz) -> LageMeldung? {
+        guard let alt, !alt.aktiv, neu.aktiv else { return nil }
+        let text = [neu.stichwort, neu.ort].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · ")
+        return LageMeldung(titel: neu.uebung == true ? "Übung angelegt" : "Einsatz angelegt", text: text.isEmpty ? nil : text)
+    }
+
     /// Was sich zwischen zwei Lagen geändert hat. Je Zustandsänderung höchstens eine Meldung;
     /// kommt dieselbe Änderung über /lage und über ein Ereignis, ist sie beim zweiten Mal schon in `alt`.
     static func vergleichen(alt: TeamLage, neu: TeamLage) -> [LageMeldung] {

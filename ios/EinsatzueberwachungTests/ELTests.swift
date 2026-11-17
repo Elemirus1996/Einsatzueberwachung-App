@@ -462,6 +462,15 @@ struct ELEinsatzTests {
         #expect(!e.polizeiGefragt)
     }
 
+    @Test func meldungEinsatzAngelegtNurBeimWechsel() throws {
+        func einsatz(_ json: String) throws -> ELLage.Einsatz { try JSONDecoder.server.decode(ELLage.Einsatz.self, from: Data(json.utf8)) }
+        let aus = try einsatz(#"{"aktiv":false}"#)
+        let an = try einsatz(#"{"aktiv":true,"stichwort":"Vermisste Person","ort":"Stadtwald"}"#)
+        #expect(LageMeldung.einsatzAngelegt(alt: nil, neu: an) == nil, "erstes Laden meldet nichts")
+        #expect(LageMeldung.einsatzAngelegt(alt: an, neu: an) == nil)
+        #expect(LageMeldung.einsatzAngelegt(alt: aus, neu: an) == LageMeldung(titel: "Einsatz angelegt", text: "Vermisste Person · Stadtwald"))
+    }
+
     @Test func berichtAbfrageMitAbschnitten() {
         let a = ELAktion.einsatzBeenden(ergebnis: "x", mitTracks: false, abschnitte: ["teams", "funk"])
         #expect(ELEinsatzEnde.abfrage(aus: a.inhalt).contains("abschnitte=teams,funk"))

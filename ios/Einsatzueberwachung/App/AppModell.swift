@@ -328,7 +328,12 @@ final class AppModell: ObservableObject {
             self.elSitzung = neu
             self.elOrtung?.ablaufSetzen(neu.expiresAt)
         }
+        var letzterEinsatz: ELLage.Einsatz?
         ansicht.nachLage = { [weak self, weak betrieb, weak ansicht, weak verlaengerung] in
+            if let neu = ansicht?.lage?.einsatz {
+                if let meldung = LageMeldung.einsatzAngelegt(alt: letzterEinsatz, neu: neu) { self?.mitteiler.senden(meldung) }
+                letzterEinsatz = neu
+            }
             await betrieb?.senden()
             await verlaengerung?.pruefen(einsatzLaeuft: ansicht?.lage?.einsatz.aktiv == true)
             self?.datenschutzVersionPruefen(ansicht?.lage?.datenschutz?.version, kennung: zugang.sitzung.kennung) {
