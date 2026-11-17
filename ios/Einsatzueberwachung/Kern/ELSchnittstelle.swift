@@ -235,8 +235,10 @@ struct ELAnmeldung: Sendable {
         var expiresAt: Date
         var server: ServerInfo?
         var datenschutz: DatenschutzAngabe
+        /// Feste Person des VPN-Geräts (Server 1.17.0); dann fragt die App nicht nach der Person
+        var ich: ELIch?
 
-        private enum Schluessel: String, CodingKey { case token, expiresAt, server, datenschutz }
+        private enum Schluessel: String, CodingKey { case token, expiresAt, server, datenschutz, ich }
 
         init(from decoder: Decoder) throws {
             let c = try decoder.container(keyedBy: Schluessel.self)
@@ -244,6 +246,7 @@ struct ELAnmeldung: Sendable {
             expiresAt = try c.decode(Date.self, forKey: .expiresAt)
             server = try c.decodeIfPresent(ServerInfo.self, forKey: .server)
             datenschutz = DatenschutzAngabe(c, .datenschutz)
+            ich = try? c.decodeIfPresent(ELIch.self, forKey: .ich)
         }
     }
 
@@ -273,7 +276,8 @@ struct ELAnmeldung: Sendable {
         case 200..<300:
             guard let ergebnis = try? JSONDecoder.server.decode(Ergebnis.self, from: daten) else { throw ELAnmeldeFehler.antwortUngueltig }
             let name = geraet.flatMap { $0.isEmpty ? nil : String($0.prefix(40)) }
-            return Angemeldet(sitzung: ELSitzung(server: server, token: ergebnis.token, expiresAt: ergebnis.expiresAt, geraet: name),
+            return Angemeldet(sitzung: ELSitzung(server: server, token: ergebnis.token, expiresAt: ergebnis.expiresAt, geraet: name,
+                                                 personId: ergebnis.ich?.personId),
                               server: ergebnis.server, datenschutz: ergebnis.datenschutz)
         case 401: throw ELAnmeldeFehler.passwortFalsch
         case 429:

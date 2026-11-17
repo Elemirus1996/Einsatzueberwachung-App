@@ -202,11 +202,6 @@ struct ELUebersichtView: View {
                         Button { startOffen = true } label: { Label("Einsatz oder Übung starten", systemImage: "play.circle") }
                     }
                     Button { modell.vorne = .start } label: { Label("Startseite", systemImage: "house") }
-                    if ansicht.lage?.ich != nil {
-                        Button { Task { await modell.elPersonFragen(auchWennGewaehlt: true) } } label: {
-                            Label("Person wechseln", systemImage: "person.crop.circle")
-                        }
-                    }
                     Button(role: .destructive) { abmeldenFragen = true } label: { Label("Abmelden", systemImage: "rectangle.portrait.and.arrow.right") }
                 } label: {
                     Image(systemName: "ellipsis")
@@ -410,8 +405,8 @@ struct ELUebersichtView: View {
                                     details: { gewaehltesTeam = team },
                                     pause: { ausfuehren(.teamPause(team.teamId, name: team.teamName)) },
                                     weiter: { ausfuehren(.teamWeiter(team.teamId, name: team.teamName)) },
-                                    stopp: { stoppTeam = team })
-                            .disabled(!darfSteuern)
+                                    stopp: { stoppTeam = team },
+                                    steuern: darfSteuern)
                     }
                 }
             }
@@ -457,6 +452,8 @@ struct ELTeamKarte: View {
     let pause: () -> Void
     let weiter: () -> Void
     let stopp: () -> Void
+    /// Rolle `lesen`: keine Start-, Pause- oder Aktionsknöpfe (APP_API EL Abschnitt 4a)
+    var steuern = true
 
     private var sucht: Bool { team.suche.status == .laeuft || team.suche.status == .kurzpause }
     private var dauer: TimeInterval? { team.suche.status == .bereit ? nil : ansicht.suchdauer(team, um: zeitpunkt) }
@@ -491,7 +488,7 @@ struct ELTeamKarte: View {
             HStack(spacing: 8) {
                 ELStempel(text: statusText, farbe: statusFarbe)
                 Spacer(minLength: 0)
-                bedienung
+                if steuern { bedienung }
             }
         }
         .padding(14)
@@ -502,7 +499,7 @@ struct ELTeamKarte: View {
         } }
         .shadow(color: ELStil.schatten, radius: 4, y: 1)
         .contentShape(Rectangle())
-        .onTapGesture(perform: details)
+        .onTapGesture { if steuern { details() } }
         .accessibilityElement(children: .contain)
     }
 

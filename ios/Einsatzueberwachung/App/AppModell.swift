@@ -269,9 +269,10 @@ final class AppModell: ObservableObject {
         Task { await elPersonFragen() }
     }
 
-    /// Personenliste laden, wenn noch keine Person gewählt ist (ältere Server ohne `/personen`: nichts fragen)
-    func elPersonFragen(auchWennGewaehlt: Bool = false) async {
-        guard let client = elClient, auchWennGewaehlt || elSitzung?.personId == nil else { return }
+    /// Personenliste laden, wenn noch keine Person feststeht (ältere Server ohne `/personen`: nichts fragen).
+    /// Kein Wechsel: eine andere Person nur über Abmelden und neue Anmeldung (Entscheidung Paul 17.11.2026)
+    func elPersonFragen() async {
+        guard let client = elClient, elSitzung?.personId == nil else { return }
         if let liste = try? await client.personen(), !liste.isEmpty { elPersonen = liste }
     }
 
@@ -284,11 +285,6 @@ final class AppModell: ObservableObject {
         elSitzung = neu
         elPersonen = nil
         await elAnsicht?.neuLaden()
-    }
-
-    func elPersonAbbrechen() {
-        // Mit gewählter Person (Wechsel abgebrochen) einfach zurück; ohne Person bleibt die Frage offen
-        if elSitzung?.personId != nil { elPersonen = nil }
     }
 
     /// Abmelden: Token auf dem Server ungültig machen, Ortung aus, Token löschen.

@@ -36,16 +36,15 @@ struct ELPersonWahlView: View {
                         .disabled(laedt != nil)
                     }
                 } footer: {
-                    Text("Steuern und den Standort senden darf, wer im Einsatz als Einsatzleiter eingetragen ist. Der Führungsassistent steuert ohne Standort, alle anderen sehen die Lage nur an.")
+                    Text("Die Wahl gilt bis zur Abmeldung und steht bei jeder Aktion im Protokoll. Steuern und den Standort senden darf, wer im Einsatz als Einsatzleiter eingetragen ist. Der Führungsassistent steuert ohne Standort, alle anderen sehen die Lage nur an.")
                 }
             }
             .searchable(text: $suche, prompt: "Name")
             .navigationTitle("Wer bist du?")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if modell.elSitzung?.personId != nil {
-                    ToolbarItem(placement: .cancellationAction) { Button("Abbrechen") { modell.elPersonAbbrechen() } }
-                }
+                // Kein Wechsel nach der Wahl; wer sich vertan hat, meldet sich ab und neu an
+                ToolbarItem(placement: .cancellationAction) { Button("Abmelden") { Task { await modell.elAbmelden() } } }
             }
             .alert("Auswahl", isPresented: Binding(get: { fehler != nil }, set: { if !$0 { fehler = nil } })) {
                 Button("OK", role: .cancel) { fehler = nil }
