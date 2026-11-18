@@ -215,6 +215,24 @@ class TeamAnsichtTest {
         assertEquals("keine Minutenabfrage, solange live", 2, server.lageAbrufe)
     }
 
+    /** #79: Mit lageStand gibt es im Hintergrund keinen Minutentakt; solange die Live-Verbindung steht, auch keine Zusatzabrufe. */
+    @Test
+    fun lageStandOhneMinutentaktUndOhneZusatzabrufSolangeLive() = runTest {
+        server.offenerStrom = true
+        val a = ansicht()
+        a.neuLaden()
+        a.lageStandGemeldet("aaa")
+        a.hintergrund()
+        runCurrent()
+        assertTrue(a.live.value)
+        val nachStart = server.lageAbrufe
+        a.lageStandGemeldet("bbb")
+        advanceTimeBy(181_000)
+        a.anhalten()
+        assertEquals(nachStart, server.lageAbrufe)
+        assertEquals("bbb", a.letzterLageStand)
+    }
+
     @Test
     fun hintergrundHoltLageJedeMinute() = runTest {
         val a = ansicht()

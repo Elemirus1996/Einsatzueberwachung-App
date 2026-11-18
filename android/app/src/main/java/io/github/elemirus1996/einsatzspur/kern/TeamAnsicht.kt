@@ -18,7 +18,8 @@ interface Ablage {
 
 /**
  * Daten der nativen Team-Ansicht wie iOS `TeamAnsicht.swift`: Lage, Laufwege, Mitteilungen, Statusmeldungen.
- * Vordergrund: Live-Verbindung, Laufwege, Lage alle 60 s. Hintergrund: nur Lage jede Minute (für Mitteilungen).
+ * Vordergrund: Live-Verbindung, Laufwege, Lage alle 60 s. Hintergrund: Live-Verbindung; reißt sie ab, lädt die App die
+ * Lage, wenn sich `lageStand` aus /positions bzw. /status ändert (#79), bei älteren Servern jede Minute.
  * Der Modus aus /lage steuert die Ortung (`beiSteuerung`); der Suchstatus (z. B. Kurzpause) nur die Anzeige.
  */
 class TeamAnsicht(
@@ -107,10 +108,23 @@ class TeamAnsicht(
     fun hintergrund() {
         anhalten()
         imHintergrund = true
-        aufgaben = listOf(
+        aufgaben = listOfNotNull(
             bereich.launch { liveSchleife() },
-            bereich.launch { schleife(lageTaktMs) { if (!_live.value) neuLaden(tracksVoll = false, mitTracks = false) } },
+            // Ohne lageStand (Server vor 1.18.0) wie bisher jede Minute, sonst nur bei Änderung (lageStandGemeldet)
+            if (letzterLageStand == null) bereich.launch { schleife(lageTaktMs) { if (!_live.value) neuLaden(tracksVoll = false, mitTracks = false) } } else null,
         )
+    }
+
+    /** Letzter `lageStand` aus /positions bzw. /status (#79); `null`: Server kennt das Feld nicht. */
+    var letzterLageStand: String? = null
+        private set
+
+    /** Im Hintergrund ohne Live-Verbindung die Lage nur laden, wenn sich ihr Stand geändert hat. */
+    fun lageStandGemeldet(stand: String) {
+        val vorher = letzterLageStand
+        letzterLageStand = stand
+        if (!imHintergrund || _live.value || vorher == null || vorher == stand) return
+        bereich.launch { neuLaden(tracksVoll = false, mitTracks = false) }
     }
 
     /** Bei Abmeldung oder Einsatzende: nichts auf dem Gerät zurücklassen. */

@@ -61,6 +61,8 @@ class KernTest {
         )
         assertEquals(SteuerAntwort(Modus.PAUSE, 20, 60, 120, 1_793_268_000_000L), a)
         assertEquals(SteuerAntwort(Modus.TRACK), TeamClient.steuerAntwort(JSONObject("""{ "mode": "track" }""")))
+        // ab Server 1.18.0 (#79)
+        assertEquals("3f9a1c07b2e4d815", TeamClient.steuerAntwort(JSONObject("""{ "mode": "track", "lageStand": "3f9a1c07b2e4d815" }""")).lageStand)
     }
 }
 

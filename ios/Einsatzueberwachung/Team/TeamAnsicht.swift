@@ -103,11 +103,25 @@ final class TeamAnsicht: ObservableObject {
         imHintergrund = false
     }
 
-    /// App im Hintergrund: keine Live-Verbindung und keine Laufwege, aber jede Minute die Lage,
-    /// damit Änderungen und Mitteilungen der EL als lokale Mitteilung ankommen (die App ist durch die Ortung wach).
+    /// Letzter `lageStand` aus /positions bzw. /status (#79). `nil`: Server kennt das Feld nicht (vor 1.18.0).
+    private(set) var letzterLageStand: String?
+
+    /// Die Ortung meldet den Stand der Lage. Im Hintergrund wird die Lage nur bei einer Änderung geladen;
+    /// neue Mitteilungen, Ziele und Gebiete erscheinen dann als lokale Mitteilung – ohne Push.
+    func lageStandGemeldet(_ stand: String) {
+        let vorher = letzterLageStand
+        letzterLageStand = stand
+        guard imHintergrund, let vorher, vorher != stand else { return }
+        Task { await neuLaden(tracksVoll: false, mitTracks: false) }
+    }
+
+    /// App im Hintergrund: keine Live-Verbindung und keine Laufwege. Die App bleibt durch die Ortung wach.
+    /// Liefert der Server `lageStand` (ab 1.18.0), lädt `lageStandGemeldet` die Lage nur bei Änderungen;
+    /// bei älteren Servern wie bisher jede Minute die Lage.
     func hintergrund() {
         anhalten()
         imHintergrund = true
+        guard letzterLageStand == nil else { return }
         aufgaben = [Task { [weak self] in
             while !Task.isCancelled {
                 guard let takt = self?.lageTakt else { return }

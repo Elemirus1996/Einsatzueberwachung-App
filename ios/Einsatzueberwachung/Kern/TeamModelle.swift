@@ -13,6 +13,8 @@ struct SteuerAntwort: Decodable, Equatable, Sendable {
     var pauseCheckSec: Int?
     var expiresAt: Date?
     var accepted: Int?
+    /// Stand von /lage (Server ab 1.18.0, #79): ändert er sich, lädt die App im Hintergrund die Lage
+    var lageStand: String?
 
     static let stop = SteuerAntwort(mode: .stop)
 }

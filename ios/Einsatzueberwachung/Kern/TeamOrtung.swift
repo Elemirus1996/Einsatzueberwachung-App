@@ -49,6 +49,8 @@ final class TeamOrtung: ObservableObject {
 
     /// Meldet, wenn eine Antwort von /positions oder /status den Modus ändert, damit die Anzeige die Lage neu lädt.
     var beiModuswechsel: ((Modus) -> Void)?
+    /// Meldet den `lageStand` jeder Antwort von /positions oder /status (#79, kein Push)
+    var beiLageStand: ((String) -> Void)?
 
     var intervall: TimeInterval { TimeInterval(max(steuerung.intervalSec ?? 20, 1)) }
     var uploadTakt: TimeInterval { TimeInterval(max(steuerung.uploadEverySec ?? 60, 5)) }
@@ -78,6 +80,7 @@ final class TeamOrtung: ObservableObject {
             return
         }
         if melden, antwort.mode != vorher { beiModuswechsel?(antwort.mode) }
+        if melden, let stand = vorgabe.lageStand { beiLageStand?(stand) }
         switch antwort.mode {
         case .track:
             quelle.starten(stufe: .fein)

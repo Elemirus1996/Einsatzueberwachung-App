@@ -565,6 +565,7 @@ class AppModell(private val context: Context) {
             _team.value?.anwenden(SteuerAntwort(modus), melden = false)
         }
         team.beiModuswechsel = { ansicht.modusGeaendert() }
+        team.beiLageStand = { ansicht.lageStandGemeldet(it) }
         ansicht.beiMeldungen = { liste -> liste.forEach { mitteilungen.senden(it, stumm = it.tonart?.let { art -> !toene.mitTon(art) } ?: false) } }
         ansicht.beiLage = { lage -> datenschutzVersionPruefen(lage.datenschutzVersion, teamKennung) { client.datenschutz() } }
         _team.value = team
