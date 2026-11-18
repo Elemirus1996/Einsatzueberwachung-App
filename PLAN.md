@@ -24,7 +24,7 @@ Die App darf nichts öffnen, was heute verschlossen ist.
 2. **Team nur per QR-Code, wie bisher.** Die App scannt den **bestehenden** QR-Code aus dem Monitor (Team-Dialog), das Mitglied wählt in der nativen Oberfläche sein Team. Erst danach gibt der Server der App ein App-Token. Es gilt nur für diesen Einsatz und dieses Team und läuft spätestens nach 24 h ab. Bei Einsatzende wird es ungültig (Token-Generation).
 3. **Nur HTTPS**, nur an die Adresse aus dem QR-Code bzw. die eingerichtete VPN-Adresse. Keine fest eingebaute Server-Adresse, damit auch andere Staffeln die App nutzen können.
 4. **Token im Schlüsselbund** (iOS Keychain / Android Keystore), nie im Klartext gespeichert oder geloggt.
-5. **Keine Daten an Dritte:** keine Analyse-SDKs, keine Absturzberichte an Fremddienste, keine Werbung. **Einzige Ausnahme: Push über Apple (APNs)**, im System eingebaut, ohne Fremd-SDK. Android ohne Firebase: Der Vordergrunddienst hält während des Einsatzes die Live-Verbindung und zeigt Mitteilungen selbst an (entschieden 01.11.2026, ersetzt die Firebase-Ausnahme vom 28.10.2026). Sichtbare Push-Mitteilungen dürfen den Text der Mitteilung der Einsatzleitung enthalten, damit das Team ihn auf dem Sperrbildschirm liest (entschieden 01.11.2026); keine Positionen im Push.
+5. **Keine Daten an Dritte:** keine Analyse-SDKs, keine Absturzberichte an Fremddienste, keine Werbung, **kein Push-Dienst** (entschieden 18.11.2026, [#79](https://github.com/Elemirus1996/Einsatzueberwachung-App/issues/79): auch kein Apple-Push; Mitteilungen kommen lokal über die laufende Ortung, siehe „Aufwecken“). ~~Einzige Ausnahme: Push über Apple (APNs), im System eingebaut, ohne Fremd-SDK.~~ (verworfen 18.11.2026) Android ohne Firebase: Der Vordergrunddienst hält während des Einsatzes die Live-Verbindung und zeigt Mitteilungen selbst an (entschieden 01.11.2026, ersetzt die Firebase-Ausnahme vom 28.10.2026). Lokale Mitteilungen dürfen den Text der Mitteilung der Einsatzleitung enthalten, damit das Team ihn auf dem Sperrbildschirm liest (entschieden 01.11.2026); keine Positionen.
 6. **Bestätigung vor dem Start:** „Ortung für Team <Name>, Einsatz <Stichwort> auf <Server> starten?“
 
 ## Steuerung der Ortung (Kern)
@@ -48,7 +48,21 @@ Zuordnung auf dem Server:
 
 Sicherheitsnetz in der App: Läuft `expiresAt` ab, stoppt die App auch ohne Netz.
 
-### Aufwecken im Modus `pause` (entschieden 29.10.2026: Grob-Ortung ohne GPS; stille Push ab Dezember prüfen)
+### Aufwecken im Modus `pause` (entschieden 29.10.2026: Grob-Ortung ohne GPS; Push verworfen 18.11.2026)
+
+**Stand 18.11.2026 ([#79](https://github.com/Elemirus1996/Einsatzueberwachung-App/issues/79), „Lösung 1“): Kein Apple-Push, kein zentraler Push-Dienst.**
+Begründung: Der APNs-Schlüssel gilt für alle Geräte der App. Selbst betriebene Server pro Staffel bräuchten entweder unseren
+Schlüssel oder einen zentralen Weiterleiter bei uns; mit einem Weiterleiter würden wir für alle Staffeln Daten verarbeiten
+(Auftragsverarbeitung) und den Betrieb verantworten.
+- **Team:** Die Hintergrund-Ortung (in `pause` die Grob-Ortung) hält die App während des Einsatzes wach. Neue Mitteilungen,
+  Suchgebiete und Ziele kommen in der Antwort auf die Positionsmeldung bzw. `/status` mit und erscheinen als **lokale Mitteilung**,
+  auch bei gesperrtem Handy. Keine zusätzliche Abfrage, um Akku zu sparen.
+- **Einsatzleitung:** EL-Modus mit Hintergrund-Ortung während des laufenden Einsatzes hält die App wach; die Position der
+  Einsatzleitung erscheint auf der Karte, Mitteilungen kommen lokal wie beim Team.
+- **App weggewischt:** Dann kommt nichts mehr an. In der Einweisung erklären; der Server zeigt der Einsatzleitung, wenn sich ein Gerät nicht mehr meldet.
+- Apple-Push bleibt eine spätere Option, falls sich das in der Praxis als zu unzuverlässig erweist.
+
+Der folgende Push-Weg ist **verworfen** (18.11.2026) und bleibt nur zur Nachvollziehbarkeit stehen:
 
 **Stand 29.10.2026:** Im iPhone-Test hat iOS die gesperrte App in der Pause schlafen gelegt, eine neue Suche kam nicht an.
 Entscheidung: In `pause` läuft eine Grob-Ortung (niedrigste Genauigkeit, Funkzellen/WLAN, kein GPS, keine Positionen senden).
@@ -78,7 +92,7 @@ damit alles flüssig läuft. Die Daten kommen ausschließlich über die Schnitts
 | Sprache / UI | Swift, SwiftUI | Kotlin, Jetpack Compose |
 | Oberflächen | SwiftUI, Karte mit MapKit (entschieden 28.10.2026) | Jetpack Compose, Karte mit MapLibre Native (entschieden 29.10.2026) |
 | Live-Daten | Server-Sent Events mit `URLSession` (Bearer-Token im Header), Rückfall Abfrage per HTTP | Server-Sent Events (Bearer-Token im Header), Rückfall Abfrage per HTTP |
-| Push | APNs (sichtbar und still) | Firebase Cloud Messaging (nur Messaging) |
+| Push | keiner (18.11.2026, #79): lokale Mitteilungen, App bleibt über die Ortung wach; ~~APNs~~ verworfen | keiner: Vordergrunddienst mit Live-Verbindung; ~~Firebase Cloud Messaging~~ verworfen |
 | Ortung | `CLLocationManager`, `allowsBackgroundLocationUpdates`, `pausesLocationUpdatesAutomatically`, Berechtigung „Beim Verwenden“ (blaue Statusanzeige, „Immer“ wird nicht verlangt) | Foreground-Service Typ `location` mit Benachrichtigung, Fused Location Provider (ausgewogen, Batching) |
 | Puffer | SQLite (Funkloch, Upload mit Originalzeit) | Room/SQLite |
 | QR-Scan | AVFoundation / VisionKit `DataScannerViewController` | CameraX + ML Kit Barcode |
@@ -145,7 +159,7 @@ Neuer Bereich `api/team-mobile/app/v1/` (öffentliche Adresse, eigener nginx-Blo
 | `GET  api/team-mobile/app/v1/status` | leichte Abfrage im Pause-Modus |
 | `POST api/team-mobile/app/v1/login/teams`, `POST …/login` | native Anmeldung: Anmelde-Code → Einsatz und Teamliste; Code + Team → Token (Phase 1c) |
 | `GET  api/team-mobile/app/v1/lage`, `POST …/statusmeldung`, `…/mitteilungen` | Daten der Team-Ansicht und Statusmeldungen (Phase 1c) |
-| `POST api/team-mobile/app/v1/push`, `POST api/el/app/v1/push` | Push-Token des Geräts anmelden/abmelden (Phase 1c bzw. 3b) |
+| ~~`POST api/team-mobile/app/v1/push`, `POST api/el/app/v1/push`~~ | ~~Push-Token des Geräts anmelden/abmelden~~ – verworfen 18.11.2026 (#79), nie umgesetzt, nicht in `APP_API.md` |
 | `api/team-mobile/app/v1/ereignisse` | Live-Aktualisierungen für die native Team-Ansicht (SSE, Phase 1c) |
 | `POST api/el/app/v1/login` | Anmeldung der nativen EL-App mit Staffel-Passwort (nur VPN, Sperre nach Fehlversuchen wie im Browser) → EL-Token |
 | `POST api/el/app/v1/positions`, `GET …/status` | Standort der Einsatzleitung, Antwort mit `mode` (fertig, PR #113) |
@@ -199,7 +213,7 @@ Nach Abschluss der laufenden Aufträge (Löschfristen #151, Release v1.12.0, And
 - [x] Tests, Beschreibung in `docs/APP_API.md`; Release v1.11.10, auf dem Staffel-Server eingespielt 28.10.2026
 - [ ] Logo der Staffel und feste Server-Kennung für die Heimatstaffel ([Server #121](https://github.com/Elemirus1996/Einsatzueberwachung.Server/issues/121))
 - [ ] Mitteilung quittieren (optional)
-- [ ] Push-Token je Gerät speichern, stille Push bei `pause`→`track` und bei `stop` (erst mit Apple-Mitgliedschaft testbar; nach dem iPhone-Test vorerst nicht nötig, siehe Akzeptanzkriterien)
+- ~~Push-Token je Gerät speichern, stille Push bei `pause`→`track` und bei `stop`~~ – verworfen 18.11.2026 (#79), siehe „Aufwecken“
 
 ### Phase 2 – App, Rolle Team (Mac; erst iOS, dann Android)
 iOS, getestet auf dem iPhone 15 Pro gegen Server v1.11.10 am 28.10.2026:
@@ -232,10 +246,12 @@ Android:
 - [ ] Android: „Kartenpunkte in den Bericht“, sobald Einsatz beenden in der Android-EL kommt
 - [ ] Test auf echten Geräten (Navi-Apps, Ortung in der Pause)
 
-### Phase 3b – Push-Mitteilungen für die Einsatzleitung (entschieden 28.10.2026)
+### Phase 3b – Mitteilungen für die Einsatzleitung (entschieden 28.10.2026, Weg geändert 18.11.2026: lokal statt Push, #79)
 - [ ] Jeder EL stellt **in der App selbst** ein, welche Mitteilungen er bekommt (z. B. Zeitwarnung Team, Funkstille Handy/Halsband, Hund außerhalb des Gebiets, neuer Funkspruch, Einsatzende) – alles einzeln abschaltbar, Standard: nur kritische Warnungen
-- [ ] Server: Geräte-Registrierung je EL-Gerät mit seinen Einstellungen, Versand bei Warnzentrum-Ereignissen und Funk; stille Push zum Aufwecken der EL-Ortung bei Einsatzbeginn
-- [ ] iOS über Apple (APNs), Android über Google (Firebase Cloud Messaging); Mitteilungstexte knapp, ohne Namen von Vermissten oder Ortsangaben
+- [ ] EL-Modus mit Hintergrund-Ortung während des laufenden Einsatzes: hält die App wach, Position der Einsatzleitung auf der Karte
+- [ ] Server liefert Warnzentrum-Ereignisse und Funk in der Antwort auf die Positionsmeldung bzw. über die Live-Verbindung; die App zeigt sie als lokale Mitteilung. Texte knapp, ohne Namen von Vermissten oder Ortsangaben
+- ~~Server: Geräte-Registrierung je EL-Gerät, Versand per Push; stille Push zum Aufwecken der EL-Ortung~~ – verworfen 18.11.2026 (#79)
+- ~~iOS über Apple (APNs), Android über Google (Firebase Cloud Messaging)~~ – verworfen (Android: 01.11.2026, iOS: 18.11.2026)
 - [ ] Mitteilungen nur, solange ein Einsatz läuft; Abmelden in der App entfernt die Registrierung
 
 ### Phase 3c – Ideen aus der Übergabe (15.11.2026)
@@ -270,10 +286,19 @@ Android:
 ## Offen
 
 - **CarPlay / Android Auto** (Prüfpunkt Dezember 2026, nach dem bezahlten Apple-Konto): Apple erlaubt CarPlay nur für bestimmte App-Arten und mit eigener Freigabe; denkbar wäre höchstens eine sehr einfache Ansicht „Aufgabe während der Fahrt“ (Warnungen, Statusänderungen der Teams). Bis dahin: Mitteilungen auf dem Handy, die im Auto angezeigt bzw. vorgelesen werden.
-- **Push bei selbst betriebenen Servern:** Der Push-Schlüssel von Apple gilt für alle Geräte mit der App und lässt sich nicht
+- (entschieden 18.11.2026, #79: kein Push, kein Weiterleiter – siehe „Aufwecken“) ~~**Push bei selbst betriebenen Servern:**~~ Der Push-Schlüssel von Apple gilt für alle Geräte mit der App und lässt sich nicht
   auf eine Staffel beschränken. Vorschlag: kleiner Push-Weiterleiter (Zugang je Staffel einzeln sperrbar, nur „wecken“ ohne
   Inhalt, sichtbare Texte Ende-zu-Ende verschlüsselt). Betrieb **nicht zu Hause**; Vorschlag: kleiner eigener Server in
   Deutschland. Erst nötig mit der bezahlten Apple-Mitgliedschaft, klären vor Phase 3b.
 - Traccar-Endpunkt nach dem Umstieg abschalten oder als Rückfallebene behalten
 - Soll die Einsatzleitung auch ohne laufenden Einsatz geortet werden? (umgesetzt: nein, `pause`)
-- (entschieden 28.10.2026) Push-Mitteilungen siehe Phase 3b
+- (entschieden 28.10.2026, geändert 18.11.2026) Mitteilungen siehe Phase 3b und „Aufwecken“
+- **App-Store: Begründung für die Hintergrund-Ortung** (Entwurf 18.11.2026, #79, vor der ersten Einreichung mit Paul abstimmen).
+  Hinweis für die Prüfer (Review Notes, englisch):
+  „EinsatzSpur is used by volunteer search-and-rescue dog units during active missions. Location is recorded in the
+  background only while the user has joined a mission (team member or incident command) and only until the mission or the
+  team's search ends; the server tells the app when to start and stop. Background location is required because handlers
+  keep the phone locked in a pocket while searching, and incident command must see each team's track live. While joined,
+  the app also shows new instructions from incident command as local notifications. Location is sent only to the server
+  of the user's own unit, never to us or third parties. No account, analytics or advertising.“
+  Zweck-Texte (`NSLocationWhenInUseUsageDescription`) bleiben wie in der App; „Immer“ wird nicht verlangt.
