@@ -183,6 +183,48 @@ struct TeamAnsichtTests {
         #expect(a.lage?.suche.status == .beendet)
     }
 
+    /// #79: Liefert der Server `lageStand`, holt die App im Hintergrund die Lage nur bei einer Änderung –
+    /// nicht mehr jede Minute. Neue Mitteilungen kommen so als lokale Mitteilung an.
+    @Test func lageStandLaedtImHintergrundNurBeiAenderung() async throws {
+        var gemeldet: [[String]] = []
+        let a = ansicht(lageTakt: .milliseconds(50))
+        a.beiMeldungen = { gemeldet.append($0.map { $0.titel + " " + ($0.text ?? "") }) }
+        await a.neuLaden()
+        a.lageStandGemeldet("aaa")
+        a.hintergrund()
+
+        var neu = Self.lage
+        neu.mitteilungen.append(Mitteilung(id: "m2", text: "Bitte Funkkontakt", zeit: Date(timeIntervalSince1970: 1_800_000_050)))
+        server.lageAntwort = .success(neu)
+
+        // Kein Minutentakt mehr: ohne neuen Stand bleibt die alte Lage
+        try await Task.sleep(for: .milliseconds(200))
+        #expect(a.lage?.mitteilungen.count == 1)
+        a.lageStandGemeldet("aaa")
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(a.lage?.mitteilungen.count == 1)
+
+        // Neuer Stand: Lage laden, neue Mitteilung melden
+        a.lageStandGemeldet("bbb")
+        try await Task.sleep(for: .milliseconds(200))
+        a.anhalten()
+        #expect(a.lage?.mitteilungen.count == 2)
+        #expect(gemeldet.flatMap { $0 }.contains { $0.contains("Bitte Funkkontakt") })
+    }
+
+    /// Älterer Server ohne `lageStand`: im Hintergrund weiter regelmäßig die Lage holen.
+    @Test func ohneLageStandBleibtDerTakt() async throws {
+        let a = ansicht(lageTakt: .milliseconds(50))
+        await a.neuLaden()
+        a.hintergrund()
+        var neu = Self.lage
+        neu.mitteilungen.append(Mitteilung(id: "m2", text: "Neu", zeit: Date(timeIntervalSince1970: 1_800_000_050)))
+        server.lageAntwort = .success(neu)
+        try await Task.sleep(for: .milliseconds(300))
+        a.anhalten()
+        #expect(a.lage?.mitteilungen.count == 2)
+    }
+
     @Test func lageGibtModusAnDieOrtungWeiter() async {
         var modi: [Modus] = []
         let a = ansicht { modi.append($0) }

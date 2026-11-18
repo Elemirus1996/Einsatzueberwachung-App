@@ -440,6 +440,7 @@ final class AppModell: ObservableObject {
             schnittstelle: client, teamId: sitzung.teamId ?? sitzung.teamName,
             beiSteuerung: { [weak self] modus in self?.team?.anwenden(SteuerAntwort(mode: modus), melden: false) })
         team?.beiModuswechsel = { [weak self] _ in self?.teamAnsicht?.modusGeaendert() }
+        team?.beiLageStand = { [weak self] stand in self?.teamAnsicht?.lageStandGemeldet(stand) }
         teamAnsicht?.beiMeldungen = { [weak self] meldungen in
             meldungen.forEach { self?.mitteiler.senden($0) }
         }

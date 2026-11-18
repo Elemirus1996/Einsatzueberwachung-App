@@ -175,6 +175,7 @@ class TeamClient(private val sitzung: TeamSitzung) : TeamSchnittstelle, TeamAnsi
                 uploadEverySec = zahl("uploadEverySec"),
                 pauseCheckSec = zahl("pauseCheckSec"),
                 expiresAtMs = isoZuMs(json.optString("expiresAt", "")),
+                lageStand = if (json.has("lageStand") && !json.isNull("lageStand")) json.optString("lageStand") else null,
             )
         }
     }

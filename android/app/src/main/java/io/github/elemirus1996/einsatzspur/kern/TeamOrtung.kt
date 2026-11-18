@@ -71,6 +71,8 @@ class TeamOrtung(
 
     /** Meldet, wenn eine Antwort von /positions oder /status den Modus ändert. */
     var beiModuswechsel: ((Modus) -> Unit)? = null
+    /** Meldet den `lageStand` jeder Antwort von /positions oder /status (#79, kein Push). */
+    var beiLageStand: ((String) -> Unit)? = null
 
     private var letzteAufnahme: Long? = null
     private var letzteAnfrage: Long? = null
@@ -112,6 +114,7 @@ class TeamOrtung(
             return
         }
         if (melden && antwort.mode != vorher) beiModuswechsel?.invoke(antwort.mode)
+        if (melden) vorgabe.lageStand?.let { beiLageStand?.invoke(it) }
         when (antwort.mode) {
             Modus.TRACK -> {
                 quelle.starten(OrtungsStufe.FEIN)
