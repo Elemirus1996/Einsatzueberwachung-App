@@ -11,11 +11,21 @@ MapLibre Native Android 13.7.1 (org.maplibre.gl:android-sdk) – Karte
 BSD 2-Clause License, Copyright MapLibre contributors
 https://github.com/maplibre/maplibre-native
 
-OkHttp 4.12.0, Okio 3.6.0 (Square), Gson, Guava, Timber, Dagger
+MapLibre GeoJSON und Turf 6.0.1 (Abhängigkeiten der Karte)
+Apache License 2.0, Copyright MapLibre contributors
+
+MapLibre Android Gestures 0.0.4
+BSD 2-Clause License, Copyright MapLibre contributors
+
+OkHttp 4.12.0, Okio 3.6.0 (Square), Gson 2.10.1, Guava 33.3.1, Timber 5.0.1, Dagger 2.59,
+javax.inject, jakarta.inject, JSR 305, JSpecify, J2ObjC Annotations, AutoValue Annotations, JetBrains Annotations
 Apache License 2.0
 
+Checker Framework Qualifiers 3.43.0 (org.checkerframework:checker-qual)
+MIT-Lizenz, Copyright Checker Framework developers
+
 Kartendaten: © OpenStreetMap-Mitwirkende (ODbL), SRTM
-Kartendarstellung: © OpenStreetMap (CC-BY-SA) bzw. © OpenTopoMap (CC-BY-SA)
+Kartendarstellung: © OpenStreetMap (CC-BY-SA) bzw. © OpenTopoMap (CC-BY-SA 3.0)
 
 AndroidX / Jetpack (Compose, Activity, Lifecycle, Core, CameraX)
 Apache License 2.0, Copyright The Android Open Source Project
