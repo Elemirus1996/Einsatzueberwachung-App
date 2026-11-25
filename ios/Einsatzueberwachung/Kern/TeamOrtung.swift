@@ -51,6 +51,8 @@ final class TeamOrtung: ObservableObject {
     var beiModuswechsel: ((Modus) -> Void)?
     /// Meldet den `lageStand` jeder Antwort von /positions oder /status (#79, kein Push)
     var beiLageStand: ((String) -> Void)?
+    /// Meldet den `mitteilungStand` jeder Antwort (Rolle Einsatzleitung, #79)
+    var beiMitteilungStand: ((String) -> Void)?
 
     var intervall: TimeInterval { TimeInterval(max(steuerung.intervalSec ?? 20, 1)) }
     var uploadTakt: TimeInterval { TimeInterval(max(steuerung.uploadEverySec ?? 60, 5)) }
@@ -81,6 +83,7 @@ final class TeamOrtung: ObservableObject {
         }
         if melden, antwort.mode != vorher { beiModuswechsel?(antwort.mode) }
         if melden, let stand = vorgabe.lageStand { beiLageStand?(stand) }
+        if melden, let stand = vorgabe.mitteilungStand { beiMitteilungStand?(stand) }
         switch antwort.mode {
         case .track:
             quelle.starten(stufe: .fein)

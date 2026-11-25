@@ -28,6 +28,8 @@ import io.github.elemirus1996.einsatzspur.kern.ELVerlaengerung
 import io.github.elemirus1996.einsatzspur.kern.ELVermissteAnsicht
 import io.github.elemirus1996.einsatzspur.kern.ELZugang
 import io.github.elemirus1996.einsatzspur.kern.ServerAdresse
+import io.github.elemirus1996.einsatzspur.kern.ELMitteilungsAbruf
+import io.github.elemirus1996.einsatzspur.kern.ELMitteilungsEinstellungen
 import io.github.elemirus1996.einsatzspur.kern.LageMeldung
 import io.github.elemirus1996.einsatzspur.kern.LocationManagerQuelle
 import io.github.elemirus1996.einsatzspur.kern.LokaleMitteilungen
@@ -154,6 +156,7 @@ class AppModell(private val context: Context) {
     val packliste = Packliste(einstellungsAblage) { PacklisteErinnerung.planen(context, it) }
     /** Ton je Art von Meldung, Einstellung dieses Geräts (APP_API.md „Töne in den Apps“) */
     val toene = Toene(einstellungsAblage, ::tonAbspielen)
+    val elMitteilungsEinstellungen = ELMitteilungsEinstellungen(einstellungsAblage)
 
     private fun tonAbspielen(wahl: TonWahl) {
         if (wahl is TonWahl.Ton) {
@@ -407,6 +410,11 @@ class AppModell(private val context: Context) {
             _elOrtung.value?.ablaufSetzen(neu.expiresAtMs)
         }
         val betrieb = ELBetrieb(client, ablage, einsatz = client) { _elOrtung.value?.anwenden(SteuerAntwort.STOP) }
+        // #79: Warnungen im Hintergrund als lokale Mitteilung, nur bei geändertem mitteilungStand
+        val abruf = ELMitteilungsAbruf(client, elMitteilungsEinstellungen) { meldung ->
+            mitteilungen.senden(meldung, stumm = meldung.tonart?.let { !toene.mitTon(it) } ?: false)
+        }
+        ortung.beiMitteilungStand = { stand -> bereich.launch { abruf.standGemeldet(stand) } }
         betrieb.nachAktion = { ansicht.neuLaden() }
         ansicht.beiNotiz = { betrieb.notizenLaden() }
         val karte = ELKartenAnsicht(client, bereich)
@@ -565,7 +573,11 @@ class AppModell(private val context: Context) {
             _team.value?.anwenden(SteuerAntwort(modus), melden = false)
         }
         team.beiModuswechsel = { ansicht.modusGeaendert() }
-        team.beiLageStand = { ansicht.lageStandGemeldet(it) }
+        team.beiLageStand = {
+            ansicht.lageStandGemeldet(it)
+            // Ruht die EL-Ortung (Team auf demselben Handy), im Takt des Teams nach EL-Mitteilungen fragen (#79)
+            _elOrtung.value?.takeIf { el -> el.ruht }?.let { el -> bereich.launch { el.statusPruefen() } }
+        }
         ansicht.beiMeldungen = { liste -> liste.forEach { mitteilungen.senden(it, stumm = it.tonart?.let { art -> !toene.mitTon(art) } ?: false) } }
         ansicht.beiLage = { lage -> datenschutzVersionPruefen(lage.datenschutzVersion, teamKennung) { client.datenschutz() } }
         _team.value = team

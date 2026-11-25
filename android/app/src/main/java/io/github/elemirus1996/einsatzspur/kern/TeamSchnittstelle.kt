@@ -176,6 +176,7 @@ class TeamClient(private val sitzung: TeamSitzung) : TeamSchnittstelle, TeamAnsi
                 pauseCheckSec = zahl("pauseCheckSec"),
                 expiresAtMs = isoZuMs(json.optString("expiresAt", "")),
                 lageStand = if (json.has("lageStand") && !json.isNull("lageStand")) json.optString("lageStand") else null,
+                mitteilungStand = if (json.has("mitteilungStand") && !json.isNull("mitteilungStand")) json.optString("mitteilungStand") else null,
             )
         }
     }

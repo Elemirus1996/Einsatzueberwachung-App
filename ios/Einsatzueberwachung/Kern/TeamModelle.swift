@@ -15,6 +15,8 @@ struct SteuerAntwort: Decodable, Equatable, Sendable {
     var accepted: Int?
     /// Stand von /lage (Server ab 1.18.0, #79): ändert er sich, lädt die App im Hintergrund die Lage
     var lageStand: String?
+    /// Stand der EL-Mitteilungen (Server ab 1.18.0, #79): ändert er sich, holt die App /mitteilungen
+    var mitteilungStand: String?
 
     static let stop = SteuerAntwort(mode: .stop)
 }

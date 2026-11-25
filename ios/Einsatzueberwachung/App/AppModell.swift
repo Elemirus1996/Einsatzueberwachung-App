@@ -307,6 +307,11 @@ final class AppModell: ObservableObject {
             self?.elOrtung?.anwenden(SteuerAntwort(mode: modus), melden: false)
         }
         let betrieb = ELBetrieb(schnittstelle: client) { [weak self] in self?.elOrtung?.anwenden(.stop) }
+        // #79: Warnungen im Hintergrund als lokale Mitteilung, nur bei geändertem mitteilungStand
+        let abruf = ELMitteilungsAbruf(schnittstelle: client, einstellungen: .geraet) { [weak self] meldung in
+            self?.mitteiler.senden(meldung)
+        }
+        ortung.beiMitteilungStand = { stand in Task { await abruf.standGemeldet(stand) } }
         betrieb.nachAktion = { [weak ansicht] in await ansicht?.neuLaden() }
         ansicht.beiNotiz = { [weak betrieb] in await betrieb?.notizenLaden() }
         let karte = ELKartenAnsicht(schnittstelle: client)
@@ -440,7 +445,11 @@ final class AppModell: ObservableObject {
             schnittstelle: client, teamId: sitzung.teamId ?? sitzung.teamName,
             beiSteuerung: { [weak self] modus in self?.team?.anwenden(SteuerAntwort(mode: modus), melden: false) })
         team?.beiModuswechsel = { [weak self] _ in self?.teamAnsicht?.modusGeaendert() }
-        team?.beiLageStand = { [weak self] stand in self?.teamAnsicht?.lageStandGemeldet(stand) }
+        team?.beiLageStand = { [weak self] stand in
+            self?.teamAnsicht?.lageStandGemeldet(stand)
+            // Ruht die EL-Ortung (Team auf demselben Handy), im Takt des Teams nach EL-Mitteilungen fragen (#79)
+            if let el = self?.elOrtung, el.ruht { Task { await el.statusPruefen() } }
+        }
         teamAnsicht?.beiMeldungen = { [weak self] meldungen in
             meldungen.forEach { self?.mitteiler.senden($0) }
         }
