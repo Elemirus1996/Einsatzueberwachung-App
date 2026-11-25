@@ -300,7 +300,7 @@ protocol ELLageSchnittstelle: Sendable {
     func ereignisse() async throws -> AsyncThrowingStream<ELEreignis, Error>
 }
 
-struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle, ELKartenSchnittstelle, ELVermissteSchnittstelle,
+struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELMitteilungsSchnittstelle, ELAktionsSchnittstelle, ELKartenSchnittstelle, ELVermissteSchnittstelle,
                 ELVerlaengerSchnittstelle {
     let zugang: ELZugang
     var session: URLSession = .einsatz
@@ -328,6 +328,11 @@ struct ELClient: TeamSchnittstelle, ELLageSchnittstelle, ELAktionsSchnittstelle,
     func status() async throws -> SteuerAntwort { try await anfrage("status", methode: "GET", inhalt: nil) }
 
     func lage() async throws -> ELLage { try await anfrage("lage", methode: "GET", inhalt: nil) }
+
+    func mitteilungen(seit: String?) async throws -> ELMitteilungSeite {
+        let wert = seit?.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-")))
+        return try await anfrage(wert.map { "mitteilungen?seit=\($0)" } ?? "mitteilungen", methode: "GET", inhalt: nil)
+    }
 
     /// Ganze Erklärung zum Nachlesen bzw. bei neuer Version; 404 = keine hinterlegt
     func datenschutz() async throws -> Datenschutz? {

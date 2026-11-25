@@ -46,6 +46,17 @@ struct EinstellungenView: View {
                 } footer: {
                     Text("Für jede Art von Meldung einen eigenen Ton wählen.")
                 }
+                if modell.elSitzung != nil {
+                    Section {
+                        NavigationLink("Mitteilungen der Einsatzleitung") {
+                            ELMitteilungsEinstellungenView(einstellungen: .geraet)
+                        }
+                    } header: {
+                        Text("Einsatzleitung")
+                    } footer: {
+                        Text("Warnungen aufs gesperrte Handy, solange ein Einsatz läuft und du Einsatzleiter bist.")
+                    }
+                }
                 Section {
                     NavigationLink("Datenschutzerklärungen der Staffeln") {
                         DatenschutzListeView(erklaerungen: modell.datenschutz.alle())
@@ -108,5 +119,28 @@ struct TonEinstellungenView: View {
             }
             .pickerStyle(.navigationLink)
         }
+    }
+}
+
+/// Mitteilungen der Einsatzleitung im Hintergrund (#79): Hauptschalter und je Art an oder aus.
+struct ELMitteilungsEinstellungenView: View {
+    @ObservedObject var einstellungen: ELMitteilungsEinstellungen
+
+    var body: some View {
+        List {
+            Section {
+                Toggle("Mitteilungen im Hintergrund", isOn: Binding(get: { einstellungen.an }, set: { einstellungen.setzen(an: $0) }))
+            } footer: {
+                Text("Nur während eines laufenden Einsatzes und nur als Einsatzleiter: Die Ortung hält die App wach, ohne Push. Wird die App weggewischt, kommt nichts mehr an. Die Texte nennen nur das Team, keine Vermissten, Orte oder Funkinhalte.")
+            }
+            Section("Arten") {
+                ForEach(ELMitteilungsArt.allCases) { art in
+                    Toggle(art.titel, isOn: Binding(get: { einstellungen.ist(art) }, set: { einstellungen.setzen($0, fuer: art) }))
+                }
+            }
+            .disabled(!einstellungen.an)
+        }
+        .navigationTitle("Mitteilungen")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }

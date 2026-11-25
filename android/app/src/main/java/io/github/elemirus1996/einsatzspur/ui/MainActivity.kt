@@ -80,7 +80,9 @@ class MainActivity : ComponentActivity() {
                 if (packlisteOffen) {
                     PacklisteScreen(modell.packliste, zurueck = { packlisteOffen = false })
                 } else if (einstellungenOffen) {
-                    EinstellungenScreen(modell.heimat, modell.datenschutz.alle(), version(), modell.toene, zurueck = { einstellungenOffen = false })
+                    EinstellungenScreen(modell.heimat, modell.datenschutz.alle(), version(), modell.toene,
+                        elMitteilungen = modell.elMitteilungsEinstellungen.takeIf { elO != null },
+                        zurueck = { einstellungenOffen = false })
                 } else if (zeigtEL && personen != null) {
                     // Erst „Wer bin ich“, dann die Lage (APP_API EL Abschnitt 4a)
                     ELPersonWahlScreen(personen, waehlen = modell::elPersonWaehlen, abmelden = {

@@ -24,6 +24,7 @@
 		2CE2CBDF74B1E03F805333FA /* TeamSchnittstelle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 602266F6E27237F5A6F9575F /* TeamSchnittstelle.swift */; };
 		2D47A3B7AAAEEDEA83923B8C /* TeamLage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86F2569C9D22B3E5711A81F0 /* TeamLage.swift */; };
 		33BD011FFFB2004676673DF4 /* Polizeibericht.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41904EB8A29355D6E70E6533 /* Polizeibericht.swift */; };
+		3B93D3781ED24F87093FB33B /* ELMitteilungen.swift in Sources */ = {isa = PBXBuildFile; fileRef = C65F0E22F5240CCEEB30CF83 /* ELMitteilungen.swift */; };
 		4167F7A0E20AC5962CED7931 /* EinmalOrtung.swift in Sources */ = {isa = PBXBuildFile; fileRef = 474936C6E865656679546095 /* EinmalOrtung.swift */; };
 		47806CDB947BFF78B4392CF0 /* PositionsPuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = C5AB257A4D6CC10859BDCE63 /* PositionsPuffer.swift */; };
 		515B5D3C7DD9A320E1E7361A /* EinstellungenView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4796A57686D309891516479C /* EinstellungenView.swift */; };
@@ -49,6 +50,7 @@
 		AC8F19C87FD06F962F9B94B2 /* HeimatStaffelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4C49A3C66952DBE5E6E35822 /* HeimatStaffelTests.swift */; };
 		ADEE71A64E25479E44A3032D /* DatenschutzTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED9442063557DF280DFD2E03 /* DatenschutzTests.swift */; };
 		B6480D220EB7A44D359EADBB /* Packliste.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE6CD954D36A7DA1A88F846D /* Packliste.swift */; };
+		B67B986A34B79A6C561B5A8C /* ELMitteilungenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51B3AE94DC34A9775D730BC1 /* ELMitteilungenTests.swift */; };
 		BA767C7EFFB7828D27A626E8 /* DatenschutzView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C42FB1FE5908EF2CC4B7DAC /* DatenschutzView.swift */; };
 		BD7D0DFAF9AECC658D5161AE /* Toene.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9883296AA44A11FAC0AF28E /* Toene.swift */; };
 		BF3D49BB7ADFB0B1D6B7C8BD /* ELAnmeldungView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B3C11402C4425DA07624D1A /* ELAnmeldungView.swift */; };
@@ -92,6 +94,7 @@
 		4C49A3C66952DBE5E6E35822 /* HeimatStaffelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeimatStaffelTests.swift; sourceTree = "<group>"; };
 		4F0A7AD89F044AE8F49C5CA6 /* ELAbschlussView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELAbschlussView.swift; sourceTree = "<group>"; };
 		4F9D34CFE0FCDBCA194CC8C5 /* ELVermissteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELVermissteView.swift; sourceTree = "<group>"; };
+		51B3AE94DC34A9775D730BC1 /* ELMitteilungenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELMitteilungenTests.swift; sourceTree = "<group>"; };
 		56F9B9620977557546AA87ED /* ServerAdresse.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerAdresse.swift; sourceTree = "<group>"; };
 		575246DBD3CA52F8FBF0DC6E /* PacklisteView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacklisteView.swift; sourceTree = "<group>"; };
 		602266F6E27237F5A6F9575F /* TeamSchnittstelle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamSchnittstelle.swift; sourceTree = "<group>"; };
@@ -117,6 +120,7 @@
 		C56FDAA2EAEF3A795863104E /* PacklisteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PacklisteTests.swift; sourceTree = "<group>"; };
 		C59E8CF5D165989F439B72BD /* TeamAnmeldungView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TeamAnmeldungView.swift; sourceTree = "<group>"; };
 		C5AB257A4D6CC10859BDCE63 /* PositionsPuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PositionsPuffer.swift; sourceTree = "<group>"; };
+		C65F0E22F5240CCEEB30CF83 /* ELMitteilungen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELMitteilungen.swift; sourceTree = "<group>"; };
 		C68F35498C530D450622E54F /* ELEinsatzView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELEinsatzView.swift; sourceTree = "<group>"; };
 		CBC65D1BBDBDDD9EB7D870F8 /* ELStil.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ELStil.swift; sourceTree = "<group>"; };
 		D0A1C0F7850179783614D223 /* AppModell.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppModell.swift; sourceTree = "<group>"; };
@@ -178,6 +182,7 @@
 			isa = PBXGroup;
 			children = (
 				ED9442063557DF280DFD2E03 /* DatenschutzTests.swift */,
+				51B3AE94DC34A9775D730BC1 /* ELMitteilungenTests.swift */,
 				1B59E2709C134ABFF739D386 /* ELTests.swift */,
 				D2AC73FC5048EC687F22B01D /* ELVerlaengerungTests.swift */,
 				4C49A3C66952DBE5E6E35822 /* HeimatStaffelTests.swift */,
@@ -222,6 +227,7 @@
 				474936C6E865656679546095 /* EinmalOrtung.swift */,
 				C14AEB1CFCD5BFB520E66C48 /* ELAktionen.swift */,
 				F0208DBE8A1D6C6A176561A4 /* ELKarte.swift */,
+				C65F0E22F5240CCEEB30CF83 /* ELMitteilungen.swift */,
 				119EF115046BB0FA7AF52B80 /* ELSchnittstelle.swift */,
 				C1AF389F95017BA7F54F2DDF /* ELVerlaengerung.swift */,
 				4001B68B182590449211F7D6 /* ELVermisste.swift */,
@@ -365,6 +371,7 @@
 				A9DC701BEE2AD18A751D5621 /* ELFunkView.swift in Sources */,
 				1D4A891BC4480DB916DAA093 /* ELKarte.swift in Sources */,
 				73BA9307343CE5FBC967B675 /* ELKarteView.swift in Sources */,
+				3B93D3781ED24F87093FB33B /* ELMitteilungen.swift in Sources */,
 				854F0D772042C98639794051 /* ELPersonWahlView.swift in Sources */,
 				9624F08F2E148F47A2EE4D15 /* ELSchnittstelle.swift in Sources */,
 				2064ACE5E9E739227189057E /* ELStil.swift in Sources */,
@@ -404,6 +411,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				ADEE71A64E25479E44A3032D /* DatenschutzTests.swift in Sources */,
+				B67B986A34B79A6C561B5A8C /* ELMitteilungenTests.swift in Sources */,
 				5C4AFAE82FC962ADD873325B /* ELTests.swift in Sources */,
 				8E2266F5BED14D0B86E1087C /* ELVerlaengerungTests.swift in Sources */,
 				AC8F19C87FD06F962F9B94B2 /* HeimatStaffelTests.swift in Sources */,

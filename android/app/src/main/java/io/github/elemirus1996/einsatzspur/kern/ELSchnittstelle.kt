@@ -373,7 +373,7 @@ class ELClient(
     val zugang: ELZugang,
     private val transport: Transport = ::http,
     private val sse: SseTransport = ::sseOeffnen,
-) : TeamSchnittstelle, ELLageSchnittstelle, ELVerlaengerSchnittstelle, ELAktionsSchnittstelle, ELKartenSchnittstelle, ELVermissteSchnittstelle, ELEinsatzSchnittstelle {
+) : TeamSchnittstelle, ELLageSchnittstelle, ELMitteilungsSchnittstelle, ELVerlaengerSchnittstelle, ELAktionsSchnittstelle, ELKartenSchnittstelle, ELVermissteSchnittstelle, ELEinsatzSchnittstelle {
 
     val sitzung: ELSitzung get() = zugang.sitzung
 
@@ -396,6 +396,8 @@ class ELClient(
     override suspend fun status(): SteuerAntwort = TeamClient.steuerAntwort(anfrage("status", "GET", null))
 
     override suspend fun lage(): ELLage = ELLage.aus(anfrage("lage", "GET", null))
+    override suspend fun mitteilungen(seit: String?): ELMitteilungSeite = ELMitteilungSeite.aus(
+        anfrage(if (seit != null) "mitteilungen?seit=${java.net.URLEncoder.encode(seit, "UTF-8")}" else "mitteilungen", "GET", null))
     override suspend fun vermisste(): ELVermisste = ELVermisste.aus(anfrage("vermisste", "GET", null))
 
     override suspend fun vermissteSpeichern(id: String, profilId: String?, version: String?, felder: JSONObject): Pair<String, String> {

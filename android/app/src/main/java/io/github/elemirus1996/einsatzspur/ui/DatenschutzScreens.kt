@@ -136,6 +136,7 @@ fun EinstellungenScreen(
     erklaerungen: Map<String, Datenschutz>,
     version: String,
     toene: Toene,
+    elMitteilungen: io.github.elemirus1996.einsatzspur.kern.ELMitteilungsEinstellungen? = null,
     zurueck: () -> Unit,
 ) {
     val eintrag by heimat.eintrag.collectAsState()
@@ -178,6 +179,11 @@ fun EinstellungenScreen(
             TonEinstellungen(toene)
             HorizontalDivider()
 
+            elMitteilungen?.let {
+                ElMitteilungsEinstellungen(it)
+                HorizontalDivider()
+            }
+
             Text("Datenschutzerklärungen der Staffeln", style = MaterialTheme.typography.titleMedium)
             if (erklaerungen.isEmpty()) {
                 Text("Noch keine. Die Erklärung der Staffel erscheint bei der Anmeldung.",
@@ -205,6 +211,27 @@ fun EinstellungenScreen(
 }
 
 /** Ton je Art von Meldung (APP_API.md „Töne in den Apps“), wie iOS `TonEinstellungenView`. Stufe 2 nie „Aus“. */
+/** Mitteilungen der Einsatzleitung im Hintergrund (#79): Hauptschalter und je Art an oder aus. */
+@Composable
+private fun ElMitteilungsEinstellungen(einstellungen: io.github.elemirus1996.einsatzspur.kern.ELMitteilungsEinstellungen) {
+    val an by einstellungen.an.collectAsState()
+    val arten by einstellungen.arten.collectAsState()
+    Text("Mitteilungen der Einsatzleitung", style = MaterialTheme.typography.titleMedium)
+    Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        Text("Mitteilungen im Hintergrund", Modifier.weight(1f))
+        androidx.compose.material3.Switch(checked = an, onCheckedChange = einstellungen::setzenAn)
+    }
+    io.github.elemirus1996.einsatzspur.kern.ELMitteilungsArt.entries.forEach { art ->
+        Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Text(art.titel, Modifier.weight(1f), color = if (an) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+            androidx.compose.material3.Switch(checked = arten[art] ?: art.standard, enabled = an,
+                onCheckedChange = { einstellungen.setzen(it, art) })
+        }
+    }
+    Text("Nur während eines laufenden Einsatzes und nur als Einsatzleiter: Die Ortung hält die App wach, ohne Push. Wird die App weggewischt, kommt nichts mehr an. Die Texte nennen nur das Team, keine Vermissten, Orte oder Funkinhalte.",
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
 @Composable
 private fun TonEinstellungen(toene: Toene) {
     val wahl by toene.wahl.collectAsState()

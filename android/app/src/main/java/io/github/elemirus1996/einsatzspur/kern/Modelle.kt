@@ -25,6 +25,8 @@ data class SteuerAntwort(
     val expiresAtMs: Long? = null,
     /** Stand von /lage (Server ab 1.18.0, #79): ändert er sich, lädt die App im Hintergrund die Lage. */
     val lageStand: String? = null,
+    /** Stand der EL-Mitteilungen (Server ab 1.18.0, #79): ändert er sich, holt die App /mitteilungen. */
+    val mitteilungStand: String? = null,
 ) {
     companion object {
         val STOP = SteuerAntwort(Modus.STOP)

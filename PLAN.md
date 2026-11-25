@@ -247,12 +247,12 @@ Android:
 - [ ] Test auf echten Geräten (Navi-Apps, Ortung in der Pause)
 
 ### Phase 3b – Mitteilungen für die Einsatzleitung (entschieden 28.10.2026, Weg geändert 18.11.2026: lokal statt Push, #79)
-- [ ] Jeder EL stellt **in der App selbst** ein, welche Mitteilungen er bekommt (z. B. Zeitwarnung Team, Funkstille Handy/Halsband, Hund außerhalb des Gebiets, neuer Funkspruch, Einsatzende) – alles einzeln abschaltbar, Standard: nur kritische Warnungen
-- [ ] EL-Modus mit Hintergrund-Ortung während des laufenden Einsatzes: hält die App wach, Position der Einsatzleitung auf der Karte
-- [ ] Server liefert Warnzentrum-Ereignisse und Funk in der Antwort auf die Positionsmeldung bzw. über die Live-Verbindung; die App zeigt sie als lokale Mitteilung. Texte knapp, ohne Namen von Vermissten oder Ortsangaben
+- [x] Jeder EL stellt **in der App selbst** ein, welche Mitteilungen er bekommt (z. B. Zeitwarnung Team, Funkstille Handy/Halsband, Hund außerhalb des Gebiets, neuer Funkspruch, Einsatzende) – alles einzeln abschaltbar, Standard: nur kritische Warnungen (umgesetzt 25.11.2026: Einstellungen → Mitteilungen der Einsatzleitung, 9 Arten inkl. Fund und Akku, Standard an: Zeitwarnung Stufe 2, Funkstille, Gebiet, Fund; Gerätetest offen)
+- [x] EL-Modus mit Hintergrund-Ortung während des laufenden Einsatzes: hält die App wach, Position der Einsatzleitung auf der Karte (nur Rolle Einsatzleiter, `mode = track`; Führungsassistent und Nur lesen nicht, Paul 18.11.2026)
+- [x] Server liefert Warnzentrum-Ereignisse und Funk in der Antwort auf die Positionsmeldung bzw. über die Live-Verbindung; die App zeigt sie als lokale Mitteilung. Texte knapp, ohne Namen von Vermissten oder Ortsangaben (Server #223: `mitteilungStand` in /status und /positions, `GET /mitteilungen?seit=`; Freitext-Statusmeldungen nur als „neue Statusmeldung“)
 - ~~Server: Geräte-Registrierung je EL-Gerät, Versand per Push; stille Push zum Aufwecken der EL-Ortung~~ – verworfen 18.11.2026 (#79)
 - ~~iOS über Apple (APNs), Android über Google (Firebase Cloud Messaging)~~ – verworfen (Android: 01.11.2026, iOS: 18.11.2026)
-- [ ] Mitteilungen nur, solange ein Einsatz läuft; Abmelden in der App entfernt die Registrierung
+- [x] Mitteilungen nur, solange ein Einsatz läuft (Server sammelt nur dann; ohne Push gibt es keine Registrierung)
 
 ### Phase 3c – Ideen aus der Übergabe (15.11.2026)
 - [x] 6.2 Bericht teilen: nach dem Beenden „Bericht öffnen“ (iOS Vorschau mit Teilen, Android Öffnen/Teilen), Server `GET /einsatz/bericht/{archivId}` (Server #187)
